@@ -198,7 +198,8 @@ elif mode == "📚 商品情報DB検索":
 
     # 表示列選択
     view_cols = ["jan", "担当者", "状態", "ブランド", "商品名", "仕入価格", "ケース入数", "重量", "発注済"]
-    st.dataframe(df[view_cols].sort_values(by="jan"))
+    available_cols = [col for col in view_cols if col in df.columns]
+    st.dataframe(df[available_cols].sort_values(by="jan"))
 
     # CSVダウンロード
     if not df.empty:
