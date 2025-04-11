@@ -141,10 +141,10 @@ elif mode == "📚 商品情報DB検索":
                     else:
                         clean_row[k] = v
 
-                
+                res = requests.post(
                     f"{SUPABASE_URL}/rest/v1/item_master?on_conflict=jan",
                     headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
-                    json=payload
+                    json=clean_row
                 )
                 st.write(f"📤 POST {payload['jan']} → {res.status_code}: {res.text}")
             st.success("✅ item_master にアップロード完了")
