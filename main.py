@@ -197,16 +197,12 @@ elif mode == "📚 商品情報DB検索":
         df = df[df["発注済"] != 0]
 
     # 表示列選択
-    view_cols = ["jan", "担当者", "状態", "ブランド", "商品名", "仕入価格", "ケース入数", "重量", "発注済"]
-    available_cols = [col for col in view_cols if col in df.columns]
-    st.dataframe(df[available_cols].sort_values(by="jan"))
-
-    # CSVダウンロード
-    if not df.empty:
-        csv = df[view_cols].to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            label="📥 CSVダウンロード",
-            data=csv,
-            file_name="item_master_search.csv",
-            mime="text/csv"
-        )
+view_cols = ["jan", "担当者", "状態", "ブランド", "商品名", "仕入価格", "ケース入数", "重量", "発注済"]
+available_cols = [col for col in view_cols if col in df.columns]
+csv = df[available_cols].to_csv(index=False).encode("utf-8-sig")
+st.download_button(
+    label="📥 CSVダウンロード",
+    data=csv,
+    file_name="item_master_search.csv",
+    mime="text/csv"
+)
