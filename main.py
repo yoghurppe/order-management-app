@@ -129,13 +129,19 @@ elif mode == "📚 商品情報DB検索":
             df_upload = df_upload.drop_duplicates(subset="jan", keep="last")
             st.write("🧾 アップロード内容プレビュー", df_upload.head())
             for _, row in df_upload.iterrows():
-                if "入数" in row:
-                    row["入数"] = int(float(row["入数"])) if pd.notnull(row["入数"]) else 0
+                clean_row = {}
+                for k, v in row.items():
+                    if pd.isnull(v):
+                        clean_row[k] = None
+                    elif k == "入数":
+                        try:
+                            clean_row[k] = int(float(v))
+                        except:
+                            clean_row[k] = 0
+                    else:
+                        clean_row[k] = v
 
-                payload = row.where(pd.notnull(row), None).to_dict()
-                if "入数" in payload and isinstance(payload["入数"], str):
-                    payload["入数"] = int(float(payload["入数"]))
-                res = requests.post(
+                
                     f"{SUPABASE_URL}/rest/v1/item_master?on_conflict=jan",
                     headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
                     json=payload
