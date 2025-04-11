@@ -122,9 +122,10 @@ elif mode == "📚 商品情報DB検索":
             df_upload.columns = df_upload.columns.str.strip().str.lower()
             df_upload["jan"] = df_upload["jan"].astype(str).str.strip()
 
-            # 入数を整数型に変換（小数→整数への安全変換）
-            if "入数" in df_upload.columns:
-                df_upload["入数"] = pd.to_numeric(df_upload["入数"], errors="coerce").fillna(0).astype(int)
+            # 入数カラムを安全に整数化（文字列・小数 → 整数）
+            for col in df_upload.columns:
+                if col == "入数":
+                    df_upload[col] = pd.to_numeric(df_upload[col], errors="coerce").fillna(0).astype(int)
 
             df_upload = df_upload.drop_duplicates(subset="jan", keep="last")
             st.write("🧾 アップロード内容プレビュー", df_upload.head())
