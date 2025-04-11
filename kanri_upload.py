@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 
-# Supabase接続情報
-SUPABASE_URL = "https://hyndhledwvknysnzrfta.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+# secrets.toml から安全に取得
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(page_title="発注管理：CSVアップロード", layout="wide")
