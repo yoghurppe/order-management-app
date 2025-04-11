@@ -116,7 +116,7 @@ elif mode == "📚 商品情報DB検索":
     st.subheader("📤 item_master テーブルへCSVアップロード")
     file = st.file_uploader("CSVファイルをアップロード", type="csv", key="item_master_upload")
 
-    if file:
+   if file:
         try:
             df_upload = pd.read_csv(file)
             df_upload.columns = df_upload.columns.str.strip().str.lower()
@@ -124,7 +124,7 @@ elif mode == "📚 商品情報DB検索":
 
             # 入数を整数型に変換（小数→整数への安全変換）
             if "入数" in df_upload.columns:
-                df_upload["入数"] = df_upload["入数"].fillna(0).astype(float).astype(int)
+                df_upload["入数"] = pd.to_numeric(df_upload["入数"], errors="coerce").fillna(0).astype(int)
 
             df_upload = df_upload.drop_duplicates(subset="jan", keep="last")
             st.write("🧾 アップロード内容プレビュー", df_upload.head())
@@ -132,7 +132,7 @@ elif mode == "📚 商品情報DB検索":
                 payload = row.where(pd.notnull(row), None).to_dict()
                 res = requests.post(
                     f"{SUPABASE_URL}/rest/v1/item_master?on_conflict=jan",
-                    headers=HEADERS,
+                    headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
                     json=payload
                 )
                 st.write(f"📤 POST {payload['jan']} → {res.status_code}: {res.text}")
