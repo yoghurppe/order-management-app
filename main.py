@@ -30,7 +30,6 @@ if mode == "📚 商品情報DB検索":
             df_upload.columns = df_upload.columns.str.strip().str.lower()
             df_upload["jan"] = df_upload["jan"].astype(str).str.strip()
             df_upload = df_upload.drop_duplicates(subset="jan", keep="last")
-            
             for _, row in df_upload.iterrows():
                 requests.post(
                     f"{SUPABASE_URL}/rest/v1/item_master?on_conflict=jan",
