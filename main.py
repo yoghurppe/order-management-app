@@ -121,6 +121,11 @@ elif mode == "📚 商品情報DB検索":
             df_upload = pd.read_csv(file)
             df_upload.columns = df_upload.columns.str.strip().str.lower()
             df_upload["jan"] = df_upload["jan"].astype(str).str.strip()
+
+            # 入数を整数型に変換（小数→整数への安全変換）
+            if "入数" in df_upload.columns:
+                df_upload["入数"] = df_upload["入数"].fillna(0).astype(float).astype(int)
+
             df_upload = df_upload.drop_duplicates(subset="jan", keep="last")
             st.write("🧾 アップロード内容プレビュー", df_upload.head())
             for _, row in df_upload.iterrows():
