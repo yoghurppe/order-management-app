@@ -64,6 +64,11 @@ elif mode == "📦 発注判定":
         st.warning("商品マスターまたは販売実績が不足しています。アップロードしてください。")
         st.stop()
 
+    # ✅ JANコードの型を揃える処理は結合の【前】に入れる！
+    df_products["jan"] = df_products["jan"].astype(str).str.strip()
+    df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
+    
+    # 結合（ここで初めてjoinされる）
     df = pd.merge(df_products, df_sales, on="jan", how="inner")
 
     def calculate_recommended_order(row):
