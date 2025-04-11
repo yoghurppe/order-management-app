@@ -17,8 +17,44 @@ st.title("📦 発注管理システム（統合版）")
 # --- モード切り替え ---
 mode = st.sidebar.radio("操作を選択", ["📤 CSVアップロード", "📦 発注判定", "📚 商品情報DB検索"])
 
+# --- CSVアップロードモード ---
+if mode == "📤 CSVアップロード":
+    st.header("🧾 商品マスター（products）")
+    file1 = st.file_uploader("CSVファイルをアップロード", type="csv", key="upload1")
+    if file1 is not None:
+        try:
+            df = pd.read_csv(file1)
+            df["jan"] = df["jan"].astype(str).str.strip()
+            df = df.drop_duplicates(subset="jan", keep="last")
+            for _, row in df.iterrows():
+                requests.post(
+                    f"{SUPABASE_URL}/rest/v1/products?on_conflict=jan",
+                    headers=HEADERS,
+                    json=row.where(pd.notnull(row), None).to_dict()
+                )
+            st.success("✅ 商品マスターを Supabase に保存しました")
+        except Exception as e:
+            st.error(f"❌ 商品マスターCSVの読み込み中にエラー: {e}")
+
+    st.header("📈 販売実績（sales）")
+    file2 = st.file_uploader("CSVファイルをアップロード", type="csv", key="upload2")
+    if file2 is not None:
+        try:
+            df = pd.read_csv(file2)
+            df["jan"] = df["jan"].astype(str).str.strip()
+            df = df.drop_duplicates(subset="jan", keep="last")
+            for _, row in df.iterrows():
+                requests.post(
+                    f"{SUPABASE_URL}/rest/v1/sales?on_conflict=jan",
+                    headers=HEADERS,
+                    json=row.where(pd.notnull(row), None).to_dict()
+                )
+            st.success("✅ 販売実績を Supabase に保存しました")
+        except Exception as e:
+            st.error(f"❌ 販売実績CSVの読み込み中にエラー: {e}")
+
 # --- 発注判定モード ---
-if mode == "📦 発注判定":
+elif mode == "📦 発注判定":
     st.header("📦 発注対象商品リスト")
 
     def fetch_table(table_name):
