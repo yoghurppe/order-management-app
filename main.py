@@ -133,6 +133,8 @@ elif mode == "📚 商品情報DB検索":
                     row["入数"] = int(float(row["入数"])) if pd.notnull(row["入数"]) else 0
 
                 payload = row.where(pd.notnull(row), None).to_dict()
+                if "入数" in payload and isinstance(payload["入数"], str):
+                    payload["入数"] = int(float(payload["入数"]))
                 res = requests.post(
                     f"{SUPABASE_URL}/rest/v1/item_master?on_conflict=jan",
                     headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
