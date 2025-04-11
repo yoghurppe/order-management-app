@@ -1,35 +1,39 @@
 import streamlit as st
 import pandas as pd
-from supabase import create_client, Client
+import requests
 
-# secrets.toml から安全に取得
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json"
+}
 
-st.set_page_config(page_title="発注管理：CSVアップロード", layout="wide")
-st.title("📤 Supabase 連携：CSVアップロード")
+st.title("📤 Supabase API連携：CSVアップロード")
 
 # 商品マスターアップロード
 st.header("🧾 商品マスター（products）")
-file1 = st.file_uploader("CSVファイルをアップロード", type="csv", key="upload1")
+file1 = st.file_uploader("CSVファイルをアップロード", type="csv")
 if file1:
     df = pd.read_csv(file1)
-    try:
-        data = df.to_dict(orient="records")
-        supabase.table("products").insert(data).execute()
-        st.success("✅ 商品マスターを Supabase に保存しました")
-    except Exception as e:
-        st.error(f"❌ エラー発生: {e}")
+    for _, row in df.iterrows():
+        response = requests.post(
+            f"{SUPABASE_URL}/rest/v1/products",
+            headers=HEADERS,
+            json=row.to_dict()
+        )
+    st.success("✅ 商品マスターを Supabase に保存しました")
 
 # 販売実績アップロード
 st.header("📈 販売実績（sales）")
 file2 = st.file_uploader("CSVファイルをアップロード", type="csv", key="upload2")
 if file2:
     df = pd.read_csv(file2)
-    try:
-        data = df.to_dict(orient="records")
-        supabase.table("sales").insert(data).execute()
-        st.success("✅ 販売実績を Supabase に保存しました")
-    except Exception as e:
-        st.error(f"❌ エラー発生: {e}")
+    for _, row in df.iterrows():
+        response = requests.post(
+            f"{SUPABASE_URL}/rest/v1/sales",
+            headers=HEADERS,
+            json=row.to_dict()
+        )
+    st.success("✅ 販売実績を Supabase に保存しました")
