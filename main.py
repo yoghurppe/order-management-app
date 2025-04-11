@@ -18,30 +18,28 @@ st.title("📦 発注管理システム（統合版）")
 mode = st.sidebar.radio("操作を選択", ["📤 CSVアップロード", "📦 発注判定"])
 
 # --- CSVアップロードモード ---
-if mode == "📤 CSVアップロード":
-    st.header("🧾 商品マスター（products）")
-    file1 = st.file_uploader("CSVファイルをアップロード", type="csv", key="upload1")
-    if file1:
-        df = pd.read_csv(file1)
-        for _, row in df.iterrows():
-            requests.post(
-                f"{SUPABASE_URL}/rest/v1/products",
-                headers=HEADERS,
-                json=row.to_dict()
-            )
-        st.success("✅ 商品マスターを Supabase に保存しました")
+# 商品マスターアップロード時の処理
+if file1:
+    df = pd.read_csv(file1)
+    for _, row in df.iterrows():
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/products?on_conflict=jan",  # ←ここがポイント！
+            headers=HEADERS,
+            json=row.to_dict()
+        )
+    st.success("✅ 商品マスターを Supabase に保存しました")
 
     st.header("📈 販売実績（sales）")
     file2 = st.file_uploader("CSVファイルをアップロード", type="csv", key="upload2")
-    if file2:
-        df = pd.read_csv(file2)
-        for _, row in df.iterrows():
-            requests.post(
-                f"{SUPABASE_URL}/rest/v1/sales",
-                headers=HEADERS,
-                json=row.to_dict()
-            )
-        st.success("✅ 販売実績を Supabase に保存しました")
+if file2:
+    df = pd.read_csv(file2)
+    for _, row in df.iterrows():
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/sales?on_conflict=jan",  # ←ここも同様！
+            headers=HEADERS,
+            json=row.to_dict()
+        )
+    st.success("✅ 販売実績を Supabase に保存しました")
 
 # --- 発注判定モード ---
 elif mode == "📦 発注判定":
