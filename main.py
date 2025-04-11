@@ -116,7 +116,7 @@ elif mode == "📚 商品情報DB検索":
     st.subheader("📤 item_master テーブルへCSVアップロード")
     file = st.file_uploader("CSVファイルをアップロード", type="csv", key="item_master_upload")
 
-   if file:
+    if file:
         try:
             df_upload = pd.read_csv(file)
             df_upload.columns = df_upload.columns.str.strip().str.lower()
@@ -139,6 +139,7 @@ elif mode == "📚 商品情報DB検索":
             st.success("✅ item_master にアップロード完了")
         except Exception as e:
             st.error(f"❌ アップロード失敗: {e}")
+
 
     def fetch_table(table_name):
         url = f"{SUPABASE_URL}/rest/v1/item_master?select=*"
