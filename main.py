@@ -167,13 +167,10 @@ elif mode == "📚 商品情報DB検索":
         except Exception as e:
             st.error(f"❌ アップロード失敗: {e}")
 
-    # Supabaseからitem_masterを取得して表示（常時表示）
-    df_master = fetch_table("item_master")
-    if not df_master.empty:
-        st.subheader("📦 item_master一覧（DBから取得）")
-        view_cols = ["jan", "担当者", "状態", "ブランド", "商品名", "仕入価格", "ケース入数", "重量", "入数", "発注済"]
-        available_cols = [col for col in view_cols if col in df_master.columns]
-        st.dataframe(df_master[available_cols].sort_values(by="jan"))
-
-        except Exception as e:
-            st.error(f"❌ アップロード失敗: {e}")
+# Supabaseからitem_masterを取得して表示（常時表示）
+df_master = fetch_table("item_master")
+if not df_master.empty:
+    st.subheader("📦 item_master一覧（DBから取得）")
+    view_cols = ["jan", "担当者", "状態", "ブランド", "商品名", "仕入価格", "ケース入数", "重量", "入数", "発注済"]
+    available_cols = [col for col in view_cols if col in df_master.columns]
+    st.dataframe(df_master[available_cols].sort_values(by="jan"))
