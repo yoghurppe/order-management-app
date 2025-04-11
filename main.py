@@ -24,6 +24,9 @@ if mode == "📤 CSVアップロード":
     if file1 is not None:
         try:
             df = pd.read_csv(file1)
+            df["jan"] = df["jan"].astype(str).str.strip()
+            # 重複削除してからアップロード
+            df = df.drop_duplicates(subset="jan", keep="last")
             for _, row in df.iterrows():
                 requests.post(
                     f"{SUPABASE_URL}/rest/v1/products?on_conflict=jan",
@@ -39,6 +42,8 @@ if mode == "📤 CSVアップロード":
     if file2 is not None:
         try:
             df = pd.read_csv(file2)
+            df["jan"] = df["jan"].astype(str).str.strip()
+            df = df.drop_duplicates(subset="jan", keep="last")
             for _, row in df.iterrows():
                 requests.post(
                     f"{SUPABASE_URL}/rest/v1/sales?on_conflict=jan",
@@ -70,11 +75,12 @@ elif mode == "📦 発注判定":
         st.warning("商品マスターまたは販売実績が不足しています。アップロードしてください。")
         st.stop()
 
-    # JANコードの型を揃える処理は結合の【前】に入れる！
     df_products["jan"] = df_products["jan"].astype(str).str.strip()
     df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
 
-    # 結合（ここで初めてjoinされる）
+    df_products = df_products.drop_duplicates(subset="jan", keep="last")
+    df_sales = df_sales.drop_duplicates(subset="jan", keep="last")
+
     df = pd.merge(df_products, df_sales, on="jan", how="inner")
 
     def calculate_recommended_order(row):
