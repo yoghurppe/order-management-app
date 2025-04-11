@@ -65,7 +65,6 @@ if mode == "📤 CSVアップロード":
 elif mode == "📦 発注判定":
     st.header("📦 発注対象商品リスト")
 
-    @st.cache_data
     def fetch_table(table_name):
         url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*"
         res = requests.get(url, headers=HEADERS)
