@@ -21,38 +21,45 @@ mode = st.sidebar.radio("操作を選択", ["📤 CSVアップロード", "📦 
 if mode == "📤 CSVアップロード":
     st.header("🧾 商品マスター（products）")
     file1 = st.file_uploader("CSVファイルをアップロード", type="csv", key="upload1")
-    if file1 is not None:
-        try:
-            df = pd.read_csv(file1)
-            df["jan"] = df["jan"].astype(str).str.strip()
-            # 重複削除してからアップロード
-            df = df.drop_duplicates(subset="jan", keep="last")
-            for _, row in df.iterrows():
-                requests.post(
-                    f"{SUPABASE_URL}/rest/v1/products?on_conflict=jan",
-                    headers=HEADERS,
-                    json=row.to_dict()
-                )
-            st.success("✅ 商品マスターを Supabase に保存しました")
-        except Exception as e:
-            st.error(f"❌ 商品マスターCSV読み込みエラー: {e}")
+    if file1:
+        if 'uploaded_file1' not in st.session_state:
+            try:
+                df = pd.read_csv(file1)
+                df["jan"] = df["jan"].astype(str).str.strip()
+                df = df.drop_duplicates(subset="jan", keep="last")
+                for _, row in df.iterrows():
+                    requests.post(
+                        f"{SUPABASE_URL}/rest/v1/products?on_conflict=jan",
+                        headers=HEADERS,
+                        json=row.to_dict()
+                    )
+                st.session_state.uploaded_file1 = True
+                st.success("✅ 商品マスターを Supabase に保存しました")
+            except Exception as e:
+                st.error(f"❌ 商品マスターCSV読み込みエラー: {e}")
+        else:
+            st.info("✅ 商品マスターはすでにアップロード済みです（再読み込みでリセット）")
 
     st.header("📈 販売実績（sales）")
     file2 = st.file_uploader("CSVファイルをアップロード", type="csv", key="upload2")
-    if file2 is not None:
-        try:
-            df = pd.read_csv(file2)
-            df["jan"] = df["jan"].astype(str).str.strip()
-            df = df.drop_duplicates(subset="jan", keep="last")
-            for _, row in df.iterrows():
-                requests.post(
-                    f"{SUPABASE_URL}/rest/v1/sales?on_conflict=jan",
-                    headers=HEADERS,
-                    json=row.to_dict()
-                )
-            st.success("✅ 販売実績を Supabase に保存しました")
-        except Exception as e:
-            st.error(f"❌ 販売実績CSV読み込みエラー: {e}")
+    if file2:
+        if 'uploaded_file2' not in st.session_state:
+            try:
+                df = pd.read_csv(file2)
+                df["jan"] = df["jan"].astype(str).str.strip()
+                df = df.drop_duplicates(subset="jan", keep="last")
+                for _, row in df.iterrows():
+                    requests.post(
+                        f"{SUPABASE_URL}/rest/v1/sales?on_conflict=jan",
+                        headers=HEADERS,
+                        json=row.to_dict()
+                    )
+                st.session_state.uploaded_file2 = True
+                st.success("✅ 販売実績を Supabase に保存しました")
+            except Exception as e:
+                st.error(f"❌ 販売実績CSV読み込みエラー: {e}")
+        else:
+            st.info("✅ 販売実績はすでにアップロード済みです（再読み込みでリセット）")
 
 # --- 発注判定モード ---
 elif mode == "📦 発注判定":
