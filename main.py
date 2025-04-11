@@ -18,28 +18,36 @@ st.title("📦 発注管理システム（統合版）")
 mode = st.sidebar.radio("操作を選択", ["📤 CSVアップロード", "📦 発注判定"])
 
 # --- CSVアップロードモード ---
-# 商品マスターアップロード時の処理
-if file1:
-    df = pd.read_csv(file1)
-    for _, row in df.iterrows():
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/products?on_conflict=jan",  # ←ここがポイント！
-            headers=HEADERS,
-            json=row.to_dict()
-        )
-    st.success("✅ 商品マスターを Supabase に保存しました")
+if mode == "📤 CSVアップロード":
+    st.header("🧾 商品マスター（products）")
+    file1 = st.file_uploader("CSVファイルをアップロード", type="csv", key="upload1")
+    if file1 is not None:
+        try:
+            df = pd.read_csv(file1)
+            for _, row in df.iterrows():
+                requests.post(
+                    f"{SUPABASE_URL}/rest/v1/products?on_conflict=jan",
+                    headers=HEADERS,
+                    json=row.to_dict()
+                )
+            st.success("✅ 商品マスターを Supabase に保存しました")
+        except Exception as e:
+            st.error(f"❌ 商品マスターCSV読み込みエラー: {e}")
 
     st.header("📈 販売実績（sales）")
     file2 = st.file_uploader("CSVファイルをアップロード", type="csv", key="upload2")
-if file2:
-    df = pd.read_csv(file2)
-    for _, row in df.iterrows():
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/sales?on_conflict=jan",  # ←ここも同様！
-            headers=HEADERS,
-            json=row.to_dict()
-        )
-    st.success("✅ 販売実績を Supabase に保存しました")
+    if file2 is not None:
+        try:
+            df = pd.read_csv(file2)
+            for _, row in df.iterrows():
+                requests.post(
+                    f"{SUPABASE_URL}/rest/v1/sales?on_conflict=jan",
+                    headers=HEADERS,
+                    json=row.to_dict()
+                )
+            st.success("✅ 販売実績を Supabase に保存しました")
+        except Exception as e:
+            st.error(f"❌ 販売実績CSV読み込みエラー: {e}")
 
 # --- 発注判定モード ---
 elif mode == "📦 発注判定":
@@ -62,10 +70,10 @@ elif mode == "📦 発注判定":
         st.warning("商品マスターまたは販売実績が不足しています。アップロードしてください。")
         st.stop()
 
-    # ✅ JANコードの型を揃える処理は結合の【前】に入れる！
+    # JANコードの型を揃える処理は結合の【前】に入れる！
     df_products["jan"] = df_products["jan"].astype(str).str.strip()
     df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
-    
+
     # 結合（ここで初めてjoinされる）
     df = pd.merge(df_products, df_sales, on="jan", how="inner")
 
