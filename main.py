@@ -116,6 +116,16 @@ elif mode == "📚 商品情報DB検索":
     st.subheader("📤 item_master テーブルへCSVアップロード")
     file = st.file_uploader("CSVファイルをアップロード", type="csv", key="item_master_upload")
 
+@st.cache_data
+def fetch_table(table_name):
+    url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*"
+    res = requests.get(url, headers=HEADERS)
+    if res.status_code == 200:
+        return pd.DataFrame(res.json())
+    else:
+        st.error(f"{table_name} の取得に失敗しました: {res.text}")
+        return pd.DataFrame()
+
     if file:
         try:
             df_upload = pd.read_csv(file)
@@ -174,3 +184,4 @@ if not df_master.empty:
     view_cols = ["jan", "担当者", "状態", "ブランド", "商品名", "仕入価格", "ケース入数", "重量", "入数", "発注済"]
     available_cols = [col for col in view_cols if col in df_master.columns]
     st.dataframe(df_master[available_cols].sort_values(by="jan"))
+
