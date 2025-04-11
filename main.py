@@ -76,14 +76,6 @@ elif mode == "📦 発注判定":
 
     df_products = fetch_table("products")
     df_sales = fetch_table("sales")
-
-    # デバッグ出力追加（発注判定モード内）
-    st.write("✅ df_products 件数:", len(df_products))
-    st.write("✅ df_sales 件数:", len(df_sales))
-    st.write("✅ df_products.columns:", df_products.columns.tolist())
-    st.write("✅ df_sales.columns:", df_sales.columns.tolist())
-    st.write("✅ df_sales サンプル:", df_sales.head())
-
     
     if df_products.empty or df_sales.empty:
         st.warning("商品マスターまたは販売実績が不足しています。アップロードしてください。")
