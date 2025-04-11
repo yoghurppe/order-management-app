@@ -124,14 +124,7 @@ elif mode == "📚 商品情報DB検索":
 
             # 入数カラムを安全に整数化（文字列・小数 → 整数）
             if "入数" in df_upload.columns:
-                df_upload["入数"] = (
-                    df_upload["入数"]
-                    .apply(lambda x: str(x).replace('.0', '') if str(x).endswith('.0') else x)
-                    .replace('', '0')
-                    .astype(float)
-                    .fillna(0)
-                    .astype(int)
-                )
+                df_upload["入数"] = pd.to_numeric(df_upload["入数"], errors="coerce").fillna(0).round().astype(int)
 
             df_upload = df_upload.drop_duplicates(subset="jan", keep="last")
             st.write("🧾 アップロード内容プレビュー", df_upload.head())
