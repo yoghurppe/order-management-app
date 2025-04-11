@@ -196,9 +196,14 @@ elif mode == "📚 商品情報DB検索":
     if 発注済_filter:
         df = df[df["発注済"] != 0]
 
-    # 表示列選択
+# 表示列選択
 view_cols = ["jan", "担当者", "状態", "ブランド", "商品名", "仕入価格", "ケース入数", "重量", "発注済"]
 available_cols = [col for col in view_cols if col in df.columns]
+
+st.subheader("📋 商品一覧")
+st.dataframe(df[available_cols].sort_values(by="jan"))
+
+# CSVダウンロード
 csv = df[available_cols].to_csv(index=False).encode("utf-8-sig")
 st.download_button(
     label="📥 CSVダウンロード",
