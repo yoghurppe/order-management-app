@@ -146,7 +146,7 @@ elif mode == "📚 商品情報DB検索":
                     headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
                     json=clean_row
                 )
-                st.write(f"📤 POST {payload['jan']} → {res.status_code}: {res.text}")
+                st.write(f"📤 POST {clean_row.get('jan')} → {res.status_code}: {res.text}")
             st.success("✅ item_master にアップロード完了")
         except Exception as e:
             st.error(f"❌ アップロード失敗: {e}")
