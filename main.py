@@ -13,8 +13,8 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-st.set_page_config(page_title="発注AI（納品タイミング考慮）", layout="wide")
-st.title("📦 発注AI（2週間後の在庫を基準）")
+st.set_page_config(page_title="発注AI（納品タイミング + 利用可能在庫）", layout="wide")
+st.title("📦 発注AI（利用可能在庫で判断）")
 
 mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定"])
 
@@ -80,7 +80,7 @@ if mode == "📤 CSVアップロード":
         batch_upload_csv_to_supabase(temp_path, "purchase_data")
 
 if mode == "📦 発注AI判定":
-    st.header("📦 発注AI（納品2週間後を基準）")
+    st.header("📦 発注AI（利用可能在庫ベース）")
 
     @st.cache_data(ttl=1)
     def fetch_table(table_name):
@@ -101,7 +101,7 @@ if mode == "📦 発注AI判定":
     df_purchase["jan"] = df_purchase["jan"].astype(str).str.strip()
 
     df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
-    df_sales["stock_total"] = pd.to_numeric(df_sales["stock_total"], errors="coerce").fillna(0).astype(int)
+    df_sales["stock_available"] = pd.to_numeric(df_sales["stock_available"], errors="coerce").fillna(0).astype(int)
     df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
     df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
@@ -109,18 +109,17 @@ if mode == "📦 発注AI判定":
     for _, row in df_sales.iterrows():
         jan = row["jan"]
         sold = row["quantity_sold"]
-        stock = row["stock_total"]
+        stock = row.get("stock_available", 0)
 
         expected_half_month_sales = sold * 0.5
         available_at_arrival = stock - expected_half_month_sales
         need_qty = max(sold - available_at_arrival, 0)
 
-        # 🔍 デバッグ表示
         st.write(f"JAN: {jan}")
         st.write(f"  今月販売見込: {sold}")
-        st.write(f"  現在在庫: {stock}")
-        st.write(f"  納品時の在庫見込: {available_at_arrival}")
-        st.write(f"  必要数: {need_qty}")
+        st.write(f"  利用可能在庫: {stock}")
+        st.write(f"  納品時在庫予測: {available_at_arrival}")
+        st.write(f"  必要発注数: {need_qty}")
 
         if need_qty <= 0:
             continue
@@ -162,6 +161,6 @@ if mode == "📦 発注AI判定":
         st.success(f"✅ 発注対象: {len(result_df)} 件")
         st.dataframe(result_df)
         csv = result_df.to_csv(index=False).encode("utf-8-sig")
-        st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_arrival_aware.csv", mime="text/csv")
+        st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
     else:
         st.info("現在、発注が必要な商品はありません。")
