@@ -16,6 +16,36 @@ HEADERS = {
 st.set_page_config(page_title="発注管理システム", layout="wide")
 st.title("📦 発注管理システム（統合版）")
 
+# --- バッチアップロード関数 ---
+def batch_upload_csv_to_supabase(file_path, table):
+    if not os.path.exists(file_path):
+        st.warning(f"❌ ファイルが見つかりません: {file_path}")
+        return
+    try:
+        df = pd.read_csv(file_path)
+
+        # sales テーブル用に列名を変換
+        if table == "sales":
+            rename_cols = {
+                "アイテム": "jan",
+                "販売数量": "quantity_sold",
+                "現在の手持数量": "stock_total",
+                "現在の利用可能数量": "stock_available"
+            }
+            df.rename(columns=rename_cols, inplace=True)
+
+        df["jan"] = df["jan"].astype(str).str.strip()
+        df = df.drop_duplicates(subset="jan", keep="last")
+        for _, row in df.iterrows():
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/{table}?on_conflict=jan",
+                headers=HEADERS,
+                json=row.where(pd.notnull(row), None).to_dict()
+            )
+        st.success(f"✅ {table} テーブルに {len(df)} 件をバッチアップロードしました")
+    except Exception as e:
+        st.error(f"❌ {table} のアップロード中にエラー: {e}")
+
 # --- モード切り替え ---
 mode = st.sidebar.radio("操作を選択", ["📦 発注＆アップロード", "📚 商品情報DB検索"])
 
@@ -47,36 +77,6 @@ if mode == "📦 発注＆アップロード":
             with open("temp_purchase.csv", "wb") as f:
                 f.write(file_purchase.getbuffer())
             batch_upload_csv_to_supabase("temp_purchase.csv", "purchase_data")
-
-# --- バッチアップロード関数 ---
-def batch_upload_csv_to_supabase(file_path, table):
-    if not os.path.exists(file_path):
-        st.warning(f"❌ ファイルが見つかりません: {file_path}")
-        return
-    try:
-        df = pd.read_csv(file_path)
-
-        # sales テーブル用に列名を変換
-        if table == "sales":
-            rename_cols = {
-                "アイテム": "jan",
-                "販売数量": "quantity_sold",
-                "現在の手持数量": "stock_total",
-                "現在の利用可能数量": "stock_available"
-            }
-            df.rename(columns=rename_cols, inplace=True)
-
-        df["jan"] = df["jan"].astype(str).str.strip()
-        df = df.drop_duplicates(subset="jan", keep="last")
-        for _, row in df.iterrows():
-            requests.post(
-                f"{SUPABASE_URL}/rest/v1/{table}?on_conflict=jan",
-                headers=HEADERS,
-                json=row.where(pd.notnull(row), None).to_dict()
-            )
-        st.success(f"✅ {table} テーブルに {len(df)} 件をバッチアップロードしました")
-    except Exception as e:
-        st.error(f"❌ {table} のアップロード中にエラー: {e}")
 
 # --- 最適な発注パターンと理由をAI的に提示する関数 ---
 def suggest_optimal_order(jan, need_qty, purchase_df):
