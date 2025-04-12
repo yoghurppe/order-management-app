@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import requests
+import os
+import json
 
 # Supabase設定
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -27,121 +29,65 @@ def fetch_table(table_name):
         st.error(f"{table_name} の取得に失敗しました: {res.text}")
         return pd.DataFrame()
 
-# --- 発注＆アップロードモード ---
-if mode == "📦 発注＆アップロード":
-    st.header("📤 CSVアップロード")
-    st.subheader("🧾 商品マスター（products）")
-    file1 = st.file_uploader("CSVファイルをアップロード", type="csv", key="upload1")
-    if file1 is not None:
-        try:
-            df = pd.read_csv(file1)
-            df["jan"] = df["jan"].astype(str).str.strip()
-            df = df.drop_duplicates(subset="jan", keep="last")
+# --- バッチアップロード関数 ---
+def batch_upload_csv_to_supabase(file_path, table):
+    if not os.path.exists(file_path):
+        st.warning(f"❌ ファイルが見つかりません: {file_path}")
+        return
+    try:
+        df = pd.read_csv(file_path)
+
+        # ロット階層データを処理（lot1, price1, lot2, price2...）から lot_levels を作成
+        if table == "products":
+            lot_cols = [col for col in df.columns if col.startswith("lot") and not col.endswith("price")]
+            lot_levels = []
             for _, row in df.iterrows():
-                requests.post(
-                    f"{SUPABASE_URL}/rest/v1/products?on_conflict=jan",
-                    headers=HEADERS,
-                    json=row.where(pd.notnull(row), None).to_dict()
-                )
-            st.success("✅ 商品マスターを Supabase に保存しました")
-        except Exception as e:
-            st.error(f"❌ 商品マスターCSVの読み込み中にエラー: {e}")
+                levels = []
+                for i in range(1, 6):  # 最大5段階まで対応
+                    lot_col = f"lot{i}"
+                    price_col = f"price{i}"
+                    if lot_col in df.columns and price_col in df.columns:
+                        lot = row.get(lot_col)
+                        price = row.get(price_col)
+                        if pd.notna(lot) and pd.notna(price):
+                            levels.append({"lot": int(lot), "price": float(price)})
+                row["lot_levels"] = json.dumps(levels, ensure_ascii=False)
+            df = df.drop(columns=[col for col in df.columns if col.startswith("lot") or col.startswith("price")], errors="ignore")
+        df["jan"] = df["jan"].astype(str).str.strip()
+        df = df.drop_duplicates(subset="jan", keep="last")
+        for _, row in df.iterrows():
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/{table}?on_conflict=jan",
+                headers=HEADERS,
+                json=row.where(pd.notnull(row), None).to_dict()
+            )
+        st.success(f"✅ {table} テーブルに {len(df)} 件をバッチアップロードしました")
+    except Exception as e:
+        st.error(f"❌ {table} のアップロード中にエラー: {e}")
 
-    st.subheader("📈 販売実績（sales）")
-    file2 = st.file_uploader("CSVファイルをアップロード", type="csv", key="upload2")
-    if file2 is not None:
-        try:
-            df = pd.read_csv(file2)
-            df["jan"] = df["jan"].astype(str).str.strip()
-            df = df.drop_duplicates(subset="jan", keep="last")
-            for _, row in df.iterrows():
-                requests.post(
-                    f"{SUPABASE_URL}/rest/v1/sales?on_conflict=jan",
-                    headers=HEADERS,
-                    json=row.where(pd.notnull(row), None).to_dict()
-                )
-            st.success("✅ 販売実績を Supabase に保存しました")
-        except Exception as e:
-            st.error(f"❌ 販売実績CSVの読み込み中にエラー: {e}")
-
-    st.header("📦 発注判定")
-    df_products = fetch_table("products")
-    df_sales = fetch_table("sales")
-
-    if df_products.empty or df_sales.empty:
-        st.warning("商品マスターまたは販売実績が不足しています。アップロードしてください。")
-        st.stop()
-
-    df_products["jan"] = df_products["jan"].astype(str).str.strip()
-    df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
-
-    df_products = df_products.drop_duplicates(subset="jan", keep="last")
-    df_sales = df_sales.drop_duplicates(subset="jan", keep="last")
-
-    df = pd.merge(df_products, df_sales, on="jan", how="inner")
-
-    def calculate_recommended_order(row):
-        if row["quantity_sold"] > 0:
-            lot = row.get("order_lot", 0)
-            if pd.isna(lot) or lot <= 0:
-                return 0
-            return ((row["quantity_sold"] // lot) + 1) * lot
-        return 0
-
-    df["推奨発注数"] = df.apply(calculate_recommended_order, axis=1)
-    df["発注必要"] = df["推奨発注数"] > 0
-
-    order_df = df[df["発注必要"] == True][[
-        "jan", "maker", "name", "quantity_sold", "order_lot", "推奨発注数"
-    ]]
-
-    st.subheader("📝 発注対象リスト")
-    st.dataframe(order_df)
-
-    if not order_df.empty:
-        csv = order_df.to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            label="📥 CSVダウンロード",
-            data=csv,
-            file_name="order_list.csv",
-            mime="text/csv"
-        )
-
-# --- 商品情報DB検索モード ---
-elif mode == "📚 商品情報DB検索":
-    st.header("📚 商品情報検索システム")
-
-    df_master = fetch_table("item_master")
-    if not df_master.empty:
-        st.subheader("🔍 商品情報検索フォーム")
-
-        jan_filter = st.text_input("JANコードで検索（部分一致）")
-        maker_filter = st.selectbox("担当者", options=[""] + sorted(df_master["担当者"].dropna().unique().tolist())) if "担当者" in df_master.columns else ""
-        status_filter = st.selectbox("状態", options=[""] + sorted(df_master["状態"].dropna().unique().tolist())) if "状態" in df_master.columns else ""
-        brand_filter = st.selectbox("ブランド", options=[""] + sorted(df_master["ブランド"].dropna().unique().tolist())) if "ブランド" in df_master.columns else ""
-        ordered_filter = st.checkbox("発注済以外のみ表示")
-
-        df_filtered = df_master.copy()
-        if jan_filter:
-            df_filtered = df_filtered[df_filtered["jan"].astype(str).str.contains(jan_filter)]
-        if maker_filter:
-            df_filtered = df_filtered[df_filtered["担当者"] == maker_filter]
-        if status_filter:
-            df_filtered = df_filtered[df_filtered["状態"] == status_filter]
-        if brand_filter:
-            df_filtered = df_filtered[df_filtered["ブランド"] == brand_filter]
-        if ordered_filter:
-            df_filtered = df_filtered[df_filtered["発注済"] == 0] if "発注済" in df_filtered.columns else df_filtered
-
-        st.subheader("📋 商品情報一覧（検索結果）")
-        view_cols = ["jan", "担当者", "状態", "ブランド", "商品名", "仕入価格", "ケース入数", "重量", "入数", "発注済"]
-        available_cols = [col for col in view_cols if col in df_filtered.columns]
-        st.dataframe(df_filtered[available_cols].sort_values(by="jan"))
-
-        csv = df_filtered[available_cols].to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            label="📥 絞り込み後CSVダウンロード",
-            data=csv,
-            file_name="item_master_filtered.csv",
-            mime="text/csv"
-        )
+# --- 最適な発注パターンと理由をAI的に提示する関数 ---
+def suggest_optimal_order(jan, need_qty, purchase_df):
+    purchase_df = purchase_df[purchase_df["jan"] == jan].copy()
+    if purchase_df.empty:
+        return None, "仕入候補が存在しません"
+    
+    best_plan = None
+    reason = ""
+    for _, row in purchase_df.iterrows():
+        lot = row["order_lot"]
+        price = row["price"]
+        supplier = row["supplier"]
+        if lot <= 0:
+            continue
+        units = -(-need_qty // lot)  # ceiling division
+        total_price = units * lot * price
+        if (best_plan is None) or (total_price < best_plan["total"]):
+            best_plan = {
+                "supplier": supplier,
+                "lot": lot,
+                "price": price,
+                "units": units,
+                "total": total_price
+            }
+            reason = f"発注数 {need_qty} に対して、{supplier} のロット {lot} で {units} セット注文 → 合計 {total_price:.0f}円 が最安です"
+    return best_plan, reason
