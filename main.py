@@ -117,6 +117,8 @@ if mode == "📦 発注AI判定":
         if need_qty <= 0:
             continue
 
+        MAX_MONTHS_OF_STOCK = 3
+
         options = df_purchase[df_purchase["jan"] == jan].copy()
         if options.empty:
             continue
@@ -134,6 +136,14 @@ if mode == "📦 発注AI判定":
 
             sets = math.ceil(need_qty / lot)
             qty = sets * lot
+
+            # 🔁 在庫回転率の考慮
+            max_qty = sold * MAX_MONTHS_OF_STOCK
+            if qty > max_qty:
+                sets = math.floor(max_qty / lot)
+                qty = sets * lot
+                if qty <= 0:
+                    continue
 
             if best_plan is None or price < best_plan["単価"]:
                 best_plan = {
