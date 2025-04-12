@@ -85,7 +85,7 @@ if mode == "📤 CSVアップロード":
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
                     if col == "order_lot":
                         df[col] = df[col].round().astype(int)  # ← ロット1を除外しないように修正
-            df["jan"] = df["jan"].astype(str).str.strip()
+            df["jan"] = df["jan"].apply(lambda x: str(int(float(x))) if pd.notna(x) else "").str.strip()
 
         return df
 
@@ -97,7 +97,7 @@ if mode == "📤 CSVアップロード":
             url = f"{SUPABASE_URL}/rest/v1/{table}?id=gt.0"
             requests.delete(url, headers=HEADERS)  # 初期化
 
-            df = df.drop_duplicates(subset=["jan", "supplier"] if "supplier" in df.columns else "jan", keep="last")
+            df = df.drop_duplicates(subset=["jan", "supplier", "order_lot"], keep="last")
 
             batch_size = 500
             for i in range(0, len(df), batch_size):
