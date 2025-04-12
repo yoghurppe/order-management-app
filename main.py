@@ -13,7 +13,7 @@ HEADERS = {
 }
 
 st.set_page_config(page_title="発注管理システム", layout="wide")
-st.title("📦 発注管理システム（単価優先）")
+st.title("📦 発注管理システム（単価優先・修正版）")
 
 mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定"])
 
@@ -79,7 +79,7 @@ if mode == "📤 CSVアップロード":
         batch_upload_csv_to_supabase(temp_path, "purchase_data")
 
 if mode == "📦 発注AI判定":
-    st.header("📦 発注対象商品AI判定（単価優先）")
+    st.header("📦 発注対象商品AI判定（単価優先・修正版）")
 
     import time
 
@@ -121,7 +121,10 @@ if mode == "📦 発注AI判定":
         if options.empty:
             continue
 
+        options["price"] = pd.to_numeric(options["price"], errors="coerce")
         options = options.sort_values(by="price", ascending=True)
+        st.write(f"🔎 候補一覧（JAN={jan}）", options[["supplier", "order_lot", "price"]])
+
         for _, opt in options.iterrows():
             lot = opt["order_lot"]
             price = opt["price"]
@@ -136,7 +139,7 @@ if mode == "📦 発注AI判定":
                 "単価": price,
                 "仕入先": supplier
             })
-            break  # 最安値の1件だけ採用
+            break
 
     if results:
         result_df = pd.DataFrame(results)
