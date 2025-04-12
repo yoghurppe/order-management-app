@@ -30,6 +30,7 @@ def batch_upload_csv_to_supabase(file_path, table):
                 "販売数量": "quantity_sold",
                 "現在の手持数量": "stock_total",
                 "現在の利用可能数量": "stock_available"
+                "現在の注文済数量": "stock_ordered"
             }
             df.rename(columns=rename_cols, inplace=True)
 
