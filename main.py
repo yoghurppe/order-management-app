@@ -117,64 +117,67 @@ if mode == "📦 発注AI判定":
         if need_qty <= 0:
             continue
 
-        # 変更箇所：在庫回転率に応じたスコア + 本来の必要数に近いロットを優先
-        MAX_MONTHS_OF_STOCK = 3
-        
-        options = df_purchase[df_purchase["jan"] == jan].copy()
-        if options.empty:
-            continue
-        
-        options["price"] = pd.to_numeric(options["price"], errors="coerce")
-        options = options.sort_values(by="price", ascending=True)
-        
-        best_plan = None
-        best_score = float("inf")
-        
-        # 本来の必要数を計算
-        expected_half_month_sales = sold * 0.5
-        available_at_arrival = max(0, stock - expected_half_month_sales)
-        need_qty = max(sold - available_at_arrival, 0)
-        
-        for _, opt in options.iterrows():
-            lot = opt["order_lot"]
-            price = opt["price"]
-            supplier = opt.get("supplier", "不明")
-            if pd.isna(lot) or pd.isna(price) or lot <= 0:
-                continue
-        
-            sets = math.ceil(need_qty / lot)
-            qty = sets * lot
-        
-            # 🔁 在庫回転率の考慮（最低1セットは維持）
-            max_qty = sold * MAX_MONTHS_OF_STOCK
-            if qty > max_qty:
-                sets = max(1, math.floor(max_qty / lot))
-                qty = sets * lot
-        
-            if qty <= 0:
-                continue
-        
-            total_cost = qty * price
-        
-            # 🧠 在庫回転率に応じたズレのペナルティ（必要数からのズレを評価）
-            penalty_ratio = MAX_MONTHS_OF_STOCK / max(sold, 1)
-            score = abs(qty - need_qty) * penalty_ratio + total_cost * 0.01
-        
-            if score < best_score:
-                best_score = score
-                best_plan = {
-                    "jan": jan,
-                    "販売実績": sold,
-                    "在庫": stock,
-                    "必要数（納品まで＋来月分）": qty,
-                    "理論必要数": need_qty,
-                    "単価": price,
-                    "総額": total_cost,
-                    "仕入先": supplier
-                }
-        
-        if best_plan:
-            results.append(best_plan)
+# 変更箇所：在庫回転率に応じたスコア + 本来の必要数に近いロットを優先
+MAX_MONTHS_OF_STOCK = 3
+
+options = df_purchase[df_purchase["jan"] == jan].copy()
+if options.empty:
+    continue
+
+options["price"] = pd.to_numeric(options["price"], errors="coerce")
+options = options.sort_values(by="price", ascending=True)
+
+best_plan = None
+best_score = float("inf")
+
+# 本来の必要数を計算
+expected_half_month_sales = sold * 0.5
+available_at_arrival = max(0, stock - expected_half_month_sales)
+need_qty = max(sold - available_at_arrival, 0)
+
+for _, opt in options.iterrows():
+    lot = opt["order_lot"]
+    price = opt["price"]
+    supplier = opt.get("supplier", "不明")
+    if pd.isna(lot) or pd.isna(price) or lot <= 0:
+        continue
+
+    sets = math.ceil(need_qty / lot)
+    qty = sets * lot
+
+    # 🔁 在庫回転率の考慮（最低1セットは維持）
+    max_qty = sold * MAX_MONTHS_OF_STOCK
+    if qty > max_qty:
+        if lot > max_qty:
+            continue  # 明らかに仕入れすぎ → 候補から除外
+        sets = max(1, math.floor(max_qty / lot))
+        qty = sets * lot
+
+    if qty <= 0:
+        continue
+
+    total_cost = qty * price
+
+    # 🧠 在庫回転率に応じたズレのペナルティ（必要数からのズレを評価）
+    penalty_ratio = MAX_MONTHS_OF_STOCK / max(sold, 1)
+    score = abs(qty - need_qty) * penalty_ratio + total_cost * 0.01
+
+    if score < best_score:
+        best_score = score
+        best_plan = {
+            "jan": jan,
+            "販売実績": sold,
+            "在庫": stock,
+            "必要数（納品まで＋来月分）": qty,
+            "理論必要数": need_qty,
+            "単価": price,
+            "総額": total_cost,
+            "仕入先": supplier
+        }
+
+if best_plan:
+    results.append(best_plan)
+
 
 
 # 以下省略（その他のコードは変更なし）
