@@ -119,8 +119,8 @@ if mode == "📦 発注AI判定":
             url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
             res = requests.get(url, headers=headers)
 
-        if res.status_code == 416:
-            break  # データ終端に到達
+            if res.status_code == 416:
+                break  # データ終端に到達
 
             if res.status_code not in [200, 206]:
                 st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
