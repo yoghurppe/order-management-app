@@ -108,11 +108,9 @@ if mode == "📦 発注AI判定":
     def fetch_table(table_name):
         headers = {
             **HEADERS,
-            "Range": "0-49999",
-            "Prefer": "count=exact",
-            "Range-Unit": "items"
+            "Prefer": "count=exact"
         }
-        res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*", headers=headers)
+        res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&limit=50000", headers=headers)
         if res.status_code in [200, 206]:
             df = pd.DataFrame(res.json())
             st.write(f"📦 {table_name} 件数: {len(df)}")
