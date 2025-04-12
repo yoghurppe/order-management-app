@@ -197,7 +197,10 @@ if mode == "📦 発注AI判定":
                 qty = sets * lot
 
             if qty <= 0:
-                continue
+                if lot <= max_qty:
+                    qty = lot  # 最低でも1ロットは発注する
+                else:
+                    continue
 
             total_cost = qty * price
 
