@@ -64,6 +64,56 @@ def batch_upload_csv_to_supabase(file_path, table):
 if mode == "📤 CSVアップロード":
     st.header("📤 CSVアップロード")
 
+    def preprocess_csv(df, table):
+        if table == "sales":
+            df.rename(columns={
+                "アイテム": "jan",
+                "販売数量": "quantity_sold",
+                "現在の手持数量": "stock_total",
+                "現在の利用可能数量": "stock_available",
+                "現在の注文済数量": "stock_ordered"
+            }, inplace=True)
+            for col in ["quantity_sold", "stock_total", "stock_available", "stock_ordered"]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+            df["jan"] = df["jan"].astype(str).str.strip()
+
+        if table == "purchase_data":
+            for col in ["order_lot", "price"]:
+                if col in df.columns:
+                    df[col] = df[col].astype(str).str.replace(",", "")
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+                    if col == "order_lot":
+                        df[col] = df[col].round().astype(int)  # ← ロット1を除外しないように修正
+            df["jan"] = df["jan"].astype(str).str.strip()
+
+        return df
+
+    def batch_upload_csv_to_supabase(file_path, table):
+        try:
+            df = pd.read_csv(file_path)
+            df = preprocess_csv(df, table)
+
+            url = f"{SUPABASE_URL}/rest/v1/{table}?id=gt.0"
+            requests.delete(url, headers=HEADERS)  # 初期化
+
+            df = df.drop_duplicates(subset=["jan", "supplier"] if "supplier" in df.columns else "jan", keep="last")
+
+            batch_size = 500
+            for i in range(0, len(df), batch_size):
+                batch = df.iloc[i:i+batch_size].where(pd.notnull(df.iloc[i:i+batch_size]), None).to_dict(orient="records")
+                res = requests.post(
+                    f"{SUPABASE_URL}/rest/v1/{table}",
+                    headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
+                    json=batch
+                )
+                if res.status_code not in [200, 201]:
+                    st.error(f"❌ バッチPOST失敗: {res.status_code} {res.text}")
+                    return
+            st.success(f"✅ {table} に {len(df)} 件アップロード完了")
+        except Exception as e:
+            st.error(f"❌ {table} のアップロード中にエラー: {e}")
+
     sales_file = st.file_uploader("🧾 sales.csv アップロード", type="csv")
     if sales_file:
         temp_path = "/tmp/sales.csv"
