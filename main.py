@@ -117,9 +117,8 @@ if mode == "📦 発注AI判定":
         if need_qty <= 0:
             continue
 
+# 変更箇所：在庫回転率に応じてズレのペナルティ係数を調整
         MAX_MONTHS_OF_STOCK = 3
-        weight_qty_diff = 1.0
-        weight_cost = 0.01
 
         options = df_purchase[df_purchase["jan"] == jan].copy()
         if options.empty:
@@ -151,7 +150,10 @@ if mode == "📦 発注AI判定":
                 continue
 
             total_cost = qty * price
-            score = abs(qty - need_qty) * weight_qty_diff + total_cost * weight_cost
+
+            # 🧠 在庫回転率に応じたズレのペナルティ
+            penalty_ratio = MAX_MONTHS_OF_STOCK / max(sold, 1)
+            score = total_cost + abs(qty - need_qty) * price * penalty_ratio
 
             if score < best_score:
                 best_score = score
