@@ -76,7 +76,7 @@ if mode == "📤 CSVアップロード":
             for col in ["quantity_sold", "stock_total", "stock_available", "stock_ordered"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
-            df["jan"] = df["jan"].astype(str).str.strip()
+            df["jan"] = df["jan"].apply(lambda x: str(int(float(x))) if pd.notna(x) else "").str.strip()
 
         if table == "purchase_data":
             for col in ["order_lot", "price"]:
