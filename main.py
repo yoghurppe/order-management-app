@@ -14,62 +14,77 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-st.set_page_config(page_title="📊 販売データ (sales) - 日付付き", layout="wide")
-st.title("📊 salesテーブル（date付き）での運用")
+st.set_page_config(page_title="📊 販売+仕入データ管理", layout="wide")
+st.title("📊 sales + purchase_data 管理 & 発注判定")
 
-mode = st.sidebar.radio("モードを選んでください", ["📤 販売データアップロード", "📦 発注AI判定（30日集計）"])
+mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定（30日集計）"])
 
 def delete_old_sales():
     cutoff = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
     res = requests.delete(f"{SUPABASE_URL}/rest/v1/sales?date=lt.{cutoff}", headers=HEADERS)
     st.write(f"🧹 30日より前のsalesデータ削除: {res.status_code}")
 
-def batch_upload_sales(file_path):
+def batch_upload(file_path, table):
     try:
         df = pd.read_csv(file_path)
 
-        df.rename(columns={
-            "アイテム": "jan",
-            "販売数量": "quantity_sold",
-            "現在の手持数量": "stock_total",
-            "現在の利用可能数量": "stock_available",
-            "現在の注文済数量": "stock_ordered"
-        }, inplace=True)
+        if table == "sales":
+            df.rename(columns={
+                "アイテム": "jan",
+                "販売数量": "quantity_sold",
+                "現在の手持数量": "stock_total",
+                "現在の利用可能数量": "stock_available",
+                "現在の注文済数量": "stock_ordered"
+            }, inplace=True)
+            for col in ["quantity_sold", "stock_total", "stock_available", "stock_ordered"]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+            df["jan"] = df["jan"].astype(str).str.strip()
+            df["date"] = pd.to_datetime("today").normalize()
+            delete_old_sales()
+            df = df.drop_duplicates(subset=["jan", "date"], keep="last")
 
-        for col in ["quantity_sold", "stock_total", "stock_available", "stock_ordered"]:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
-
-        df["jan"] = df["jan"].astype(str).str.strip()
-        df["date"] = pd.to_datetime("today").normalize()
-
-        delete_old_sales()
-
-        df = df.drop_duplicates(subset=["jan", "date"], keep="last")
+        elif table == "purchase_data":
+            for col in ["order_lot", "price"]:
+                if col in df.columns:
+                    df[col] = df[col].astype(str).str.replace(",", "")
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+                    if col == "order_lot":
+                        df[col] = df[col].round().astype(int)
+            df["jan"] = pd.to_numeric(df["jan"], errors="coerce").fillna(0).astype("int64").astype(str).str.strip()
+            df = df.drop_duplicates(subset=["jan", "supplier"], keep="last")
 
         batch_size = 500
         for i in range(0, len(df), batch_size):
             batch = df.iloc[i:i+batch_size].where(pd.notnull(df.iloc[i:i+batch_size]), None).to_dict(orient="records")
             res = requests.post(
-                f"{SUPABASE_URL}/rest/v1/sales",
+                f"{SUPABASE_URL}/rest/v1/{table}",
                 headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
                 json=batch
             )
             if res.status_code not in [200, 201]:
-                st.error(f"❌ アップロード失敗: {res.status_code} {res.text}")
+                st.error(f"❌ {table} アップロード失敗: {res.status_code} {res.text}")
                 return
-        st.success(f"✅ {len(df)} 件 sales にアップロード完了")
+        st.success(f"✅ {table} に {len(df)} 件アップロード完了")
     except Exception as e:
-        st.error(f"❌ アップロードエラー: {e}")
+        st.error(f"❌ {table} のアップロード中にエラー: {e}")
 
-if mode == "📤 販売データアップロード":
-    st.subheader("📤 毎日の販売CSVをアップロード（sales）")
-    uploaded = st.file_uploader("sales.csv アップロード", type="csv")
-    if uploaded:
-        tmp_path = "/tmp/sales_upload.csv"
-        with open(tmp_path, "wb") as f:
-            f.write(uploaded.read())
-        batch_upload_sales(tmp_path)
+if mode == "📤 CSVアップロード":
+    st.subheader("📤 販売データ (sales)")
+    uploaded_sales = st.file_uploader("sales.csv", type="csv", key="sales")
+    if uploaded_sales:
+        path = "/tmp/sales.csv"
+        with open(path, "wb") as f:
+            f.write(uploaded_sales.read())
+        batch_upload(path, "sales")
+
+    st.subheader("📤 仕入データ (purchase_data)")
+    uploaded_purchase = st.file_uploader("purchase_data.csv", type="csv", key="purchase")
+    if uploaded_purchase:
+        path = "/tmp/purchase_data.csv"
+        with open(path, "wb") as f:
+            f.write(uploaded_purchase.read())
+        batch_upload(path, "purchase_data")
 
 if mode == "📦 発注AI判定（30日集計）":
     st.header("📦 発注AI（salesテーブルから30日間の集計）")
