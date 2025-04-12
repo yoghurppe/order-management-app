@@ -49,7 +49,8 @@ def batch_upload_csv_to_supabase(file_path, table):
                     jan = row.get("jan")
                     if jan:
                         jan_encoded = urllib.parse.quote(str(jan))
-                        requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?jan=eq.{jan_encoded}", headers=HEADERS)
+                        res_del = requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?jan=eq.{jan_encoded}", headers=HEADERS)
+                        st.write(f"🗑 DELETE jan={jan}: {res_del.status_code}")
             else:
                 st.error(f"❌ テーブル初期化用の取得に失敗: {res.status_code} {res.text}")
                 return
@@ -76,7 +77,11 @@ def batch_upload_csv_to_supabase(file_path, table):
                     if jan and supplier:
                         jan_encoded = urllib.parse.quote(str(jan))
                         supplier_encoded = urllib.parse.quote(str(supplier))
-                        requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?jan=eq.{jan_encoded}&supplier=eq.{supplier_encoded}", headers=HEADERS)
+                        res_del = requests.delete(
+                            f"{SUPABASE_URL}/rest/v1/{table}?jan=eq.{jan_encoded}&supplier=eq.{supplier_encoded}",
+                            headers=HEADERS
+                        )
+                        st.write(f"🗑 DELETE jan={jan}, supplier={supplier}: {res_del.status_code}")
             else:
                 st.error(f"❌ テーブル初期化用の取得に失敗: {res.status_code} {res.text}")
                 return
