@@ -34,7 +34,7 @@ def batch_upload_csv_to_supabase(file_path, table):
             df.rename(columns=rename_cols, inplace=True)
 
         df["jan"] = df["jan"].astype(str).str.strip()
-        df = df.drop_duplicates(subset="jan", keep="last")
+        df = df.drop_duplicates(subset=["jan", "supplier"] if "supplier" in df.columns else "jan", keep="last")
 
         st.info(f"🔄 {table} に {len(df)} 件をアップロード中...")
         progress = st.progress(0)
@@ -44,7 +44,7 @@ def batch_upload_csv_to_supabase(file_path, table):
         for i in range(0, total, batch_size):
             batch = df.iloc[i:i+batch_size].where(pd.notnull(df.iloc[i:i+batch_size]), None).to_dict(orient="records")
             res = requests.post(
-                f"{SUPABASE_URL}/rest/v1/{table}?on_conflict=jan",
+                f"{SUPABASE_URL}/rest/v1/{table}",
                 headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
                 json=batch
             )
