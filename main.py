@@ -41,6 +41,7 @@ def batch_upload(file_path, table):
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
             df["jan"] = df["jan"].astype(str).str.strip()
             df["date"] = pd.to_datetime("today").normalize()
+            df["date"] = df["date"].dt.strftime('%Y-%m-%d')
             delete_old_sales()
             df = df.drop_duplicates(subset=["jan", "date"], keep="last")
 
