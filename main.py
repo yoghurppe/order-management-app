@@ -219,7 +219,7 @@ if mode == "📦 発注AI判定":
             if score < best_score:
                 best_score = score
                 best_plan = {
-                    "jan": jan,
+                    "ロット": lot,
                     "販売実績": sold,
                     "在庫": stock,
                     "必要数（納品まで＋来月分）": qty,
