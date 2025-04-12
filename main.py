@@ -35,18 +35,18 @@ if mode == "📦 発注＆アップロード":
     upload_col1, upload_col2 = st.columns(2)
 
     with upload_col1:
-        file_products = st.file_uploader("📦 products.csv をアップロード", type="csv")
-        if file_products:
-            with open("temp_products.csv", "wb") as f:
-                f.write(file_products.getbuffer())
-            batch_upload_csv_to_supabase("temp_products.csv", "products")
-
-    with upload_col2:
         file_sales = st.file_uploader("📈 sales.csv をアップロード", type="csv")
         if file_sales:
             with open("temp_sales.csv", "wb") as f:
                 f.write(file_sales.getbuffer())
             batch_upload_csv_to_supabase("temp_sales.csv", "sales")
+
+    with upload_col2:
+        file_purchase = st.file_uploader("🛒 purchase_data.csv をアップロード", type="csv")
+        if file_purchase:
+            with open("temp_purchase.csv", "wb") as f:
+                f.write(file_purchase.getbuffer())
+            batch_upload_csv_to_supabase("temp_purchase.csv", "purchase_data")
 
 # --- バッチアップロード関数 ---
 def batch_upload_csv_to_supabase(file_path, table):
@@ -65,22 +65,6 @@ def batch_upload_csv_to_supabase(file_path, table):
                 "現在の利用可能数量": "stock_available"
             }
             df.rename(columns=rename_cols, inplace=True)
-
-        # ロット階層データを処理（lot1, price1, lot2, price2...）から lot_levels を作成
-        if table == "products":
-            lot_cols = [col for col in df.columns if col.startswith("lot") and not col.endswith("price")]
-            for _, row in df.iterrows():
-                levels = []
-                for i in range(1, 6):  # 最大5段階まで対応
-                    lot_col = f"lot{i}"
-                    price_col = f"price{i}"
-                    if lot_col in df.columns and price_col in df.columns:
-                        lot = row.get(lot_col)
-                        price = row.get(price_col)
-                        if pd.notna(lot) and pd.notna(price):
-                            levels.append({"lot": int(lot), "price": float(price)})
-                row["lot_levels"] = json.dumps(levels, ensure_ascii=False)
-            df = df.drop(columns=[col for col in df.columns if col.startswith("lot") or col.startswith("price")], errors="ignore")
 
         df["jan"] = df["jan"].astype(str).str.strip()
         df = df.drop_duplicates(subset="jan", keep="last")
