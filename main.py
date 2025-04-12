@@ -117,13 +117,17 @@ if mode == "📦 発注AI判定":
         if need_qty <= 0:
             continue
 
-# 変更箇所：在庫回転率に応じたスコア + 本来の必要数に近いロットを優先
 MAX_MONTHS_OF_STOCK = 3
 
-options = df_purchase[df_purchase["jan"] == jan].copy()
-if options.empty:
-    pass  # ループ外なのでスキップ
-else:
+for _, row in df_sales.iterrows():
+    jan = row["jan"]
+    sold = row["quantity_sold"]
+    stock = row.get("stock_available", 0)
+
+    options = df_purchase[df_purchase["jan"] == jan].copy()
+    if options.empty:
+        continue
+
     options["price"] = pd.to_numeric(options["price"], errors="coerce")
     options = options.sort_values(by="price", ascending=True)
 
@@ -177,8 +181,6 @@ else:
 
     if best_plan:
         results.append(best_plan)
-
-
 
 
 # 以下省略（その他のコードは変更なし）
