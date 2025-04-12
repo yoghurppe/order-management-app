@@ -118,6 +118,8 @@ if mode == "📦 発注AI判定":
             continue
 
         MAX_MONTHS_OF_STOCK = 3
+        weight_qty_diff = 1.0
+        weight_cost = 0.01
 
         options = df_purchase[df_purchase["jan"] == jan].copy()
         if options.empty:
@@ -127,6 +129,8 @@ if mode == "📦 発注AI判定":
         options = options.sort_values(by="price", ascending=True)
 
         best_plan = None
+        best_score = float("inf")
+
         for _, opt in options.iterrows():
             lot = opt["order_lot"]
             price = opt["price"]
@@ -146,13 +150,18 @@ if mode == "📦 発注AI判定":
             if qty <= 0:
                 continue
 
-            if best_plan is None or price < best_plan["単価"]:
+            total_cost = qty * price
+            score = abs(qty - need_qty) * weight_qty_diff + total_cost * weight_cost
+
+            if score < best_score:
+                best_score = score
                 best_plan = {
                     "jan": jan,
                     "販売実績": sold,
                     "在庫": stock,
                     "必要数（納品まで＋来月分）": qty,
                     "単価": price,
+                    "総額": total_cost,
                     "仕入先": supplier
                 }
 
