@@ -16,7 +16,7 @@ HEADERS = {
 st.set_page_config(page_title="発注管理システム", layout="wide")
 st.title("📦 発注管理システム（統合版）")
 
-# --- バッチアップロード関数 ---
+# --- バッチアップロード関数（最適化） ---
 def batch_upload_csv_to_supabase(file_path, table):
     if not os.path.exists(file_path):
         st.warning(f"❌ ファイルが見つかりません: {file_path}")
@@ -24,7 +24,6 @@ def batch_upload_csv_to_supabase(file_path, table):
     try:
         df = pd.read_csv(file_path)
 
-        # sales テーブル用に列名を変換
         if table == "sales":
             rename_cols = {
                 "アイテム": "jan",
@@ -36,13 +35,25 @@ def batch_upload_csv_to_supabase(file_path, table):
 
         df["jan"] = df["jan"].astype(str).str.strip()
         df = df.drop_duplicates(subset="jan", keep="last")
-        for _, row in df.iterrows():
-            requests.post(
+
+        st.info(f"🔄 {table} に {len(df)} 件をアップロード中...")
+        progress = st.progress(0)
+        batch_size = 500
+        total = len(df)
+
+        for i in range(0, total, batch_size):
+            batch = df.iloc[i:i+batch_size].where(pd.notnull(df.iloc[i:i+batch_size]), None).to_dict(orient="records")
+            res = requests.post(
                 f"{SUPABASE_URL}/rest/v1/{table}?on_conflict=jan",
-                headers=HEADERS,
-                json=row.where(pd.notnull(row), None).to_dict()
+                headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
+                json=batch
             )
-        st.success(f"✅ {table} テーブルに {len(df)} 件をバッチアップロードしました")
+            if res.status_code not in [200, 201]:
+                st.error(f"❌ バッチPOST失敗 ({i} 件目〜): {res.status_code} {res.text}")
+                return
+            progress.progress(min((i + batch_size) / total, 1.0))
+
+        st.success(f"✅ {table} テーブルに {total} 件をアップロードしました")
     except Exception as e:
         st.error(f"❌ {table} のアップロード中にエラー: {e}")
 
