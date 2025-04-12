@@ -112,7 +112,7 @@ if mode == "📦 発注AI判定":
         stock = row.get("stock_available", 0)
 
         expected_half_month_sales = sold * 0.5
-        available_at_arrival = stock - expected_half_month_sales
+        available_at_arrival = max(0, stock - expected_half_month_sales)
         need_qty = max(sold - available_at_arrival, 0)
 
         st.write(f"JAN: {jan}")
