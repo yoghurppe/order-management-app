@@ -3,7 +3,17 @@ import pandas as pd
 import requests
 import os
 import math
+import re
 
+def normalize_jan(x):
+    try:
+        if re.fullmatch(r"\d+(\.0+)?", str(x)):
+            return str(int(float(x)))
+        else:
+            return str(x).strip()
+    except:
+        return ""
+      
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 HEADERS = {
@@ -44,7 +54,8 @@ if mode == "📤 CSVアップロード":
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
                     if col == "order_lot":
                         df[col] = df[col].round().astype(int)  # ← ロット1を除外しないように修正
-            df["jan"] = df["jan"].apply(lambda x: str(int(float(x))) if pd.notna(x) else "").str.strip()
+            df["jan"] = df["jan"].apply(normalize_jan)
+
 
         return df
 
