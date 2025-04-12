@@ -86,8 +86,11 @@ if mode == "📤 CSVアップロード":
 if mode == "📦 発注AI判定":
     st.header("📦 発注対象商品AI判定")
 
-    @st.cache_data
+    import time
+
+    @st.cache_data(ttl=1)  # キャッシュを短命に
     def fetch_table(table_name):
+        time.sleep(1)  # Supabase側の反映を待つ
         res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*", headers=HEADERS)
         if res.status_code == 200:
             return pd.DataFrame(res.json())
@@ -96,10 +99,15 @@ if mode == "📦 発注AI判定":
 
     df_sales = fetch_table("sales")
     df_purchase = fetch_table("purchase_data")
-    
+
+    # 🔍 デバッグ表示
+    st.write(f"📊 df_sales: {len(df_sales)} 件 / columns: {df_sales.columns.tolist()}")
+    st.write(f"📦 df_purchase: {len(df_purchase)} 件 / columns: {df_purchase.columns.tolist()}")
+
     if df_sales.empty or df_purchase.empty:
         st.warning("販売実績または仕入データが不足しています。")
         st.stop()
+
 
 
     df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
