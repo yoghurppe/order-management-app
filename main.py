@@ -119,7 +119,7 @@ if mode == "📦 発注AI判定":
         st.warning("販売実績または仕入データが不足しています。")
         st.stop()
 
-    df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
+    df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
     df_purchase["jan"] = df_purchase["jan"].astype(str).str.strip()
 
     df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
