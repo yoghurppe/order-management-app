@@ -106,18 +106,18 @@ if mode == "📦 発注AI判定":
 
     @st.cache_data(ttl=1)
     def fetch_table(table_name):
-    headers = {
-        **HEADERS,
-        "Range": "0-49999",
-        "Prefer": "count=exact"
-    }
+        headers = {
+            **HEADERS,
+            "Range": "0-49999",
+            "Prefer": "count=exact"
+        }
         res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*", headers=headers)
-    if res.status_code == 200:
-                df = pd.DataFrame(res.json())
-        st.write(f"📦 {table_name} 件数: {len(df)}")
-        return df
-    st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
-    return pd.DataFrame()
+        if res.status_code == 200:
+            df = pd.DataFrame(res.json())
+            st.write(f"📦 {table_name} 件数: {len(df)}")
+            return df
+        st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
+        return pd.DataFrame()
 
     df_sales = fetch_table("sales")
     df_purchase = fetch_table("purchase_data")
