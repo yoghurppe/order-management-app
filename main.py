@@ -96,10 +96,11 @@ if mode == "📦 発注AI判定":
 
     df_sales = fetch_table("sales")
     df_purchase = fetch_table("purchase_data")
-
+    
     if df_sales.empty or df_purchase.empty:
         st.warning("販売実績または仕入データが不足しています。")
         st.stop()
+
 
     df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
     df_purchase["jan"] = df_purchase["jan"].astype(str).str.strip()
