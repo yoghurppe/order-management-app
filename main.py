@@ -40,10 +40,16 @@ def batch_upload_csv_to_supabase(file_path, table):
 
             df["jan"] = df["jan"].astype(str).str.strip()
 
-            # 🔁 全削除（上書き動作）
-            del_res = requests.delete(f"{SUPABASE_URL}/rest/v1/sales", headers=HEADERS)
-            if del_res.status_code not in [200, 204]:
-                st.error(f"❌ テーブル初期化に失敗: {del_res.status_code} {del_res.text}")
+            # 🔁 全削除（上書き動作） - 全行削除にはRLS無効とfilterなしDELETE不可の制限があるため、rowごと削除APIに変更
+            res = requests.get(f"{SUPABASE_URL}/rest/v1/{table}?select=jan", headers=HEADERS)
+            if res.status_code == 200:
+                existing = res.json()
+                for row in existing:
+                    jan = row.get("jan")
+                    if jan:
+                        requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?jan=eq.{jan}", headers=HEADERS)
+            else:
+                st.error(f"❌ テーブル初期化用の取得に失敗: {res.status_code} {res.text}")
                 return
 
         if table == "purchase_data":
@@ -58,10 +64,17 @@ def batch_upload_csv_to_supabase(file_path, table):
             if "jan" in df.columns:
                 df["jan"] = pd.to_numeric(df["jan"], errors="coerce").fillna(0).astype("int64").astype(str).str.strip()
 
-            # 🔁 全削除（上書き動作）
-            del_res = requests.delete(f"{SUPABASE_URL}/rest/v1/purchase_data", headers=HEADERS)
-            if del_res.status_code not in [200, 204]:
-                st.error(f"❌ テーブル初期化に失敗: {del_res.status_code} {del_res.text}")
+            # 🔁 全削除（上書き動作） - 同様に個別削除
+            res = requests.get(f"{SUPABASE_URL}/rest/v1/{table}?select=jan,supplier", headers=HEADERS)
+            if res.status_code == 200:
+                existing = res.json()
+                for row in existing:
+                    jan = row.get("jan")
+                    supplier = row.get("supplier")
+                    if jan and supplier:
+                        requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?jan=eq.{jan}&supplier=eq.{supplier}", headers=HEADERS)
+            else:
+                st.error(f"❌ テーブル初期化用の取得に失敗: {res.status_code} {res.text}")
                 return
 
         df = df.drop_duplicates(subset=["jan", "supplier"] if "supplier" in df.columns else "jan", keep="last")
@@ -86,7 +99,6 @@ def batch_upload_csv_to_supabase(file_path, table):
         st.success(f"✅ {table} テーブルに {total} 件をアップロードしました")
     except Exception as e:
         st.error(f"❌ {table} のアップロード中にエラー: {e}")
-
 
 # --- モード切り替え ---
 mode = st.sidebar.radio("操作を選択", ["📦 発注＆アップロード", "📚 商品情報DB検索", "📝 発注判定"])
