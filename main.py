@@ -41,19 +41,9 @@ def batch_upload_csv_to_supabase(file_path, table):
 
             df["jan"] = df["jan"].astype(str).str.strip()
 
-            # 🔁 全削除（上書き動作）
-            res = requests.get(f"{SUPABASE_URL}/rest/v1/{table}?select=jan", headers=HEADERS)
-            if res.status_code == 200:
-                existing = res.json()
-                for row in existing:
-                    jan = row.get("jan")
-                    if jan:
-                        jan_encoded = urllib.parse.quote(str(jan))
-                        res_del = requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?jan=eq.{jan_encoded}", headers=HEADERS)
-                        st.write(f"🗑 DELETE jan={jan}: {res_del.status_code}")
-            else:
-                st.error(f"❌ テーブル初期化用の取得に失敗: {res.status_code} {res.text}")
-                return
+            # 🔁 全削除（idがある前提で高速削除）
+            res_del = requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?id=gt.0", headers=HEADERS)
+            st.write(f"🗑 DELETE ALL FROM {table}: {res_del.status_code}")
 
         if table == "purchase_data":
             for col in ["order_lot", "price"]:
@@ -67,24 +57,9 @@ def batch_upload_csv_to_supabase(file_path, table):
             if "jan" in df.columns:
                 df["jan"] = pd.to_numeric(df["jan"], errors="coerce").fillna(0).astype("int64").astype(str).str.strip()
 
-            # 🔁 全削除（上書き動作）
-            res = requests.get(f"{SUPABASE_URL}/rest/v1/{table}?select=jan,supplier", headers=HEADERS)
-            if res.status_code == 200:
-                existing = res.json()
-                for row in existing:
-                    jan = row.get("jan")
-                    supplier = row.get("supplier")
-                    if jan and supplier:
-                        jan_encoded = urllib.parse.quote(str(jan))
-                        supplier_encoded = urllib.parse.quote(str(supplier))
-                        res_del = requests.delete(
-                            f"{SUPABASE_URL}/rest/v1/{table}?jan=eq.{jan_encoded}&supplier=eq.{supplier_encoded}",
-                            headers=HEADERS
-                        )
-                        st.write(f"🗑 DELETE jan={jan}, supplier={supplier}: {res_del.status_code}")
-            else:
-                st.error(f"❌ テーブル初期化用の取得に失敗: {res.status_code} {res.text}")
-                return
+            # 🔁 全削除（idがある前提で高速削除）
+            res_del = requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?id=gt.0", headers=HEADERS)
+            st.write(f"🗑 DELETE ALL FROM {table}: {res_del.status_code}")
 
         df = df.drop_duplicates(subset=["jan", "supplier"] if "supplier" in df.columns else "jan", keep="last")
 
