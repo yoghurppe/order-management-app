@@ -115,6 +115,16 @@ if mode == "📦 発注AI判定":
     df_sales = fetch_table("sales")
     df_purchase = fetch_table("purchase_data")
 
+    # JAN一致率のログ出力
+    sales_jans = set(df_sales["jan"].unique())
+    purchase_jans = set(df_purchase["jan"].unique())
+    matched = sales_jans & purchase_jans
+    unmatched = sales_jans - purchase_jans
+
+    st.write(f"🧮 sales内JAN数: {len(sales_jans)}")
+    st.write(f"✅ purchaseに一致したJAN数: {len(matched)}")
+    st.write(f"❌ purchaseに存在しないJAN: {len(unmatched)} 件")
+
     if df_sales.empty or df_purchase.empty:
         st.warning("販売実績または仕入データが不足しています。")
         st.stop()
