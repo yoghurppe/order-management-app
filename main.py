@@ -41,7 +41,7 @@ def batch_upload_csv_to_supabase(file_path, table):
         if table == "purchase_data":
             for col in ["order_lot", "price"]:
                 if col in df.columns:
-                    df[col] = (df[col].astype(str).str.replace(",", "")  # カンマ除去
+                    df[col] = (df[col].astype(str).str.replace(",", "")
                                     .pipe(pd.to_numeric, errors="coerce")
                                     .fillna(0))
                     if col == "order_lot":
@@ -72,7 +72,7 @@ def batch_upload_csv_to_supabase(file_path, table):
         st.error(f"❌ {table} のアップロード中にエラー: {e}")
 
 # --- モード切り替え ---
-mode = st.sidebar.radio("操作を選択", ["📦 発注＆アップロード", "📚 商品情報DB検索"])
+mode = st.sidebar.radio("操作を選択", ["📦 発注＆アップロード", "📚 商品情報DB検索", "📝 発注判定"])
 
 @st.cache_data
 def fetch_table(table_name):
@@ -129,3 +129,52 @@ def suggest_optimal_order(jan, need_qty, purchase_df):
             }
             reason = f"発注数 {need_qty} に対して、{supplier} のロット {lot} で {units} セット注文 → 合計 {total_price:.0f}円 が最安です"
     return best_plan, reason
+
+# --- 発注判定画面 ---
+if mode == "📝 発注判定":
+    st.subheader("📝 発注対象商品の自動判定")
+
+    sales_df = fetch_table("sales")
+    purchase_df = fetch_table("purchase_data")
+
+    if sales_df.empty or purchase_df.empty:
+        st.warning("販売実績または仕入データが不足しています。先にアップロードしてください。")
+        st.stop()
+
+    sales_df["jan"] = sales_df["jan"].astype(str).str.strip()
+    purchase_df["jan"] = purchase_df["jan"].astype(str).str.strip()
+
+    results = []
+    for _, row in sales_df.iterrows():
+        jan = row["jan"]
+        sold = row.get("quantity_sold", 0)
+        stock = row.get("stock_total", 0)
+        need_qty = max(sold - stock, 0)
+        if need_qty > 0:
+            best_plan, reason = suggest_optimal_order(jan, need_qty, purchase_df)
+            if best_plan:
+                results.append({
+                    "jan": jan,
+                    "販売数": sold,
+                    "在庫": stock,
+                    "発注数": need_qty,
+                    "ロット": best_plan["lot"],
+                    "単価": best_plan["price"],
+                    "合計金額": best_plan["total"],
+                    "仕入先": best_plan["supplier"],
+                    "コメント": reason
+                })
+
+    if results:
+        df_order = pd.DataFrame(results)
+        st.dataframe(df_order)
+
+        csv = df_order.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            label="📥 発注CSVダウンロード",
+            data=csv,
+            file_name="recommended_orders.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("現在、発注が必要な商品はありません。")
