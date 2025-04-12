@@ -18,12 +18,7 @@ st.title("📦 発注AI（利用可能在庫で判断）")
 mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定", "🔍 商品情報検索"])
 
 
-            if res.status_code not in [200, 201]:
-                st.error(f"❌ バッチPOST失敗: {res.status_code} {res.text}")
-                return
-        st.success(f"✅ {table} に {len(df)} 件アップロード完了")
-    except Exception as e:
-        st.error(f"❌ {table} のアップロード中にエラー: {e}")
+
 
 if mode == "📤 CSVアップロード":
     st.header("📤 CSVアップロード")
