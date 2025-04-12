@@ -109,7 +109,8 @@ if mode == "📦 発注AI判定":
         headers = {
             **HEADERS,
             "Range": "0-49999",
-            "Prefer": "count=exact"
+            "Prefer": "count=exact",
+            "Range-Unit": "items"
         }
         res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*", headers=headers)
         if res.status_code in [200, 206]:
