@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import os
 import json
+import urllib.parse
 
 # Supabase設定
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -40,14 +41,15 @@ def batch_upload_csv_to_supabase(file_path, table):
 
             df["jan"] = df["jan"].astype(str).str.strip()
 
-            # 🔁 全削除（上書き動作） - 全行削除にはRLS無効とfilterなしDELETE不可の制限があるため、rowごと削除APIに変更
+            # 🔁 全削除（上書き動作）
             res = requests.get(f"{SUPABASE_URL}/rest/v1/{table}?select=jan", headers=HEADERS)
             if res.status_code == 200:
                 existing = res.json()
                 for row in existing:
                     jan = row.get("jan")
                     if jan:
-                        requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?jan=eq.{jan}", headers=HEADERS)
+                        jan_encoded = urllib.parse.quote(str(jan))
+                        requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?jan=eq.{jan_encoded}", headers=HEADERS)
             else:
                 st.error(f"❌ テーブル初期化用の取得に失敗: {res.status_code} {res.text}")
                 return
@@ -64,7 +66,7 @@ def batch_upload_csv_to_supabase(file_path, table):
             if "jan" in df.columns:
                 df["jan"] = pd.to_numeric(df["jan"], errors="coerce").fillna(0).astype("int64").astype(str).str.strip()
 
-            # 🔁 全削除（上書き動作） - 同様に個別削除
+            # 🔁 全削除（上書き動作）
             res = requests.get(f"{SUPABASE_URL}/rest/v1/{table}?select=jan,supplier", headers=HEADERS)
             if res.status_code == 200:
                 existing = res.json()
@@ -72,7 +74,9 @@ def batch_upload_csv_to_supabase(file_path, table):
                     jan = row.get("jan")
                     supplier = row.get("supplier")
                     if jan and supplier:
-                        requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?jan=eq.{jan}&supplier=eq.{supplier}", headers=HEADERS)
+                        jan_encoded = urllib.parse.quote(str(jan))
+                        supplier_encoded = urllib.parse.quote(str(supplier))
+                        requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?jan=eq.{jan_encoded}&supplier=eq.{supplier_encoded}", headers=HEADERS)
             else:
                 st.error(f"❌ テーブル初期化用の取得に失敗: {res.status_code} {res.text}")
                 return
@@ -99,6 +103,7 @@ def batch_upload_csv_to_supabase(file_path, table):
         st.success(f"✅ {table} テーブルに {total} 件をアップロードしました")
     except Exception as e:
         st.error(f"❌ {table} のアップロード中にエラー: {e}")
+
 
 # --- モード切り替え ---
 mode = st.sidebar.radio("操作を選択", ["📦 発注＆アップロード", "📚 商品情報DB検索", "📝 発注判定"])
