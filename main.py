@@ -145,10 +145,11 @@ if mode == "📦 発注AI判定":
         best_plan = None
         best_score = float("inf")
 
-        # 本来の必要数を計算
-        expected_half_month_sales = sold * 0.5
-        available_at_arrival = max(0, stock - expected_half_month_sales)
-        need_qty = max(sold - available_at_arrival, 0)
+        # 本来の必要数を計算（より自然な在庫判断）
+        need_qty = sold - stock
+        if need_qty < sold:
+            need_qty += math.ceil(sold * 0.5)  # 次月分も確保（50%）
+        need_qty = max(need_qty, 1)  # 少なくとも1は仕入れる
 
         for _, opt in options.iterrows():
             st.write(f"🧪 {jan} | ロット: {opt['order_lot']}, 単価: {opt['price']}")
