@@ -38,6 +38,8 @@ def batch_upload_csv_to_supabase(file_path, table):
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).round().astype(int)
 
+            df["jan"] = df["jan"].astype(str).str.strip()
+
         if table == "purchase_data":
             for col in ["order_lot", "price"]:
                 if col in df.columns:
@@ -47,7 +49,10 @@ def batch_upload_csv_to_supabase(file_path, table):
                     if col == "order_lot":
                         df[col] = df[col].round().astype(int)
 
-        df["jan"] = df["jan"].astype(str).str.strip()
+            # JANコードを整数→文字列に整形（4903301339670.0 → "4903301339670"）
+            if "jan" in df.columns:
+                df["jan"] = pd.to_numeric(df["jan"], errors="coerce").fillna(0).astype("int64").astype(str).str.strip()
+
         df = df.drop_duplicates(subset=["jan", "supplier"] if "supplier" in df.columns else "jan", keep="last")
 
         st.info(f"🔄 {table} に {len(df)} 件をアップロード中...")
