@@ -137,13 +137,14 @@ if mode == "📦 発注AI判定":
             sets = math.ceil(need_qty / lot)
             qty = sets * lot
 
-            # 🔁 在庫回転率の考慮
+            # 🔁 在庫回転率の考慮（最低1セットは維持）
             max_qty = sold * MAX_MONTHS_OF_STOCK
             if qty > max_qty:
-                sets = math.floor(max_qty / lot)
+                sets = max(1, math.floor(max_qty / lot))
                 qty = sets * lot
-                if qty <= 0:
-                    continue
+
+            if qty <= 0:
+                continue
 
             if best_plan is None or price < best_plan["単価"]:
                 best_plan = {
