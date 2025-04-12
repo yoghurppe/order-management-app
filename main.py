@@ -196,4 +196,4 @@ elif mode == "📚 商品情報DB検索":
             data=csv,
             file_name="item_master_filtered.csv",
             mime="text/csv"
-        ))
+        )
