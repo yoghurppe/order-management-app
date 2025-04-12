@@ -29,6 +29,25 @@ def fetch_table(table_name):
         st.error(f"{table_name} の取得に失敗しました: {res.text}")
         return pd.DataFrame()
 
+# --- CSVアップロード画面 ---
+if mode == "📦 発注＆アップロード":
+    st.subheader("📤 CSVアップロード")
+    upload_col1, upload_col2 = st.columns(2)
+
+    with upload_col1:
+        file_products = st.file_uploader("📦 products.csv をアップロード", type="csv")
+        if file_products:
+            with open("temp_products.csv", "wb") as f:
+                f.write(file_products.getbuffer())
+            batch_upload_csv_to_supabase("temp_products.csv", "products")
+
+    with upload_col2:
+        file_sales = st.file_uploader("📈 sales.csv をアップロード", type="csv")
+        if file_sales:
+            with open("temp_sales.csv", "wb") as f:
+                f.write(file_sales.getbuffer())
+            batch_upload_csv_to_supabase("temp_sales.csv", "sales")
+
 # --- バッチアップロード関数 ---
 def batch_upload_csv_to_supabase(file_path, table):
     if not os.path.exists(file_path):
@@ -70,7 +89,7 @@ def suggest_optimal_order(jan, need_qty, purchase_df):
     purchase_df = purchase_df[purchase_df["jan"] == jan].copy()
     if purchase_df.empty:
         return None, "仕入候補が存在しません"
-    
+
     best_plan = None
     reason = ""
     for _, row in purchase_df.iterrows():
