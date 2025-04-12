@@ -123,6 +123,7 @@ if mode == "📦 発注AI判定":
             continue
 
         best_plan = None
+        best_total = None
         for _, opt in options.iterrows():
             lot = opt["order_lot"]
             price = opt["price"]
@@ -131,7 +132,8 @@ if mode == "📦 発注AI判定":
                 continue
             sets = -(-need_qty // lot)
             total = sets * lot * price
-            if best_plan is None or total < best_plan["合計"]:
+            if best_plan is None or total < best_total:
+                best_total = total
                 best_plan = {
                     "jan": jan,
                     "必要数": sets * lot,
