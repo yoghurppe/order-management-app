@@ -67,7 +67,10 @@ if mode == "📤 CSVアップロード":
             url = f"{SUPABASE_URL}/rest/v1/{table}?id=gt.0"
             requests.delete(url, headers=HEADERS)  # 初期化
 
-            df = df.drop_duplicates(subset=["jan", "supplier", "order_lot"], keep="last")
+            if table == "purchase_data":
+                df = df.drop_duplicates(subset=["jan", "supplier", "order_lot"], keep="last")
+            else:
+                df = df.drop_duplicates(subset=["jan"], keep="last")
 
             batch_size = 500
             for i in range(0, len(df), batch_size):
