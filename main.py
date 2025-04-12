@@ -115,6 +115,8 @@ if mode == "📦 発注AI判定（30日集計）":
         "stock_available": "last"
     }).reset_index()
 
+    agg_sales["stock_available"] = pd.to_numeric(agg_sales["stock_available"], errors="coerce").fillna(0)
+
     df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
     df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
