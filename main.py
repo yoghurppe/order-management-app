@@ -111,28 +111,35 @@ df_purchase["jan"] = df_purchase["jan"].astype(str).str.strip()
 results = []
 
 for _, row in df_sales.iterrows():
-    jan = row["jan"]
+    jan = str(row["jan"]).strip()
     sold = row.get("quantity_sold", 0)
     stock = row.get("stock_total", 0)
     need_qty = max(sold - stock, 0)
+
+    st.write(f"🔍 判定中 JAN: {jan}, 販売数={sold}, 在庫={stock}, 必要数={need_qty}")
+
     if need_qty <= 0:
         continue
 
-    # 該当JANの仕入候補を抽出
     purchase_options = df_purchase[df_purchase["jan"] == jan]
     if purchase_options.empty:
+        st.warning(f"⚠️ JAN {jan} の仕入候補が見つかりません")
         continue
+    else:
+        st.write("候補データ:", purchase_options)
 
-    # AIロジック的な最適選択（最安になる組み合わせを選ぶ）
     best_plan = None
     for _, opt in purchase_options.iterrows():
         lot = opt["order_lot"]
         price = opt["price"]
         supplier = opt["supplier"]
-        if lot <= 0:
+        if pd.isna(lot) or pd.isna(price) or lot <= 0:
+            st.warning(f"⚠️ 無効なロット/単価: lot={lot}, price={price} (JAN={jan})")
             continue
-        units = -(-need_qty // lot)  # ceiling division
+
+        units = -(-need_qty // lot)
         total_cost = units * lot * price
+
         if best_plan is None or total_cost < best_plan["total"]:
             best_plan = {
                 "jan": jan,
