@@ -14,17 +14,17 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-st.set_page_config(page_title="📊 毎日販売データアップロード + 発注判定", layout="wide")
-st.title("📊 販売データ (sales_daily) - 30日分のみ保持")
+st.set_page_config(page_title="📊 販売データ (sales) - 日付付き", layout="wide")
+st.title("📊 salesテーブル（date付き）での運用")
 
 mode = st.sidebar.radio("モードを選んでください", ["📤 販売データアップロード", "📦 発注AI判定（30日集計）"])
 
 def delete_old_sales():
     cutoff = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
-    res = requests.delete(f"{SUPABASE_URL}/rest/v1/sales_daily?date=lt.{cutoff}", headers=HEADERS)
-    st.write(f"🧹 30日より前のsales_dailyデータ削除: {res.status_code}")
+    res = requests.delete(f"{SUPABASE_URL}/rest/v1/sales?date=lt.{cutoff}", headers=HEADERS)
+    st.write(f"🧹 30日より前のsalesデータ削除: {res.status_code}")
 
-def batch_upload_daily_sales(file_path):
+def batch_upload_sales(file_path):
     try:
         df = pd.read_csv(file_path)
 
@@ -43,7 +43,6 @@ def batch_upload_daily_sales(file_path):
         df["jan"] = df["jan"].astype(str).str.strip()
         df["date"] = pd.to_datetime("today").normalize()
 
-        # アップロード前に古いデータ削除
         delete_old_sales()
 
         df = df.drop_duplicates(subset=["jan", "date"], keep="last")
@@ -52,28 +51,28 @@ def batch_upload_daily_sales(file_path):
         for i in range(0, len(df), batch_size):
             batch = df.iloc[i:i+batch_size].where(pd.notnull(df.iloc[i:i+batch_size]), None).to_dict(orient="records")
             res = requests.post(
-                f"{SUPABASE_URL}/rest/v1/sales_daily",
+                f"{SUPABASE_URL}/rest/v1/sales",
                 headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
                 json=batch
             )
             if res.status_code not in [200, 201]:
                 st.error(f"❌ アップロード失敗: {res.status_code} {res.text}")
                 return
-        st.success(f"✅ {len(df)} 件 sales_daily にアップロード完了")
+        st.success(f"✅ {len(df)} 件 sales にアップロード完了")
     except Exception as e:
         st.error(f"❌ アップロードエラー: {e}")
 
 if mode == "📤 販売データアップロード":
-    st.subheader("📤 毎日の販売CSVをアップロード（sales_daily）")
-    uploaded = st.file_uploader("sales_daily.csv アップロード", type="csv")
+    st.subheader("📤 毎日の販売CSVをアップロード（sales）")
+    uploaded = st.file_uploader("sales.csv アップロード", type="csv")
     if uploaded:
-        tmp_path = "/tmp/sales_daily.csv"
+        tmp_path = "/tmp/sales_upload.csv"
         with open(tmp_path, "wb") as f:
             f.write(uploaded.read())
-        batch_upload_daily_sales(tmp_path)
+        batch_upload_sales(tmp_path)
 
 if mode == "📦 発注AI判定（30日集計）":
-    st.header("📦 発注AI（30日間の合計から判定）")
+    st.header("📦 発注AI（salesテーブルから30日間の集計）")
 
     @st.cache_data(ttl=1)
     def fetch_table(name):
@@ -81,7 +80,7 @@ if mode == "📦 発注AI判定（30日集計）":
         res = requests.get(url, headers=HEADERS)
         return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
 
-    df_sales = fetch_table("sales_daily")
+    df_sales = fetch_table("sales")
     df_purchase = fetch_table("purchase_data")
 
     if df_sales.empty or df_purchase.empty:
@@ -89,9 +88,13 @@ if mode == "📦 発注AI判定（30日集計）":
         st.stop()
 
     df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
+    df_sales["date"] = pd.to_datetime(df_sales["date"])
     df_purchase["jan"] = df_purchase["jan"].astype(str).str.strip()
 
-    agg_sales = df_sales.groupby("jan").agg({
+    cutoff_date = pd.to_datetime("today") - pd.Timedelta(days=30)
+    df_sales_30 = df_sales[df_sales["date"] >= cutoff_date]
+
+    agg_sales = df_sales_30.groupby("jan").agg({
         "quantity_sold": "sum",
         "stock_available": "last"
     }).reset_index()
@@ -107,10 +110,6 @@ if mode == "📦 発注AI判定（30日集計）":
         expected_half_month_sales = sold * 0.5
         available_at_arrival = max(0, stock - expected_half_month_sales)
         need_qty = max(sold - available_at_arrival, 0)
-
-        st.write(f"JAN: {jan}")
-        st.write(f"  30日販売数: {sold}, 利用可能在庫: {stock}")
-        st.write(f"  納品時在庫予測: {available_at_arrival}, 必要発注数: {need_qty}")
 
         if need_qty <= 0:
             continue
