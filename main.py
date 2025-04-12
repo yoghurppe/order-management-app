@@ -178,6 +178,7 @@ if mode == "📦 発注AI判定":
         need_qty = max(sold - available_at_arrival, 0)
 
         for _, opt in options.iterrows():
+            st.write(f"\n🧪 {jan} | ロット: {opt['order_lot']}, 単価: {opt['price']}")
             lot = opt["order_lot"]
             price = opt["price"]
             supplier = opt.get("supplier", "不明")
@@ -203,6 +204,8 @@ if mode == "📦 発注AI判定":
             # 🧠 在庫回転率に応じたズレのペナルティ（必要数からのズレを評価）
             penalty_ratio = MAX_MONTHS_OF_STOCK / max(sold, 1)
             score = abs(qty - need_qty) * price * penalty_ratio + total_cost * 0.01
+
+                        st.write(f"  → need_qty={need_qty}, qty={qty}, max_qty={max_qty}, score={score:.2f}")
 
             if score < best_score:
                 best_score = score
