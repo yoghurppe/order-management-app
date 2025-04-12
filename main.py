@@ -106,9 +106,16 @@ if mode == "📦 発注AI判定":
 
     @st.cache_data(ttl=1)
     def fetch_table(table_name):
-        res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*", headers={**HEADERS, "Range": "0-49999"})
+        headers = {
+            **HEADERS,
+            "Range": "0-49999",             # ← 上限拡張（最大5万件）
+            "Prefer": "count=exact"         # ← 正確な件数を返すように指示
+        }
+        res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*", headers=headers)
         if res.status_code == 200:
-            return pd.DataFrame(res.json())
+            df = pd.DataFrame(res.json())
+            st.write(f"📦 {table_name} 件数: {len(df)}")  # 件数確認のため表示
+            return df
         st.error(f"{table_name} の取得に失敗: {res.text}")
         return pd.DataFrame()
 
