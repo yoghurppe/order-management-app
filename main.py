@@ -140,7 +140,7 @@ if mode == "📦 発注AI判定":
             # 🔁 在庫回転率の考慮（最低1セットは維持）
             max_qty = sold * MAX_MONTHS_OF_STOCK
             if qty > max_qty:
-                if lot > max_qty:
+                if qty > max_qty and lot > max_qty:
                     continue  # 明らかに仕入れすぎ → 候補から除外
                 sets = max(1, math.floor(max_qty / lot))
                 qty = sets * lot
@@ -178,7 +178,6 @@ if mode == "📦 発注AI判定":
         st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
     else:
         st.info("現在、発注が必要な商品はありません。")
-
 
 
 # --- 商品情報DB検索機能 ---
