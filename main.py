@@ -13,8 +13,8 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-st.set_page_config(page_title="発注管理システム", layout="wide")
-st.title("📦 発注AI（デバッグ付き・次月在庫補充）")
+st.set_page_config(page_title="発注AI（納品タイミング考慮）", layout="wide")
+st.title("📦 発注AI（2週間後の在庫を基準）")
 
 mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定"])
 
@@ -80,7 +80,7 @@ if mode == "📤 CSVアップロード":
         batch_upload_csv_to_supabase(temp_path, "purchase_data")
 
 if mode == "📦 発注AI判定":
-    st.header("📦 発注AI（次月在庫切れ回避・在庫消化考慮・デバッグ付き）")
+    st.header("📦 発注AI（納品2週間後を基準）")
 
     @st.cache_data(ttl=1)
     def fetch_table(table_name):
@@ -111,17 +111,16 @@ if mode == "📦 発注AI判定":
         sold = row["quantity_sold"]
         stock = row["stock_total"]
 
-        available_after_this_month = stock - sold
-        next_month_demand = sold
-        need_qty = max(next_month_demand - available_after_this_month, 0)
+        expected_half_month_sales = sold * 0.5
+        available_at_arrival = stock - expected_half_month_sales
+        need_qty = max(sold - available_at_arrival, 0)
 
-        # 🔍 デバッグ出力
+        # 🔍 デバッグ表示
         st.write(f"JAN: {jan}")
-        st.write(f"  販売実績: {sold}")
-        st.write(f"  現在の在庫: {stock}")
-        st.write(f"  今月末の在庫（在庫 - 販売実績）: {available_after_this_month}")
-        st.write(f"  次月販売想定: {next_month_demand}")
-        st.write(f"  必要数（次月分）: {need_qty}")
+        st.write(f"  今月販売見込: {sold}")
+        st.write(f"  現在在庫: {stock}")
+        st.write(f"  納品時の在庫見込: {available_at_arrival}")
+        st.write(f"  必要数: {need_qty}")
 
         if need_qty <= 0:
             continue
@@ -150,7 +149,7 @@ if mode == "📦 発注AI判定":
                     "jan": jan,
                     "販売実績": sold,
                     "在庫": stock,
-                    "必要数（次月分まで）": qty,
+                    "必要数（納品まで＋来月分）": qty,
                     "単価": price,
                     "仕入先": supplier
                 }
@@ -163,6 +162,6 @@ if mode == "📦 発注AI判定":
         st.success(f"✅ 発注対象: {len(result_df)} 件")
         st.dataframe(result_df)
         csv = result_df.to_csv(index=False).encode("utf-8-sig")
-        st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_debug.csv", mime="text/csv")
+        st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_arrival_aware.csv", mime="text/csv")
     else:
         st.info("現在、発注が必要な商品はありません。")
