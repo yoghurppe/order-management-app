@@ -13,7 +13,7 @@ HEADERS = {
 }
 
 st.set_page_config(page_title="発注管理システム", layout="wide")
-st.title("📦 発注管理システム（AIロジック強化版）")
+st.title("📦 発注管理システム（単価優先）")
 
 mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定"])
 
@@ -79,7 +79,7 @@ if mode == "📤 CSVアップロード":
         batch_upload_csv_to_supabase(temp_path, "purchase_data")
 
 if mode == "📦 発注AI判定":
-    st.header("📦 発注対象商品AI判定")
+    st.header("📦 発注対象商品AI判定（単価優先）")
 
     import time
 
@@ -117,12 +117,11 @@ if mode == "📦 発注AI判定":
         if need_qty <= 0:
             continue
 
-        options = df_purchase[df_purchase["jan"] == jan]
+        options = df_purchase[df_purchase["jan"] == jan].copy()
         if options.empty:
             continue
 
-        best_plan = None
-        best_total = None
+        options = options.sort_values(by="price", ascending=True)
         for _, opt in options.iterrows():
             lot = opt["order_lot"]
             price = opt["price"]
@@ -130,20 +129,14 @@ if mode == "📦 発注AI判定":
             if pd.isna(lot) or pd.isna(price) or lot <= 0:
                 continue
 
-            sets = -(-need_qty // lot)  # ceiling
-            total = sets * lot * price
-
-            if best_plan is None or total < best_total:
-                best_total = total
-                best_plan = {
-                    "jan": jan,
-                    "必要数": sets * lot,
-                    "単価": price,
-                    "仕入先": supplier
-                }
-
-        if best_plan:
-            results.append(best_plan)
+            sets = -(-need_qty // lot)
+            results.append({
+                "jan": jan,
+                "必要数": sets * lot,
+                "単価": price,
+                "仕入先": supplier
+            })
+            break  # 最安値の1件だけ採用
 
     if results:
         result_df = pd.DataFrame(results)
