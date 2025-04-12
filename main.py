@@ -58,7 +58,7 @@ def batch_upload_csv_to_supabase(file_path, table):
                                         st.error(f"❌ バッチPOST失敗: {res.status_code} {res.text}")
                                         return
                                         st.success(f"✅ {table} に {len(df)} 件アップロード完了")
-                                        except Exception as e:
+                                    except Exception as e:
                                             st.error(f"❌ {table} のアップロード中にエラー: {e}")
 
                                             if mode == "📤 CSVアップロード":
