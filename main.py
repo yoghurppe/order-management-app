@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import requests
@@ -16,7 +15,7 @@ HEADERS = {
 st.set_page_config(page_title="発注AI（納品タイミング + 利用可能在庫）", layout="wide")
 st.title("📦 発注AI（利用可能在庫で判断）")
 
-mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定"])
+mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定", "🔍 商品情報検索"])
 
 def batch_upload_csv_to_supabase(file_path, table):
     try:
@@ -164,3 +163,54 @@ if mode == "📦 発注AI判定":
         st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
     else:
         st.info("現在、発注が必要な商品はありません。")
+
+
+# --- 商品情報DB検索機能 ---
+if mode == "🔍 商品情報検索":
+    st.header("🔍 商品情報DB検索")
+
+    @st.cache_data(ttl=60)
+    def fetch_item_master():
+        url = f"{SUPABASE_URL}/rest/v1/item_master?select=*"
+        res = requests.get(url, headers=HEADERS)
+        if res.status_code == 200:
+            return pd.DataFrame(res.json())
+        st.error("item_master の取得に失敗しました")
+        return pd.DataFrame()
+
+    df_master = fetch_item_master()
+    if df_master.empty:
+        st.warning("商品情報データベースにデータが存在しません。")
+        st.stop()
+
+    df_master["jan"] = df_master["jan"].astype(str)
+
+    st.subheader("🔎 検索条件")
+
+    keyword = st.text_input("商品名で検索", "")
+    brand_filter = st.selectbox("ブランドで絞り込み", ["すべて"] + sorted(df_master["ブランド"].dropna().unique()))
+    status_filter = st.selectbox("状態で絞り込み", ["すべて"] + sorted(df_master["状態"].dropna().unique()))
+    buyer_filter = st.selectbox("担当者で絞り込み", ["すべて"] + sorted(df_master["担当者"].dropna().unique()))
+    order_flag = st.checkbox("発注済以外のみ表示")
+
+    df_view = df_master.copy()
+
+    if keyword:
+        df_view = df_view[df_view["商品名"].astype(str).str.contains(keyword, case=False, na=False)]
+    if brand_filter != "すべて":
+        df_view = df_view[df_view["ブランド"] == brand_filter]
+    if status_filter != "すべて":
+        df_view = df_view[df_view["状態"] == status_filter]
+    if buyer_filter != "すべて":
+        df_view = df_view[df_view["担当者"] == buyer_filter]
+    if order_flag and "発注済" in df_view.columns:
+        df_view = df_view[df_view["発注済"] != 1]
+
+    view_cols = ["jan", "担当者", "状態", "ブランド", "商品名", "仕入価格", "ケース入数", "重量", "発注済"]
+    available_cols = [col for col in view_cols if col in df_view.columns]
+
+    st.subheader("📋 商品一覧")
+    st.dataframe(df_view[available_cols].sort_values(by="jan"))
+
+    csv = df_view[available_cols].to_csv(index=False).encode("utf-8-sig")
+    st.download_button("📥 CSVダウンロード", data=csv, file_name="item_master_filtered.csv", mime="text/csv")
