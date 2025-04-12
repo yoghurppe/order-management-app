@@ -56,10 +56,19 @@ def batch_upload_csv_to_supabase(file_path, table):
     try:
         df = pd.read_csv(file_path)
 
+        # sales テーブル用に列名を変換
+        if table == "sales":
+            rename_cols = {
+                "アイテム": "jan",
+                "販売数量": "quantity_sold",
+                "現在の手持数量": "stock_total",
+                "現在の利用可能数量": "stock_available"
+            }
+            df.rename(columns=rename_cols, inplace=True)
+
         # ロット階層データを処理（lot1, price1, lot2, price2...）から lot_levels を作成
         if table == "products":
             lot_cols = [col for col in df.columns if col.startswith("lot") and not col.endswith("price")]
-            lot_levels = []
             for _, row in df.iterrows():
                 levels = []
                 for i in range(1, 6):  # 最大5段階まで対応
@@ -72,6 +81,7 @@ def batch_upload_csv_to_supabase(file_path, table):
                             levels.append({"lot": int(lot), "price": float(price)})
                 row["lot_levels"] = json.dumps(levels, ensure_ascii=False)
             df = df.drop(columns=[col for col in df.columns if col.startswith("lot") or col.startswith("price")], errors="ignore")
+
         df["jan"] = df["jan"].astype(str).str.strip()
         df = df.drop_duplicates(subset="jan", keep="last")
         for _, row in df.iterrows():
