@@ -4,7 +4,6 @@ import pandas as pd
 import requests
 import os
 
-# Supabase設定
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 HEADERS = {
@@ -14,7 +13,7 @@ HEADERS = {
 }
 
 st.set_page_config(page_title="発注管理システム", layout="wide")
-st.title("📦 発注管理システム（統合版）")
+st.title("📦 発注管理システム（AIロジック強化版）")
 
 mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定"])
 
@@ -130,8 +129,10 @@ if mode == "📦 発注AI判定":
             supplier = opt.get("supplier", "不明")
             if pd.isna(lot) or pd.isna(price) or lot <= 0:
                 continue
-            sets = -(-need_qty // lot)
+
+            sets = -(-need_qty // lot)  # ceiling
             total = sets * lot * price
+
             if best_plan is None or total < best_total:
                 best_total = total
                 best_plan = {
