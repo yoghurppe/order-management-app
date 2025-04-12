@@ -117,7 +117,9 @@ if mode == "📦 発注AI判定":
         if need_qty <= 0:
             continue
 
-# 変更箇所：在庫回転率に応じてズレのペナルティ係数を調整
+（全文省略：前回の内容をベースに変更）
+
+# 変更箇所：在庫回転率に応じたスコア + 本来の必要数に近いロットを優先
         MAX_MONTHS_OF_STOCK = 3
 
         options = df_purchase[df_purchase["jan"] == jan].copy()
@@ -129,6 +131,11 @@ if mode == "📦 発注AI判定":
 
         best_plan = None
         best_score = float("inf")
+
+        # 本来の必要数を計算
+        expected_half_month_sales = sold * 0.5
+        available_at_arrival = max(0, stock - expected_half_month_sales)
+        need_qty = max(sold - available_at_arrival, 0)
 
         for _, opt in options.iterrows():
             lot = opt["order_lot"]
@@ -151,9 +158,9 @@ if mode == "📦 発注AI判定":
 
             total_cost = qty * price
 
-            # 🧠 在庫回転率に応じたズレのペナルティ
+            # 🧠 在庫回転率に応じたズレのペナルティ（必要数からのズレを評価）
             penalty_ratio = MAX_MONTHS_OF_STOCK / max(sold, 1)
-            score = total_cost + abs(qty - need_qty) * price * penalty_ratio
+            score = abs(qty - need_qty) * penalty_ratio + total_cost * 0.01
 
             if score < best_score:
                 best_score = score
@@ -162,6 +169,7 @@ if mode == "📦 発注AI判定":
                     "販売実績": sold,
                     "在庫": stock,
                     "必要数（納品まで＋来月分）": qty,
+                    "理論必要数": need_qty,
                     "単価": price,
                     "総額": total_cost,
                     "仕入先": supplier
@@ -169,6 +177,9 @@ if mode == "📦 発注AI判定":
 
         if best_plan:
             results.append(best_plan)
+
+# 以下省略（その他のコードは変更なし）
+
 
     if results:
         result_df = pd.DataFrame(results)
