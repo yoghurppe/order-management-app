@@ -105,7 +105,7 @@ if mode == "📦 発注AI判定":
     st.header("📦 発注AI（利用可能在庫ベース）")
 
     @st.cache_data(ttl=1)
-def fetch_table(table_name):
+    def fetch_table(table_name):
     headers = {
         **HEADERS,
         "Range": "0-49999",
