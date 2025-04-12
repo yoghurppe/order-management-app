@@ -110,13 +110,29 @@ if mode == "📦 発注AI判定":
             **HEADERS,
             "Prefer": "count=exact"
         }
-        res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&limit=50000", headers=headers)
-        if res.status_code in [200, 206]:
-            df = pd.DataFrame(res.json())
-            st.write(f"📦 {table_name} 件数: {len(df)}")
-            return df
-        st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
-        return pd.DataFrame()
+
+        dfs = []
+        offset = 0
+        limit = 1000
+
+        while True:
+            url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
+            res = requests.get(url, headers=headers)
+
+            if res.status_code not in [200, 206]:
+                st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
+                return pd.DataFrame()
+
+            data = res.json()
+            if not data:
+                break
+
+            dfs.append(pd.DataFrame(data))
+            offset += limit
+
+        df = pd.concat(dfs, ignore_index=True)
+        st.write(f"📦 {table_name} 件数: {len(df)}")
+        return df
 
     df_sales = fetch_table("sales")
     df_purchase = fetch_table("purchase_data")
