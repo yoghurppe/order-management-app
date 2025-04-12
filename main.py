@@ -165,7 +165,35 @@ elif mode == "📚 商品情報DB検索":
 
     df_master = fetch_table("item_master")
     if not df_master.empty:
-        st.subheader("📦 item_master一覧（DBから取得）")
+        st.subheader("🔍 商品情報検索フォーム")
+
+        jan_filter = st.text_input("JANコードで検索（部分一致）")
+        maker_filter = st.selectbox("担当者", options=[""] + sorted(df_master["担当者"].dropna().unique().tolist())) if "担当者" in df_master.columns else ""
+        status_filter = st.selectbox("状態", options=[""] + sorted(df_master["状態"].dropna().unique().tolist())) if "状態" in df_master.columns else ""
+        brand_filter = st.selectbox("ブランド", options=[""] + sorted(df_master["ブランド"].dropna().unique().tolist())) if "ブランド" in df_master.columns else ""
+        ordered_filter = st.checkbox("発注済以外のみ表示")
+
+        df_filtered = df_master.copy()
+        if jan_filter:
+            df_filtered = df_filtered[df_filtered["jan"].astype(str).str.contains(jan_filter)]
+        if maker_filter:
+            df_filtered = df_filtered[df_filtered["担当者"] == maker_filter]
+        if status_filter:
+            df_filtered = df_filtered[df_filtered["状態"] == status_filter]
+        if brand_filter:
+            df_filtered = df_filtered[df_filtered["ブランド"] == brand_filter]
+        if ordered_filter:
+            df_filtered = df_filtered[df_filtered["発注済"] != 1] if "発注済" in df_filtered.columns else df_filtered
+
+        st.subheader("📋 商品情報一覧（検索結果）")
         view_cols = ["jan", "担当者", "状態", "ブランド", "商品名", "仕入価格", "ケース入数", "重量", "入数", "発注済"]
-        available_cols = [col for col in view_cols if col in df_master.columns]
-        st.dataframe(df_master[available_cols].sort_values(by="jan"))
+        available_cols = [col for col in view_cols if col in df_filtered.columns]
+        st.dataframe(df_filtered[available_cols].sort_values(by="jan"))
+
+        csv = df_filtered[available_cols].to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            label="📥 絞り込み後CSVダウンロード",
+            data=csv,
+            file_name="item_master_filtered.csv",
+            mime="text/csv"
+        ))
