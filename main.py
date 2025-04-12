@@ -178,10 +178,12 @@ if mode == "📦 発注AI判定":
         best_score = float("inf")
 
         # 本来の必要数を計算（より自然な在庫判断）
-        need_qty = sold - stock
-        if need_qty < sold:
+        if stock >= sold:
+            need_qty = 0  # 在庫が十分にあるので仕入れ不要
+        else:
+            need_qty = sold - stock
             need_qty += math.ceil(sold * 0.5)  # 次月分も確保（50%）
-        need_qty = max(need_qty, 1)  # 少なくとも1は仕入れる
+            need_qty = max(need_qty, 1)  # 少なくとも1は仕入れる
 
         for _, opt in options.iterrows():
             lot = opt["order_lot"]
