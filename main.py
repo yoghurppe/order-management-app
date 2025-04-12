@@ -114,7 +114,7 @@ if mode == "📦 発注AI判定":
         res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*", headers=headers)
         if res.status_code == 200:
             df = pd.DataFrame(res.json())
-            st.write(f"📦 {table_name} 件数: {len(df)}")  # 件数確認のため表示
+            st.write(f"📦 {table_name} 件数: {len(df)}")  # ← これだけ表示
             return df
         st.error(f"{table_name} の取得に失敗: {res.text}")
         return pd.DataFrame()
