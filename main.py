@@ -229,7 +229,7 @@ if mode == "📦 発注AI判定":
                     "仕入先": supplier
                 }
 
-        if best_plan:
+        if best_plan and best_plan["理論必要数"] > 0:
             results.append(best_plan)
 
     if results:
