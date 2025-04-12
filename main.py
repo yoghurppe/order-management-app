@@ -84,9 +84,8 @@ def batch_upload_csv_to_supabase(file_path, table):
     except Exception as e:
         st.error(f"❌ {table} のアップロード中にエラー: {e}")
 
-
-# --- モード切り替え ---
-mode = st.sidebar.radio("操作を選択", ["📦 発注＆アップロード", "📚 商品情報DB検索", "📝 発注判定"])
+# --- 発注判定ロジック ---
+st.header("🧠 発注対象商品のAI判定")
 
 @st.cache_data
 def fetch_table(table_name):
@@ -95,100 +94,65 @@ def fetch_table(table_name):
     if res.status_code == 200:
         return pd.DataFrame(res.json())
     else:
-        st.error(f"{table_name} の取得に失敗しました: {res.text}")
+        st.error(f"❌ {table_name} の取得に失敗: {res.text}")
         return pd.DataFrame()
 
-# --- CSVアップロード画面 ---
-if mode == "📦 発注＆アップロード":
-    st.subheader("📤 CSVアップロード")
-    upload_col1, upload_col2 = st.columns(2)
+df_sales = fetch_table("sales")
+df_purchase = fetch_table("purchase_data")
 
-    with upload_col1:
-        file_sales = st.file_uploader("📈 sales.csv をアップロード", type="csv")
-        if file_sales:
-            with open("temp_sales.csv", "wb") as f:
-                f.write(file_sales.getbuffer())
-            batch_upload_csv_to_supabase("temp_sales.csv", "sales")
+if df_sales.empty or df_purchase.empty:
+    st.info("販売実績または仕入データが不足しています。")
+    st.stop()
 
-    with upload_col2:
-        file_purchase = st.file_uploader("🛒 purchase_data.csv をアップロード", type="csv")
-        if file_purchase:
-            with open("temp_purchase.csv", "wb") as f:
-                f.write(file_purchase.getbuffer())
-            batch_upload_csv_to_supabase("temp_purchase.csv", "purchase_data")
+# 整形
+df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
+df_purchase["jan"] = df_purchase["jan"].astype(str).str.strip()
 
-# --- 最適な発注パターンと理由をAI的に提示する関数 ---
-def suggest_optimal_order(jan, need_qty, purchase_df):
-    purchase_df = purchase_df[purchase_df["jan"] == jan].copy()
-    if purchase_df.empty:
-        return None, "仕入候補が存在しません"
+results = []
 
+for _, row in df_sales.iterrows():
+    jan = row["jan"]
+    sold = row.get("quantity_sold", 0)
+    stock = row.get("stock_total", 0)
+    need_qty = max(sold - stock, 0)
+    if need_qty <= 0:
+        continue
+
+    # 該当JANの仕入候補を抽出
+    purchase_options = df_purchase[df_purchase["jan"] == jan]
+    if purchase_options.empty:
+        continue
+
+    # AIロジック的な最適選択（最安になる組み合わせを選ぶ）
     best_plan = None
-    reason = ""
-    for _, row in purchase_df.iterrows():
-        lot = row["order_lot"]
-        price = row["price"]
-        supplier = row["supplier"]
+    for _, opt in purchase_options.iterrows():
+        lot = opt["order_lot"]
+        price = opt["price"]
+        supplier = opt["supplier"]
         if lot <= 0:
             continue
         units = -(-need_qty // lot)  # ceiling division
-        total_price = units * lot * price
-        if (best_plan is None) or (total_price < best_plan["total"]):
+        total_cost = units * lot * price
+        if best_plan is None or total_cost < best_plan["total"]:
             best_plan = {
-                "supplier": supplier,
-                "lot": lot,
-                "price": price,
-                "units": units,
-                "total": total_price
+                "jan": jan,
+                "販売数": sold,
+                "在庫": stock,
+                "必要数": need_qty,
+                "ロット": lot,
+                "単価": price,
+                "セット数": units,
+                "合計": total_cost,
+                "仕入先": supplier
             }
-            reason = f"発注数 {need_qty} に対して、{supplier} のロット {lot} で {units} セット注文 → 合計 {total_price:.0f}円 が最安です"
-    return best_plan, reason
 
-# --- 発注判定画面 ---
-if mode == "📝 発注判定":
-    st.subheader("📝 発注対象商品の自動判定")
+    if best_plan:
+        results.append(best_plan)
 
-    sales_df = fetch_table("sales")
-    purchase_df = fetch_table("purchase_data")
-
-    if sales_df.empty or purchase_df.empty:
-        st.warning("販売実績または仕入データが不足しています。先にアップロードしてください。")
-        st.stop()
-
-    sales_df["jan"] = sales_df["jan"].astype(str).str.strip()
-    purchase_df["jan"] = purchase_df["jan"].astype(str).str.strip()
-
-    results = []
-    for _, row in sales_df.iterrows():
-        jan = row["jan"]
-        sold = row.get("quantity_sold", 0)
-        stock = row.get("stock_total", 0)
-        need_qty = max(sold - stock, 0)
-        if need_qty > 0:
-            best_plan, reason = suggest_optimal_order(jan, need_qty, purchase_df)
-            if best_plan:
-                results.append({
-                    "jan": jan,
-                    "販売数": sold,
-                    "在庫": stock,
-                    "発注数": need_qty,
-                    "ロット": best_plan["lot"],
-                    "単価": best_plan["price"],
-                    "合計金額": best_plan["total"],
-                    "仕入先": best_plan["supplier"],
-                    "コメント": reason
-                })
-
-    if results:
-        df_order = pd.DataFrame(results)
-        st.dataframe(df_order)
-
-        csv = df_order.to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            label="📥 発注CSVダウンロード",
-            data=csv,
-            file_name="recommended_orders.csv",
-            mime="text/csv"
-        )
-    else:
-        st.info("現在、発注が必要な商品はありません。")
+if results:
+    result_df = pd.DataFrame(results)
+    st.dataframe(result_df)
+    csv = result_df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button("📥 発注CSVダウンロード", data=csv, file_name="recommended_orders.csv", mime="text/csv")
+else:
+    st.info("現在、発注が必要な商品はありません。")
