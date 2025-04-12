@@ -114,12 +114,6 @@ if mode == "📦 発注AI判定":
         available_at_arrival = max(0, stock - expected_half_month_sales)
         need_qty = max(sold - available_at_arrival, 0)
 
-        st.write(f"JAN: {jan}")
-        st.write(f"  今月販売見込: {sold}")
-        st.write(f"  利用可能在庫: {stock}")
-        st.write(f"  納品時在庫予測: {available_at_arrival}")
-        st.write(f"  必要発注数: {need_qty}")
-
         if need_qty <= 0:
             continue
 
