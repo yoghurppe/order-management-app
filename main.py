@@ -104,87 +104,71 @@ if mode == "📦 発注AI判定":
     df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
     df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
+    MAX_MONTHS_OF_STOCK = 3
     results = []
+
     for _, row in df_sales.iterrows():
         jan = row["jan"]
         sold = row["quantity_sold"]
         stock = row.get("stock_available", 0)
 
+        options = df_purchase[df_purchase["jan"] == jan].copy()
+        if options.empty:
+            continue
+
+        options["price"] = pd.to_numeric(options["price"], errors="coerce")
+        options = options.sort_values(by="price", ascending=True)
+
+        best_plan = None
+        best_score = float("inf")
+
+        # 本来の必要数を計算
         expected_half_month_sales = sold * 0.5
         available_at_arrival = max(0, stock - expected_half_month_sales)
         need_qty = max(sold - available_at_arrival, 0)
 
-        if need_qty <= 0:
-            continue
+        for _, opt in options.iterrows():
+            lot = opt["order_lot"]
+            price = opt["price"]
+            supplier = opt.get("supplier", "不明")
+            if pd.isna(lot) or pd.isna(price) or lot <= 0:
+                continue
 
-MAX_MONTHS_OF_STOCK = 3
-
-for _, row in df_sales.iterrows():
-    jan = row["jan"]
-    sold = row["quantity_sold"]
-    stock = row.get("stock_available", 0)
-
-    options = df_purchase[df_purchase["jan"] == jan].copy()
-    if options.empty:
-        continue
-
-    options["price"] = pd.to_numeric(options["price"], errors="coerce")
-    options = options.sort_values(by="price", ascending=True)
-
-    best_plan = None
-    best_score = float("inf")
-
-    # 本来の必要数を計算
-    expected_half_month_sales = sold * 0.5
-    available_at_arrival = max(0, stock - expected_half_month_sales)
-    need_qty = max(sold - available_at_arrival, 0)
-
-    for _, opt in options.iterrows():
-        lot = opt["order_lot"]
-        price = opt["price"]
-        supplier = opt.get("supplier", "不明")
-        if pd.isna(lot) or pd.isna(price) or lot <= 0:
-            continue
-
-        sets = math.ceil(need_qty / lot)
-        qty = sets * lot
-
-        # 🔁 在庫回転率の考慮（最低1セットは維持）
-        max_qty = sold * MAX_MONTHS_OF_STOCK
-        if qty > max_qty:
-            if lot > max_qty:
-                continue  # 明らかに仕入れすぎ → 候補から除外
-            sets = max(1, math.floor(max_qty / lot))
+            sets = math.ceil(need_qty / lot)
             qty = sets * lot
 
-        if qty <= 0:
-            continue
+            # 🔁 在庫回転率の考慮（最低1セットは維持）
+            max_qty = sold * MAX_MONTHS_OF_STOCK
+            if qty > max_qty:
+                if lot > max_qty:
+                    continue  # 明らかに仕入れすぎ → 候補から除外
+                sets = max(1, math.floor(max_qty / lot))
+                qty = sets * lot
 
-        total_cost = qty * price
+            if qty <= 0:
+                continue
 
-        # 🧠 在庫回転率に応じたズレのペナルティ（必要数からのズレを評価）
-        penalty_ratio = MAX_MONTHS_OF_STOCK / max(sold, 1)
-        score = abs(qty - need_qty) * price * penalty_ratio + total_cost * 0.01
+            total_cost = qty * price
 
-        if score < best_score:
-            best_score = score
-            best_plan = {
-                "jan": jan,
-                "販売実績": sold,
-                "在庫": stock,
-                "必要数（納品まで＋来月分）": qty,
-                "理論必要数": need_qty,
-                "単価": price,
-                "総額": total_cost,
-                "仕入先": supplier
-            }
+            # 🧠 在庫回転率に応じたズレのペナルティ（必要数からのズレを評価）
+            penalty_ratio = MAX_MONTHS_OF_STOCK / max(sold, 1)
+            score = abs(qty - need_qty) * price * penalty_ratio + total_cost * 0.01
 
-    if best_plan:
-        results.append(best_plan)
+            if score < best_score:
+                best_score = score
+                best_plan = {
+                    "jan": jan,
+                    "販売実績": sold,
+                    "在庫": stock,
+                    "必要数（納品まで＋来月分）": qty,
+                    "理論必要数": need_qty,
+                    "単価": price,
+                    "総額": total_cost,
+                    "仕入先": supplier
+                }
 
-
-# 以下省略（その他のコードは変更なし）
-
+        if best_plan:
+            results.append(best_plan)
 
     if results:
         result_df = pd.DataFrame(results)
@@ -194,6 +178,7 @@ for _, row in df_sales.iterrows():
         st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
     else:
         st.info("現在、発注が必要な商品はありません。")
+
 
 
 # --- 商品情報DB検索機能 ---
