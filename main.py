@@ -146,10 +146,7 @@ if mode == "📦 発注AI判定":
     matched = sales_jans & purchase_jans
     unmatched = sales_jans - purchase_jans
 
-    st.write(f"🧮 sales内JAN数: {len(sales_jans)}")
-    st.write(f"✅ purchaseに一致したJAN数: {len(matched)}")
-    st.write(f"❌ purchaseに存在しないJAN: {len(unmatched)} 件")
-
+    
     if df_sales.empty or df_purchase.empty:
         st.warning("販売実績または仕入データが不足しています。")
         st.stop()
@@ -172,8 +169,7 @@ if mode == "📦 発注AI判定":
 
         options = df_purchase[df_purchase["jan"] == jan].copy()
         if options.empty:
-            st.write(f"⚠️ {jan} は purchase_data に候補が見つからずスキップされました")
-            continue
+                        continue
 
         options["price"] = pd.to_numeric(options["price"], errors="coerce")
         options = options.sort_values(by="price", ascending=True)
@@ -188,8 +184,7 @@ if mode == "📦 発注AI判定":
         need_qty = max(need_qty, 1)  # 少なくとも1は仕入れる
 
         for _, opt in options.iterrows():
-            st.write(f"🧪 {jan} | ロット: {opt['order_lot']}, 単価: {opt['price']}")
-            lot = opt["order_lot"]
+                        lot = opt["order_lot"]
             price = opt["price"]
             supplier = opt.get("supplier", "不明")
             if pd.isna(lot) or pd.isna(price) or lot <= 0:
@@ -218,8 +213,7 @@ if mode == "📦 発注AI判定":
             penalty_ratio = MAX_MONTHS_OF_STOCK / max(sold, 1)
             score = abs(qty - need_qty) * price * penalty_ratio + total_cost * 0.01
 
-            st.write(f"  → need_qty={need_qty}, qty={qty}, max_qty={max_qty}, score={score:.2f}")
-
+            
             if score < best_score:
                 best_score = score
                 best_plan = {
