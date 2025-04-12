@@ -14,7 +14,7 @@ HEADERS = {
 }
 
 st.set_page_config(page_title="発注管理システム", layout="wide")
-st.title("📦 発注AI（次月も在庫切れしない仕入）")
+st.title("📦 発注AI（正確な在庫消化を考慮）")
 
 mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定"])
 
@@ -80,7 +80,7 @@ if mode == "📤 CSVアップロード":
         batch_upload_csv_to_supabase(temp_path, "purchase_data")
 
 if mode == "📦 発注AI判定":
-    st.header("📦 発注AI（次月在庫切れ回避）")
+    st.header("📦 発注AI（次月在庫切れ回避・在庫消化考慮）")
 
     @st.cache_data(ttl=1)
     def fetch_table(table_name):
@@ -111,8 +111,10 @@ if mode == "📦 発注AI判定":
         sold = row["quantity_sold"]
         stock = row["stock_total"]
 
-        # 🔁 次の1ヶ月分もカバー → 必要数は2倍
-        need_qty = max(sold * 2 - stock, 0)
+        # 🔁 発注は「次月の販売実績」だけをカバー（今月分は今の在庫で吸収される前提）
+        available_after_this_month = stock - sold
+        next_month_demand = sold
+        need_qty = max(next_month_demand - available_after_this_month, 0)
 
         if need_qty <= 0:
             continue
@@ -140,7 +142,7 @@ if mode == "📦 発注AI判定":
                     "jan": jan,
                     "販売実績": sold,
                     "在庫": stock,
-                    "必要数（次月まで）": qty,
+                    "必要数（次月分まで）": qty,
                     "単価": price,
                     "仕入先": supplier
                 }
@@ -153,6 +155,6 @@ if mode == "📦 発注AI判定":
         st.success(f"✅ 発注対象: {len(result_df)} 件")
         st.dataframe(result_df)
         csv = result_df.to_csv(index=False).encode("utf-8-sig")
-        st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_demand_based.csv", mime="text/csv")
+        st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_fixed_demand.csv", mime="text/csv")
     else:
         st.info("現在、発注が必要な商品はありません。")
