@@ -39,9 +39,13 @@ def batch_upload_csv_to_supabase(file_path, table):
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).round().astype(int)
 
         if table == "purchase_data":
-            for col in ["order_lot"]:
+            for col in ["order_lot", "price"]:
                 if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).round().astype(int)
+                    df[col] = (df[col].astype(str).str.replace(",", "")  # カンマ除去
+                                    .pipe(pd.to_numeric, errors="coerce")
+                                    .fillna(0))
+                    if col == "order_lot":
+                        df[col] = df[col].round().astype(int)
 
         df["jan"] = df["jan"].astype(str).str.strip()
         df = df.drop_duplicates(subset=["jan", "supplier"] if "supplier" in df.columns else "jan", keep="last")
