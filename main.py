@@ -106,7 +106,7 @@ if mode == "📦 発注AI判定":
 
     @st.cache_data(ttl=1)
     def fetch_table(table_name):
-        res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*", headers=HEADERS)
+        res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*", headers={**HEADERS, "Range": "0-49999"})
         if res.status_code == 200:
             return pd.DataFrame(res.json())
         st.error(f"{table_name} の取得に失敗: {res.text}")
