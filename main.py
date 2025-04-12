@@ -234,6 +234,12 @@ if mode == "📦 発注AI判定":
 
     if results:
         result_df = pd.DataFrame(results)
+        # 列の並び順を調整（ロットを単価の左に）
+        column_order = [
+            "jan", "販売実績", "在庫", "必要数（納品まで＋来月分）", "理論必要数",
+            "ロット", "単価", "総額", "仕入先"
+        ]
+        result_df = result_df[[col for col in column_order if col in result_df.columns]]
         st.success(f"✅ 発注対象: {len(result_df)} 件")
         st.dataframe(result_df)
         csv = result_df.to_csv(index=False).encode("utf-8-sig")
