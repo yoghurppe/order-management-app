@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import os
+import math
 
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -13,7 +14,7 @@ HEADERS = {
 }
 
 st.set_page_config(page_title="発注管理システム", layout="wide")
-st.title("📦 発注管理システム（単価優先・修正版）")
+st.title("📦 発注AI（次月も在庫切れしない仕入）")
 
 mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定"])
 
@@ -79,13 +80,10 @@ if mode == "📤 CSVアップロード":
         batch_upload_csv_to_supabase(temp_path, "purchase_data")
 
 if mode == "📦 発注AI判定":
-    st.header("📦 発注対象商品AI判定（単価優先・修正版）")
-
-    import time
+    st.header("📦 発注AI（次月在庫切れ回避）")
 
     @st.cache_data(ttl=1)
     def fetch_table(table_name):
-        time.sleep(1)
         res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*", headers=HEADERS)
         if res.status_code == 200:
             return pd.DataFrame(res.json())
@@ -112,7 +110,9 @@ if mode == "📦 発注AI判定":
         jan = row["jan"]
         sold = row["quantity_sold"]
         stock = row["stock_total"]
-        need_qty = max(sold - stock, 0)
+
+        # 🔁 次の1ヶ月分もカバー → 必要数は2倍
+        need_qty = max(sold * 2 - stock, 0)
 
         if need_qty <= 0:
             continue
@@ -123,8 +123,8 @@ if mode == "📦 発注AI判定":
 
         options["price"] = pd.to_numeric(options["price"], errors="coerce")
         options = options.sort_values(by="price", ascending=True)
-        st.write(f"🔎 候補一覧（JAN={jan}）", options[["supplier", "order_lot", "price"]])
 
+        best_plan = None
         for _, opt in options.iterrows():
             lot = opt["order_lot"]
             price = opt["price"]
@@ -132,21 +132,27 @@ if mode == "📦 発注AI判定":
             if pd.isna(lot) or pd.isna(price) or lot <= 0:
                 continue
 
-            sets = -(-need_qty // lot)
-            results.append({
-                "jan": jan,
-                "必要数": sets * lot,
-                "単価": price,
-                "仕入先": supplier
-            })
-            break
+            sets = math.ceil(need_qty / lot)
+            qty = sets * lot
+
+            if best_plan is None or price < best_plan["単価"]:
+                best_plan = {
+                    "jan": jan,
+                    "販売実績": sold,
+                    "在庫": stock,
+                    "必要数（次月まで）": qty,
+                    "単価": price,
+                    "仕入先": supplier
+                }
+
+        if best_plan:
+            results.append(best_plan)
 
     if results:
         result_df = pd.DataFrame(results)
-        export_df = result_df[["jan", "必要数", "単価", "仕入先"]]
-        st.success(f"✅ 発注対象: {len(export_df)} 件")
-        st.dataframe(export_df)
-        csv = export_df.to_csv(index=False).encode("utf-8-sig")
-        st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders.csv", mime="text/csv")
+        st.success(f"✅ 発注対象: {len(result_df)} 件")
+        st.dataframe(result_df)
+        csv = result_df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_demand_based.csv", mime="text/csv")
     else:
         st.info("現在、発注が必要な商品はありません。")
