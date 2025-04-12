@@ -119,7 +119,6 @@ if mode == "📦 発注AI判定":
 
         options = df_purchase[df_purchase["jan"] == jan].copy()
         if options.empty:
-            st.warning(f"⚠️ 仕入候補が見つかりません (JAN: {jan})")
             continue
 
         options["price"] = pd.to_numeric(options["price"], errors="coerce")
