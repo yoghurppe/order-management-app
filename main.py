@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import requests
@@ -15,14 +16,11 @@ HEADERS = {
 st.set_page_config(page_title="発注管理システム", layout="wide")
 st.title("📦 発注管理システム（統合版）")
 
-# --- モード選択 ---
 mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定"])
 
-# --- バッチアップロード関数 ---
 def batch_upload_csv_to_supabase(file_path, table):
     try:
         df = pd.read_csv(file_path)
-
         if table == "sales":
             df.rename(columns={
                 "アイテム": "jan",
@@ -64,7 +62,6 @@ def batch_upload_csv_to_supabase(file_path, table):
     except Exception as e:
         st.error(f"❌ {table} のアップロード中にエラー: {e}")
 
-# --- CSVアップロード画面 ---
 if mode == "📤 CSVアップロード":
     st.header("📤 CSVアップロード")
 
@@ -82,15 +79,14 @@ if mode == "📤 CSVアップロード":
             f.write(purchase_file.read())
         batch_upload_csv_to_supabase(temp_path, "purchase_data")
 
-# --- 発注判定画面 ---
 if mode == "📦 発注AI判定":
     st.header("📦 発注対象商品AI判定")
 
     import time
 
-    @st.cache_data(ttl=1)  # キャッシュを短命に
+    @st.cache_data(ttl=1)
     def fetch_table(table_name):
-        time.sleep(1)  # Supabase側の反映を待つ
+        time.sleep(1)
         res = requests.get(f"{SUPABASE_URL}/rest/v1/{table_name}?select=*", headers=HEADERS)
         if res.status_code == 200:
             return pd.DataFrame(res.json())
@@ -100,15 +96,9 @@ if mode == "📦 発注AI判定":
     df_sales = fetch_table("sales")
     df_purchase = fetch_table("purchase_data")
 
-    # 🔍 デバッグ表示
-    st.write(f"📊 df_sales: {len(df_sales)} 件 / columns: {df_sales.columns.tolist()}")
-    st.write(f"📦 df_purchase: {len(df_purchase)} 件 / columns: {df_purchase.columns.tolist()}")
-
     if df_sales.empty or df_purchase.empty:
         st.warning("販売実績または仕入データが不足しています。")
         st.stop()
-
-
 
     df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
     df_purchase["jan"] = df_purchase["jan"].astype(str).str.strip()
@@ -125,13 +115,11 @@ if mode == "📦 発注AI判定":
         stock = row["stock_total"]
         need_qty = max(sold - stock, 0)
 
-        st.write(f"🔍 JAN: {jan}, 販売数={sold}, 在庫={stock}, 必要数={need_qty}")
         if need_qty <= 0:
             continue
 
         options = df_purchase[df_purchase["jan"] == jan]
         if options.empty:
-            st.warning(f"⚠️ 仕入候補が見つかりません (JAN: {jan})")
             continue
 
         best_plan = None
@@ -146,13 +134,8 @@ if mode == "📦 発注AI判定":
             if best_plan is None or total < best_plan["合計"]:
                 best_plan = {
                     "jan": jan,
-                    "販売数": sold,
-                    "在庫": stock,
-                    "必要数": need_qty,
-                    "ロット": lot,
+                    "必要数": sets * lot,
                     "単価": price,
-                    "セット数": sets,
-                    "合計": total,
                     "仕入先": supplier
                 }
 
@@ -161,9 +144,10 @@ if mode == "📦 発注AI判定":
 
     if results:
         result_df = pd.DataFrame(results)
-        st.success(f"✅ 発注対象: {len(result_df)} 件")
-        st.dataframe(result_df)
-        csv = result_df.to_csv(index=False).encode("utf-8-sig")
+        export_df = result_df[["jan", "必要数", "単価", "仕入先"]]
+        st.success(f"✅ 発注対象: {len(export_df)} 件")
+        st.dataframe(export_df)
+        csv = export_df.to_csv(index=False).encode("utf-8-sig")
         st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders.csv", mime="text/csv")
     else:
         st.info("現在、発注が必要な商品はありません。")
