@@ -184,7 +184,7 @@ if mode == "📦 発注AI判定":
         need_qty = max(need_qty, 1)  # 少なくとも1は仕入れる
 
         for _, opt in options.iterrows():
-                        lot = opt["order_lot"]
+            lot = opt["order_lot"]
             price = opt["price"]
             supplier = opt.get("supplier", "不明")
             if pd.isna(lot) or pd.isna(price) or lot <= 0:
