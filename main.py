@@ -165,7 +165,6 @@ if mode == "📦 発注AI判定":
             continue
 
         options["price"] = pd.to_numeric(options["price"], errors="coerce")
-        options = options.sort_values(by="price", ascending=True)
 
         if stock >= sold:
             need_qty = 0
@@ -175,82 +174,45 @@ if mode == "📦 発注AI判定":
             need_qty = max(need_qty, 1)
 
         if need_qty <= 0:
-            continue  # 理論必要数が0の場合は表示しない
-
-        best_plan = None
-        best_score = float("inf")
-
-        # 優先ロジック: 理論必要数を満たす中で最大ロットを優先
-        valid_options = options[options["order_lot"] > 0].copy()
-        valid_options["sets"] = (need_qty / valid_options["order_lot"]).apply(math.ceil)
-        valid_options["qty"] = valid_options["sets"] * valid_options["order_lot"]
-        valid_options["total_cost"] = valid_options["qty"] * valid_options["price"]
-        valid_options = valid_options[valid_options["qty"] >= need_qty]
-
-        if not valid_options.empty:
-            best_opt = valid_options.sort_values(by=["order_lot", "price"], ascending=[False, True]).iloc[0]
-            best_plan = {
-                "jan": jan,
-                "ロット": best_opt["order_lot"],
-                "販売実績": sold,
-                "在庫": stock,
-                "必要数（納品まで＋来月分）": int(best_opt["qty"]),
-                "理論必要数": need_qty,
-                "単価": best_opt["price"],
-                "総額": best_opt["total_cost"],
-                "仕入先": best_opt.get("supplier", "不明")
-            }
-            results.append(best_plan)
             continue
 
-        for _, opt in options.iterrows():
-            lot = opt["order_lot"]
-            price = opt["price"]
-            supplier = opt.get("supplier", "不明")
-            if pd.isna(lot) or pd.isna(price) or lot <= 0:
-                continue
+        # 条件に応じたロット選択ルール
+        options = options[options["order_lot"] > 0]
+        options["diff"] = (options["order_lot"] - need_qty).abs()
 
-            sets = math.ceil(need_qty / lot)
-            qty = sets * lot
+        # まず理論必要数を下回るロットを抽出
+        smaller_lots = options[options["order_lot"] <= need_qty]
 
-            max_qty = sold * MAX_MONTHS_OF_STOCK
-            if qty > max_qty:
-                if qty > max_qty and lot > max_qty:
+        if not smaller_lots.empty:
+            best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
+        else:
+            # 次に order_lot > need_qty でも、order_lot <= need_qty * 1.2 を許容
+            near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.2) & (options["order_lot"] != 1)]
+            if not near_lots.empty:
+                best_option = near_lots.loc[near_lots["diff"].idxmin()]
+            else:
+                # 最後の手段としてロット1を選ぶ
+                one_lot = options[options["order_lot"] == 1]
+                if one_lot.empty:
                     continue
-                sets = max(1, math.floor(max_qty / lot))
-                qty = sets * lot
+                best_option = one_lot.iloc[0]
 
-            if qty <= 0:
-                if lot <= max_qty:
-                    qty = lot
-                else:
-                    continue
+        sets = math.ceil(need_qty / best_option["order_lot"])
+        qty = sets * best_option["order_lot"]
+        total_cost = qty * best_option["price"]
 
-            total_cost = qty * price
-
-            penalty_ratio = MAX_MONTHS_OF_STOCK / max(sold, 1)
-            lot_penalty = 0
-            if lot < need_qty * 0.5:
-                lot_penalty = (need_qty * 0.5 - lot) * 0.5
-
-            score = abs(qty - need_qty) * price * penalty_ratio + total_cost * 0.01 + lot_penalty
-
-            if score < best_score:
-                best_score = score
-                best_plan = {
-                    "jan": jan,
-                    "ロット": lot,
-                    "販売実績": sold,
-                    "在庫": stock,
-                    "必要数（納品まで＋来月分）": qty,
-                    "理論必要数": need_qty,
-                    "単価": price,
-                    "総額": total_cost,
-                    "仕入先": supplier
-                }
-
-        if best_plan:
-            results.append(best_plan)
+        best_plan = {
+            "jan": jan,
+            "ロット": best_option["order_lot"],
+            "販売実績": sold,
+            "在庫": stock,
+            "必要数（納品まで＋来月分）": qty,
+            "理論必要数": need_qty,
+            "単価": best_option["price"],
+            "総額": total_cost,
+            "仕入先": best_option.get("supplier", "不明")
+        }
+        results.append(best_plan)
 
     if results:
         result_df = pd.DataFrame(results)
