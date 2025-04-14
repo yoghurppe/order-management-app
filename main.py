@@ -140,13 +140,11 @@ if mode == "📦 発注AI判定":
     df_sales = fetch_table("sales")
     df_purchase = fetch_table("purchase_data")
 
-    # JAN一致率のログ出力
     sales_jans = set(df_sales["jan"].unique())
     purchase_jans = set(df_purchase["jan"].unique())
     matched = sales_jans & purchase_jans
     unmatched = sales_jans - purchase_jans
 
-    
     if df_sales.empty or df_purchase.empty:
         st.warning("販売実績または仕入データが不足しています。")
         st.stop()
@@ -169,7 +167,7 @@ if mode == "📦 発注AI判定":
 
         options = df_purchase[df_purchase["jan"] == jan].copy()
         if options.empty:
-                        continue
+            continue
 
         options["price"] = pd.to_numeric(options["price"], errors="coerce")
         options = options.sort_values(by="price", ascending=True)
@@ -177,13 +175,35 @@ if mode == "📦 発注AI判定":
         best_plan = None
         best_score = float("inf")
 
-        # 本来の必要数を計算（より自然な在庫判断）
         if stock >= sold:
-            need_qty = 0  # 在庫が十分にあるので仕入れ不要
+            need_qty = 0
         else:
             need_qty = sold - stock
-            need_qty += math.ceil(sold * 0.5)  # 次月分も確保（50%）
-            need_qty = max(need_qty, 1)  # 少なくとも1は仕入れる
+            need_qty += math.ceil(sold * 0.5)
+            need_qty = max(need_qty, 1)
+
+        # --- 優先ロジック: 理論必要数を満たす中で最大ロットを優先 ---
+        valid_options = options[options["order_lot"] > 0].copy()
+        valid_options["sets"] = (need_qty / valid_options["order_lot"]).apply(math.ceil)
+        valid_options["qty"] = valid_options["sets"] * valid_options["order_lot"]
+        valid_options["total_cost"] = valid_options["qty"] * valid_options["price"]
+        valid_options = valid_options[valid_options["qty"] >= need_qty]
+
+        if not valid_options.empty:
+            best_opt = valid_options.sort_values(by=["order_lot", "price"], ascending=[False, True]).iloc[0]
+            best_plan = {
+                "jan": jan,
+                "ロット": best_opt["order_lot"],
+                "販売実績": sold,
+                "在庫": stock,
+                "必要数（納品まで＋来月分）": int(best_opt["qty"]),
+                "理論必要数": need_qty,
+                "単価": best_opt["price"],
+                "総額": best_opt["total_cost"],
+                "仕入先": best_opt.get("supplier", "不明")
+            }
+            results.append(best_plan)
+            continue
 
         for _, opt in options.iterrows():
             lot = opt["order_lot"]
@@ -195,27 +215,28 @@ if mode == "📦 発注AI判定":
             sets = math.ceil(need_qty / lot)
             qty = sets * lot
 
-            # 🔁 在庫回転率の考慮（最低1セットは維持）
             max_qty = sold * MAX_MONTHS_OF_STOCK
             if qty > max_qty:
                 if qty > max_qty and lot > max_qty:
-                    continue  # 明らかに仕入れすぎ → 候補から除外
+                    continue
                 sets = max(1, math.floor(max_qty / lot))
                 qty = sets * lot
 
             if qty <= 0:
                 if lot <= max_qty:
-                    qty = lot  # 最低でも1ロットは発注する
+                    qty = lot
                 else:
                     continue
 
             total_cost = qty * price
 
-            # 🧠 在庫回転率に応じたズレのペナルティ（必要数からのズレを評価）
             penalty_ratio = MAX_MONTHS_OF_STOCK / max(sold, 1)
-            score = abs(qty - need_qty) * price * penalty_ratio + total_cost * 0.01
+            lot_penalty = 0
+            if lot < need_qty * 0.5:
+                lot_penalty = (need_qty * 0.5 - lot) * 0.5
 
-            
+            score = abs(qty - need_qty) * price * penalty_ratio + total_cost * 0.01 + lot_penalty
+
             if score < best_score:
                 best_score = score
                 best_plan = {
