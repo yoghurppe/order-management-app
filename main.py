@@ -120,7 +120,7 @@ if mode == "📦 発注AI判定":
             res = requests.get(url, headers=headers)
 
             if res.status_code == 416:
-                break  # データ終端に到達
+                break
 
             if res.status_code not in [200, 206]:
                 st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
@@ -139,11 +139,6 @@ if mode == "📦 発注AI判定":
 
     df_sales = fetch_table("sales")
     df_purchase = fetch_table("purchase_data")
-
-    sales_jans = set(df_sales["jan"].unique())
-    purchase_jans = set(df_purchase["jan"].unique())
-    matched = sales_jans & purchase_jans
-    unmatched = sales_jans - purchase_jans
 
     if df_sales.empty or df_purchase.empty:
         st.warning("販売実績または仕入データが不足しています。")
@@ -172,9 +167,6 @@ if mode == "📦 発注AI判定":
         options["price"] = pd.to_numeric(options["price"], errors="coerce")
         options = options.sort_values(by="price", ascending=True)
 
-        best_plan = None
-        best_score = float("inf")
-
         if stock >= sold:
             need_qty = 0
         else:
@@ -182,7 +174,13 @@ if mode == "📦 発注AI判定":
             need_qty += math.ceil(sold * 0.5)
             need_qty = max(need_qty, 1)
 
-        # --- 優先ロジック: 理論必要数を満たす中で最大ロットを優先 ---
+        if need_qty <= 0:
+            continue  # 理論必要数が0の場合は表示しない
+
+        best_plan = None
+        best_score = float("inf")
+
+        # 優先ロジック: 理論必要数を満たす中で最大ロットを優先
         valid_options = options[options["order_lot"] > 0].copy()
         valid_options["sets"] = (need_qty / valid_options["order_lot"]).apply(math.ceil)
         valid_options["qty"] = valid_options["sets"] * valid_options["order_lot"]
@@ -251,7 +249,7 @@ if mode == "📦 発注AI判定":
                     "仕入先": supplier
                 }
 
-        if best_plan and best_plan["理論必要数"] > 0:
+        if best_plan:
             results.append(best_plan)
 
     if results:
