@@ -173,7 +173,8 @@ if mode == "📦 発注AI判定":
         else:
             need_qty = sold - stock
             need_qty += math.ceil(sold * 0.5)
-            need_qty = max(need_qty, 1)
+            need_qty -= ordered  # 発注済み分を差し引く
+            need_qty = max(need_qty, 0)
 
         if need_qty <= 0:
             continue
@@ -223,8 +224,6 @@ if mode == "📦 発注AI判定":
         st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
     else:
         st.info("現在、発注が必要な商品はありません。")
-
-
 
 # --- 商品情報DB検索機能 ---
 if mode == "🔍 商品情報検索":
