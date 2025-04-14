@@ -149,6 +149,7 @@ if mode == "📦 発注AI判定":
 
     df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
     df_sales["stock_available"] = pd.to_numeric(df_sales["stock_available"], errors="coerce").fillna(0).astype(int)
+    df_sales["stock_ordered"] = pd.to_numeric(df_sales["stock_ordered"], errors="coerce").fillna(0).astype(int)
     df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
     df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
@@ -159,6 +160,7 @@ if mode == "📦 発注AI判定":
         jan = row["jan"]
         sold = row["quantity_sold"]
         stock = row.get("stock_available", 0)
+        ordered = row.get("stock_ordered", 0)
 
         options = df_purchase[df_purchase["jan"] == jan].copy()
         if options.empty:
@@ -176,22 +178,18 @@ if mode == "📦 発注AI判定":
         if need_qty <= 0:
             continue
 
-        # 条件に応じたロット選択ルール
         options = options[options["order_lot"] > 0]
         options["diff"] = (options["order_lot"] - need_qty).abs()
 
-        # まず理論必要数を下回るロットを抽出
         smaller_lots = options[options["order_lot"] <= need_qty]
 
         if not smaller_lots.empty:
             best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
         else:
-            # 次に order_lot > need_qty でも、order_lot <= need_qty * 1.2 を許容
             near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.2) & (options["order_lot"] != 1)]
             if not near_lots.empty:
                 best_option = near_lots.loc[near_lots["diff"].idxmin()]
             else:
-                # 最後の手段としてロット1を選ぶ
                 one_lot = options[options["order_lot"] == 1]
                 if one_lot.empty:
                     continue
@@ -203,11 +201,12 @@ if mode == "📦 発注AI判定":
 
         best_plan = {
             "jan": jan,
-            "ロット": best_option["order_lot"],
             "販売実績": sold,
             "在庫": stock,
-            "必要数（納品まで＋来月分）": qty,
+            "発注済": ordered,
             "理論必要数": need_qty,
+            "発注数": qty,
+            "ロット": best_option["order_lot"],
             "単価": best_option["price"],
             "総額": total_cost,
             "仕入先": best_option.get("supplier", "不明")
@@ -216,11 +215,7 @@ if mode == "📦 発注AI判定":
 
     if results:
         result_df = pd.DataFrame(results)
-        # 列の並び順を調整（ロットを単価の左に）
-        column_order = [
-            "jan", "販売実績", "在庫", "必要数（納品まで＋来月分）", "理論必要数",
-            "ロット", "単価", "総額", "仕入先"
-        ]
+        column_order = ["jan", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "単価", "総額", "仕入先"]
         result_df = result_df[[col for col in column_order if col in result_df.columns]]
         st.success(f"✅ 発注対象: {len(result_df)} 件")
         st.dataframe(result_df)
@@ -228,6 +223,7 @@ if mode == "📦 発注AI判定":
         st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
     else:
         st.info("現在、発注が必要な商品はありません。")
+
 
 
 # --- 商品情報DB検索機能 ---
