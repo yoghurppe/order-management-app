@@ -208,6 +208,7 @@ if mode == "📦 発注AI判定":
             "理論必要数": need_qty,
             "発注数": qty,
             "ロット": best_option["order_lot"],
+            "数量": round(qty / best_option["order_lot"], 2),
             "単価": best_option["price"],
             "総額": total_cost,
             "仕入先": best_option.get("supplier", "不明")
@@ -216,7 +217,7 @@ if mode == "📦 発注AI判定":
 
     if results:
         result_df = pd.DataFrame(results)
-        column_order = ["jan", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "単価", "総額", "仕入先"]
+        column_order = ["jan", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
         result_df = result_df[[col for col in column_order if col in result_df.columns]]
         st.success(f"✅ 発注対象: {len(result_df)} 件")
         st.dataframe(result_df)
