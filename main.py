@@ -294,11 +294,14 @@ if mode == "📤 商品情報CSVアップロード":
             "注文済": "発注済",
             "名前": "商品コード"
         }, inplace=True)
-
+    
+        # 不要な列を削除
+        df.drop(columns=["内部ID"], inplace=True, errors="ignore")
+    
         # 商品コードを商品名の先頭に追加
         if "商品コード" in df.columns and "商品名" in df.columns:
             df["商品名"] = df["商品コード"].astype(str) + " " + df["商品名"].astype(str)
-
+    
         df["jan"] = df["jan"].apply(normalize_jan)
         return df
 
