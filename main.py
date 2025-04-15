@@ -281,6 +281,24 @@ if mode == "📤 商品情報CSVアップロード":
     st.header("📤 商品情報CSVアップロード")
 
     def preprocess_item_master(df):
+        df.rename(columns={
+            "UPCコード": "jan",
+            "表示名": "商品名",
+            "メーカー名": "ブランド",
+            "アイテム定義原価": "仕入価格",
+            "カートン入数": "ケース入数",
+            "発注ロット": "発注ロット",
+            "パッケージ重量(g)": "重量",
+            "手持": "在庫",
+            "利用可能": "利用可能",
+            "注文済": "発注済",
+            "名前": "商品コード"
+        }, inplace=True)
+
+        # 商品コードを商品名の先頭に追加
+        if "商品コード" in df.columns and "商品名" in df.columns:
+            df["商品名"] = df["商品コード"].astype(str) + " " + df["商品名"].astype(str)
+
         df["jan"] = df["jan"].apply(normalize_jan)
         return df
 
@@ -293,8 +311,12 @@ if mode == "📤 商品情報CSVアップロード":
         try:
             df = pd.read_csv(temp_path)
             df = preprocess_item_master(df)
+
+            # Supabaseテーブル初期化
             requests.delete(f"{SUPABASE_URL}/rest/v1/item_master?id=gt.0", headers=HEADERS)
-            df = df.drop_duplicates(subset=["jan"], keep="last")
+
+            # 商品コードをキーに重複排除
+            df = df.drop_duplicates(subset=["商品コード"], keep="last")
 
             batch_size = 500
             for i in range(0, len(df), batch_size):
@@ -311,4 +333,3 @@ if mode == "📤 商品情報CSVアップロード":
                 st.success(f"✅ item_master に {len(df)} 件アップロード完了")
         except Exception as e:
             st.error(f"❌ item_master のアップロード中にエラー: {e}")
-
