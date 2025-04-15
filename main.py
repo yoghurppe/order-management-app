@@ -246,6 +246,7 @@ if mode == "🔍 商品情報検索":
 
     df_master["jan"] = df_master["jan"].astype(str)
     df_master["商品コード"] = df_master["商品コード"].astype(str)
+    df_master["商品名"] = df_master["商品名"].astype(str)
 
     st.subheader("🔎 検索条件")
 
@@ -257,8 +258,8 @@ if mode == "🔍 商品情報検索":
 
     if keyword:
         df_view = df_view[
-            df_view["商品名"].astype(str).str.contains(keyword, case=False, na=False) |
-            df_view["商品コード"].astype(str).str.contains(keyword, case=False, na=False)
+            df_view["商品名"].str.contains(keyword, case=False, na=False) |
+            df_view["商品コード"].str.contains(keyword, case=False, na=False)
         ]
     if brand_filter != "すべて":
         df_view = df_view[df_view["ブランド"] == brand_filter]
