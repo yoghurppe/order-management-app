@@ -226,7 +226,7 @@ if mode == "📦 発注AI判定":
     else:
         st.info("現在、発注が必要な商品はありません。")
 
-# --- 商品情報DB検索機能 ---
+# 商品情報検索
 if mode == "🔍 商品情報検索":
     st.header("🔍 商品情報DB検索")
 
@@ -245,36 +245,38 @@ if mode == "🔍 商品情報検索":
         st.stop()
 
     df_master["jan"] = df_master["jan"].astype(str)
+    df_master["商品コード"] = df_master["商品コード"].astype(str)
 
     st.subheader("🔎 検索条件")
 
-    keyword = st.text_input("商品名で検索", "")
+    keyword = st.text_input("商品名・商品コードで検索", "")
     brand_filter = st.selectbox("ブランドで絞り込み", ["すべて"] + sorted(df_master["ブランド"].dropna().unique()))
-    status_filter = st.selectbox("状態で絞り込み", ["すべて"] + sorted(df_master["状態"].dropna().unique()))
-    buyer_filter = st.selectbox("担当者で絞り込み", ["すべて"] + sorted(df_master["担当者"].dropna().unique()))
-    order_flag = st.checkbox("発注済以外のみ表示")
+    type_filter = st.selectbox("取扱区分で絞り込み", ["すべて"] + sorted(df_master["取扱区分"].dropna().unique()))
 
     df_view = df_master.copy()
 
     if keyword:
-        df_view = df_view[df_view["商品名"].astype(str).str.contains(keyword, case=False, na=False)]
+        df_view = df_view[
+            df_view["商品名"].astype(str).str.contains(keyword, case=False, na=False) |
+            df_view["商品コード"].astype(str).str.contains(keyword, case=False, na=False)
+        ]
     if brand_filter != "すべて":
         df_view = df_view[df_view["ブランド"] == brand_filter]
-    if status_filter != "すべて":
-        df_view = df_view[df_view["状態"] == status_filter]
-    if buyer_filter != "すべて":
-        df_view = df_view[df_view["担当者"] == buyer_filter]
-    if order_flag and "発注済" in df_view.columns:
-        df_view = df_view[df_view["発注済"] != 1]
+    if type_filter != "すべて":
+        df_view = df_view[df_view["取扱区分"] == type_filter]
 
-    view_cols = ["jan", "担当者", "状態", "ブランド", "商品名", "仕入価格", "ケース入数", "重量", "発注済"]
+    view_cols = [
+        "商品コード", "jan", "ブランド", "商品名", "取扱区分",
+        "在庫", "利用可能", "発注済", "仕入価格", "ケース入数", "発注ロット", "重量"
+    ]
     available_cols = [col for col in view_cols if col in df_view.columns]
 
     st.subheader("📋 商品一覧")
-    st.dataframe(df_view[available_cols].sort_values(by="jan"))
+    st.dataframe(df_view[available_cols].sort_values(by="商品コード"))
 
     csv = df_view[available_cols].to_csv(index=False).encode("utf-8-sig")
     st.download_button("📥 CSVダウンロード", data=csv, file_name="item_master_filtered.csv", mime="text/csv")
+
 
 # 商品情報CSVアップロード
 if mode == "📤 商品情報CSVアップロード":
