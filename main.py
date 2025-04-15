@@ -101,44 +101,40 @@ if mode == "📤 CSVアップロード":
             f.write(purchase_file.read())
         batch_upload_csv_to_supabase(temp_path, "purchase_data")
 
+# 発注AI判定
 if mode == "📦 発注AI判定":
     st.header("📦 発注AI（利用可能在庫ベース）")
 
-    @st.cache_data(ttl=1)
-    def fetch_table(table_name):
-        headers = {
-            **HEADERS,
-            "Prefer": "count=exact"
-        }
+    def fetch_table_cached(table_name):
+        if table_name not in st.session_state:
+            headers = {
+                **HEADERS,
+                "Prefer": "count=exact"
+            }
+            dfs = []
+            offset = 0
+            limit = 1000
+            while True:
+                url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
+                res = requests.get(url, headers=headers)
+                if res.status_code == 416:
+                    break
+                if res.status_code not in [200, 206]:
+                    st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
+                    st.session_state[table_name] = pd.DataFrame()
+                    return
+                data = res.json()
+                if not data:
+                    break
+                dfs.append(pd.DataFrame(data))
+                offset += limit
+            df = pd.concat(dfs, ignore_index=True)
+            st.session_state[table_name] = df
+        st.write(f"📦 {table_name} 件数: {len(st.session_state[table_name])}")
+        return st.session_state[table_name]
 
-        dfs = []
-        offset = 0
-        limit = 1000
-
-        while True:
-            url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
-            res = requests.get(url, headers=headers)
-
-            if res.status_code == 416:
-                break
-
-            if res.status_code not in [200, 206]:
-                st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
-                return pd.DataFrame()
-
-            data = res.json()
-            if not data:
-                break
-
-            dfs.append(pd.DataFrame(data))
-            offset += limit
-
-        df = pd.concat(dfs, ignore_index=True)
-        st.write(f"📦 {table_name} 件数: {len(df)}")
-        return df
-
-    df_sales = fetch_table("sales")
-    df_purchase = fetch_table("purchase_data")
+    df_sales = fetch_table_cached("sales")
+    df_purchase = fetch_table_cached("purchase_data")
 
     if df_sales.empty or df_purchase.empty:
         st.warning("販売実績または仕入データが不足しています。")
@@ -173,7 +169,7 @@ if mode == "📦 発注AI判定":
         else:
             need_qty = sold - stock
             need_qty += math.ceil(sold * 0.5)
-            need_qty -= ordered  # 発注済み分を差し引く
+            need_qty -= ordered
             need_qty = max(need_qty, 0)
 
         if need_qty <= 0:
@@ -226,11 +222,12 @@ if mode == "📦 発注AI判定":
     else:
         st.info("現在、発注が必要な商品はありません。")
 
+
 # 商品情報検索
 if mode == "🔍 商品情報検索":
     st.header("🔍 商品情報DB検索")
 
-    @st.cache_data(ttl=60)
+    @st.cache_resource
     def fetch_item_master():
         url = f"{SUPABASE_URL}/rest/v1/item_master?select=*"
         res = requests.get(url, headers=HEADERS)
@@ -239,7 +236,11 @@ if mode == "🔍 商品情報検索":
         st.error("item_master の取得に失敗しました")
         return pd.DataFrame()
 
-    df_master = fetch_item_master()
+    if "df_master" not in st.session_state:
+        st.session_state.df_master = fetch_item_master()
+
+    df_master = st.session_state.df_master
+
     if df_master.empty:
         st.warning("商品情報データベースにデータが存在しません。")
         st.stop()
