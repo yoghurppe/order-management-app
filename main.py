@@ -296,14 +296,10 @@ if mode == "📤 商品情報CSVアップロード":
             "注文済": "発注済",
             "名前": "商品コード"
         }, inplace=True)
-    
+
         # 不要な列を削除
         df.drop(columns=["内部ID"], inplace=True, errors="ignore")
-    
-        # 商品コードを商品名の先頭に追加
-        if "商品コード" in df.columns and "商品名" in df.columns:
-            df["商品名"] = df["商品コード"].astype(str) + " " + df["商品名"].astype(str)
-    
+
         df["jan"] = df["jan"].apply(normalize_jan)
         return df
 
@@ -316,10 +312,14 @@ if mode == "📤 商品情報CSVアップロード":
         try:
             df = pd.read_csv(temp_path)
             df = preprocess_item_master(df)
+
+            # Supabaseテーブル初期化
             requests.delete(f"{SUPABASE_URL}/rest/v1/item_master?id=gt.0", headers=HEADERS)
+
+            # 商品コードをキーに重複排除
             df = df.drop_duplicates(subset=["商品コード"], keep="last")
 
-            # NaNをnull互換に変換（Supabase JSON対応）
+            # NaN・inf を JSON互換な None に変換
             df = df.replace({pd.NA: None, pd.NaT: None, float('nan'): None, float('inf'): None, -float('inf'): None})
             df = df.where(pd.notnull(df), None)
 
