@@ -275,3 +275,40 @@ if mode == "🔍 商品情報検索":
 
     csv = df_view[available_cols].to_csv(index=False).encode("utf-8-sig")
     st.download_button("📥 CSVダウンロード", data=csv, file_name="item_master_filtered.csv", mime="text/csv")
+
+# 商品情報CSVアップロード
+if mode == "📤 商品情報CSVアップロード":
+    st.header("📤 商品情報CSVアップロード")
+
+    def preprocess_item_master(df):
+        df["jan"] = df["jan"].apply(normalize_jan)
+        return df
+
+    item_file = st.file_uploader("🧾 item_master.csv アップロード", type="csv")
+    if item_file:
+        temp_path = "/tmp/item_master.csv"
+        with open(temp_path, "wb") as f:
+            f.write(item_file.read())
+
+        try:
+            df = pd.read_csv(temp_path)
+            df = preprocess_item_master(df)
+            requests.delete(f"{SUPABASE_URL}/rest/v1/item_master?id=gt.0", headers=HEADERS)
+            df = df.drop_duplicates(subset=["jan"], keep="last")
+
+            batch_size = 500
+            for i in range(0, len(df), batch_size):
+                batch = df.iloc[i:i+batch_size].where(pd.notnull(df.iloc[i:i+batch_size]), None).to_dict(orient="records")
+                res = requests.post(
+                    f"{SUPABASE_URL}/rest/v1/item_master",
+                    headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
+                    json=batch
+                )
+                if res.status_code not in [200, 201]:
+                    st.error(f"❌ バッチPOST失敗: {res.status_code} {res.text}")
+                    break
+            else:
+                st.success(f"✅ item_master に {len(df)} 件アップロード完了")
+        except Exception as e:
+            st.error(f"❌ item_master のアップロード中にエラー: {e}")
+
