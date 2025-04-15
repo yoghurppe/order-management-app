@@ -311,16 +311,16 @@ if mode == "📤 商品情報CSVアップロード":
         try:
             df = pd.read_csv(temp_path)
             df = preprocess_item_master(df)
-
-            # Supabaseテーブル初期化
             requests.delete(f"{SUPABASE_URL}/rest/v1/item_master?id=gt.0", headers=HEADERS)
-
-            # 商品コードをキーに重複排除
             df = df.drop_duplicates(subset=["商品コード"], keep="last")
+
+            # NaNをnull互換に変換（Supabase JSON対応）
+            df = df.replace({pd.NA: None, pd.NaT: None, float('nan'): None, float('inf'): None, -float('inf'): None})
+            df = df.where(pd.notnull(df), None)
 
             batch_size = 500
             for i in range(0, len(df), batch_size):
-                batch = df.iloc[i:i+batch_size].where(pd.notnull(df.iloc[i:i+batch_size]), None).to_dict(orient="records")
+                batch = df.iloc[i:i+batch_size].to_dict(orient="records")
                 res = requests.post(
                     f"{SUPABASE_URL}/rest/v1/item_master",
                     headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
