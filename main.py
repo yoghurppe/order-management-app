@@ -271,13 +271,30 @@ if mode == "🔍 商品情報検索":
         "商品コード", "jan", "ブランド", "商品名", "取扱区分",
         "在庫", "利用可能", "発注済", "仕入価格", "ケース入数", "発注ロット", "重量"
     ]
+    rename_map = {
+        "商品コード": "商品コード/商品编号",
+        "jan": "JAN",
+        "ブランド": "ブランド/品牌",
+        "商品名": "商品名/商品名称",
+        "取扱区分": "取扱区分/分类",
+        "在庫": "在庫/库存",
+        "利用可能": "利用可能/可用库存",
+        "発注済": "発注済/已订购",
+        "仕入価格": "仕入価格/进货价",
+        "ケース入数": "ケース入数/箱入数",
+        "発注ロット": "発注ロット/订购单位",
+        "重量": "重量/重量(g)"
+    }
     available_cols = [col for col in view_cols if col in df_view.columns]
 
     st.subheader("📋 商品一覧")
-    st.dataframe(df_view[available_cols].sort_values(by="商品コード"))
+    display_df = df_view[available_cols].sort_values(by="商品コード")
+    display_df = display_df.rename(columns=rename_map)
+    st.dataframe(display_df)
 
-    csv = df_view[available_cols].to_csv(index=False).encode("utf-8-sig")
+    csv = display_df.to_csv(index=False).encode("utf-8-sig")
     st.download_button("📥 CSVダウンロード", data=csv, file_name="item_master_filtered.csv", mime="text/csv")
+
 
 
 # 商品情報CSVアップロード
