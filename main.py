@@ -132,10 +132,11 @@ if mode == "📤 CSVアップロード":
 
 if mode == "📦 発注AI判定":
     with st.spinner("📦 データを読み込み中..."):
-    st.header("📦 発注AI（利用可能在庫ベース）")
+        st.header("📦 発注AI（利用可能在庫ベース）")
 
-    df_sales = fetch_table_cached("sales")
-    df_purchase = fetch_table_cached("purchase_data")
+        df_sales = fetch_table_cached("sales")
+        df_purchase = fetch_table_cached("purchase_data")
+
 
     if df_sales.empty or df_purchase.empty:
         st.warning("販売実績または仕入データが不足しています。")
