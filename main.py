@@ -371,7 +371,7 @@ if mode == "📤 商品情報CSVアップロード":
 
 if mode == "💰 仕入価格改善リスト":
     with st.spinner("📊 データを読み込み中..."):
-    df_sales = fetch_table_cached("sales")
+            df_sales = fetch_table_cached("sales")
     df_purchase = fetch_table_cached("purchase_data")
     df_item = fetch_table_cached("item_master")
 
