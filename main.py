@@ -29,11 +29,12 @@ mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップ
 
 
 
-
 if mode == "📤 CSVアップロード":
     st.header("📤 CSVアップロード")
 
     def preprocess_csv(df, table):
+        df.columns = df.columns.str.strip()  # 列名の前後の空白を除去
+
         if table == "sales":
             df.rename(columns={
                 "アイテム": "jan",
@@ -43,6 +44,10 @@ if mode == "📤 CSVアップロード":
                 "現在の利用可能数量": "stock_available",
                 "現在の注文済数量": "stock_ordered"
             }, inplace=True)
+
+            if "jan" not in df.columns:
+                raise ValueError("❌ sales.csv に 'アイテム' 列が見つかりません（列名が正しいか確認してください）")
+
             for col in ["quantity_sold", "stock_total", "stock_available", "stock_ordered"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
