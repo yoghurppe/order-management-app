@@ -137,6 +137,11 @@ if mode == "📦 発注AI判定":
         df_sales = fetch_table_cached("sales")
         df_purchase = fetch_table_cached("purchase_data")
 
+    if df_sales.empty or df_purchase.empty:
+        st.warning("販売実績または仕入データが不足しています。")
+        st.stop()
+
+    
 
     if df_sales.empty or df_purchase.empty:
         st.warning("販売実績または仕入データが不足しています。")
@@ -230,6 +235,7 @@ if mode == "📦 発注AI判定":
             )
     else:
         st.info("現在、発注が必要な商品はありません。")
+
 
 
 # 商品情報検索
@@ -369,15 +375,15 @@ if mode == "📤 商品情報CSVアップロード":
 
 if mode == "💰 仕入価格改善リスト":
     with st.spinner("📊 データを読み込み中..."):
-            df_sales = fetch_table_cached("sales")
-    df_purchase = fetch_table_cached("purchase_data")
-    df_item = fetch_table_cached("item_master")
+        df_sales = fetch_table_cached("sales")
+            df_purchase = fetch_table_cached("purchase_data")
+            df_item = fetch_table_cached("item_master")
 
-    df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
-    df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
-    df_item["jan"] = df_item["jan"].apply(normalize_jan)
+            df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
+            df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
+            df_item["jan"] = df_item["jan"].apply(normalize_jan)
 
-    df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
+            df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
     # 発注AIから現在の仕入価格を再現
     current_prices = {}
