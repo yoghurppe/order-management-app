@@ -106,16 +106,12 @@ if mode == "📤 CSVアップロード":
             f.write(purchase_file.read())
         batch_upload_csv_to_supabase(temp_path, "purchase_data")
 
-# 発注AI判定
 if mode == "📦 発注AI判定":
     st.header("📦 発注AI（利用可能在庫ベース）")
 
     def fetch_table_cached(table_name):
         if table_name not in st.session_state:
-            headers = {
-                **HEADERS,
-                "Prefer": "count=exact"
-            }
+            headers = {**HEADERS, "Prefer": "count=exact"}
             dfs = []
             offset = 0
             limit = 1000
@@ -154,7 +150,6 @@ if mode == "📦 発注AI判定":
     df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
     df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
-    MAX_MONTHS_OF_STOCK = 3
     results = []
 
     for _, row in df_sales.iterrows():
@@ -167,14 +162,10 @@ if mode == "📦 発注AI判定":
         if options.empty:
             continue
 
-        options["price"] = pd.to_numeric(options["price"], errors="coerce")
-
         if stock >= sold:
             need_qty = 0
         else:
-            need_qty = sold - stock
-            need_qty += math.ceil(sold * 0.5)
-            need_qty -= ordered
+            need_qty = sold - stock + math.ceil(sold * 0.5) - ordered
             need_qty = max(need_qty, 0)
 
         if need_qty <= 0:
@@ -188,14 +179,15 @@ if mode == "📦 発注AI判定":
         if not smaller_lots.empty:
             best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
         else:
-            near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.2) & (options["order_lot"] != 1)]
+            near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.5) & (options["order_lot"] != 1)]
             if not near_lots.empty:
                 best_option = near_lots.loc[near_lots["diff"].idxmin()]
             else:
                 one_lot = options[options["order_lot"] == 1]
-                if one_lot.empty:
-                    continue
-                best_option = one_lot.iloc[0]
+                if not one_lot.empty:
+                    best_option = one_lot.iloc[0]
+                else:
+                    best_option = options.sort_values("order_lot").iloc[0]  # 最小ロットを選ぶ
 
         sets = math.ceil(need_qty / best_option["order_lot"])
         qty = sets * best_option["order_lot"]
@@ -226,6 +218,7 @@ if mode == "📦 発注AI判定":
         st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
     else:
         st.info("現在、発注が必要な商品はありません。")
+
 
 
 # 商品情報検索
