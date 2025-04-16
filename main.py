@@ -383,12 +383,12 @@ if mode == "💰 仕入価格改善リスト":
 
     # 発注AIから現在の仕入価格を再現
     current_prices = {}
-        for _, row in df_sales.iterrows():
-                jan = row["jan"]
-                sold = row["quantity_sold"]
-                stock = row.get("stock_available", 0)
-                ordered = row.get("stock_ordered", 0)
-            options = df_purchase[df_purchase["jan"] == jan].copy()
+    for _, row in df_sales.iterrows():
+        jan = row["jan"]
+        sold = row["quantity_sold"]
+        stock = row.get("stock_available", 0)
+        ordered = row.get("stock_ordered", 0)
+        options = df_purchase[df_purchase["jan"] == jan].copy()
         if options.empty:
             continue
 
@@ -447,3 +447,4 @@ if mode == "💰 仕入価格改善リスト":
         st.download_button("📥 改善リストCSVダウンロード", data=csv, file_name="price_improvement_list.csv", mime="text/csv")
     else:
         st.info("改善の余地がある商品は見つかりませんでした。")
+
