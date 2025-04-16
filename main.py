@@ -157,7 +157,7 @@ if mode == "📦 発注AI判定":
     df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
     with st.spinner("🤖 発注AIを計算中..."):
-    results = []
+        results = []
 
     for _, row in df_sales.iterrows():
         jan = row["jan"]
