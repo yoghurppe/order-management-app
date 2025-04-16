@@ -376,14 +376,12 @@ if mode == "📤 商品情報CSVアップロード":
 if mode == "💰 仕入価格改善リスト":
     with st.spinner("📊 データを読み込み中..."):
         df_sales = fetch_table_cached("sales")
-            df_purchase = fetch_table_cached("purchase_data")
-            df_item = fetch_table_cached("item_master")
-
-            df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
-            df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
-            df_item["jan"] = df_item["jan"].apply(normalize_jan)
-
-            df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
+        df_purchase = fetch_table_cached("purchase_data")
+        df_item = fetch_table_cached("item_master")
+        df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
+        df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
+        df_item["jan"] = df_item["jan"].apply(normalize_jan)
+        df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
     # 発注AIから現在の仕入価格を再現
     current_prices = {}
