@@ -237,6 +237,7 @@ if mode == "📦 発注AI判定":
         st.info("現在、発注が必要な商品はありません。")
 
 
+
 # 商品情報検索
 if mode == "🔍 商品情報検索":
     st.header("🔍 商品情報DB検索")
@@ -384,11 +385,11 @@ if mode == "💰 仕入価格改善リスト":
 
     # 発注AIから現在の仕入価格を再現
     current_prices = {}
-    for _, row in df_sales.iterrows():
-            jan = row["jan"]
-            sold = row["quantity_sold"]
-            stock = row.get("stock_available", 0)
-            ordered = row.get("stock_ordered", 0)
+        for _, row in df_sales.iterrows():
+                jan = row["jan"]
+                sold = row["quantity_sold"]
+                stock = row.get("stock_available", 0)
+                ordered = row.get("stock_ordered", 0)
             options = df_purchase[df_purchase["jan"] == jan].copy()
         if options.empty:
             continue
