@@ -159,6 +159,8 @@ if mode == "📦 発注AI判定":
     with st.spinner("🤖 発注AIを計算中..."):
         results = []
 
+        
+
     for _, row in df_sales.iterrows():
         jan = row["jan"]
         sold = row["quantity_sold"]
