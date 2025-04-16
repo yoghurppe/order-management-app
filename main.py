@@ -216,8 +216,20 @@ if mode == "📦 発注AI判定":
         st.dataframe(result_df)
         csv = result_df.to_csv(index=False).encode("utf-8-sig")
         st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
+
+        st.markdown("---")
+        st.subheader("📦 仕入先別ダウンロード")
+        for supplier, group in result_df.groupby("仕入先"):
+            supplier_csv = group.to_csv(index=False).encode("utf-8-sig")
+            st.download_button(
+                label=f"📥 {supplier} 用 発注CSVダウンロード",
+                data=supplier_csv,
+                file_name=f"orders_{supplier}.csv",
+                mime="text/csv"
+            )
     else:
         st.info("現在、発注が必要な商品はありません。")
+
 
 
 
