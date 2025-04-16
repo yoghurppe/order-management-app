@@ -156,6 +156,7 @@ if mode == "📦 発注AI判定":
     df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
     df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
+    with st.spinner("🤖 発注AIを計算中..."):
     results = []
 
     for _, row in df_sales.iterrows():
@@ -235,8 +236,6 @@ if mode == "📦 発注AI判定":
             )
     else:
         st.info("現在、発注が必要な商品はありません。")
-
-
 
 # 商品情報検索
 if mode == "🔍 商品情報検索":
