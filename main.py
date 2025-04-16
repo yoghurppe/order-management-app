@@ -109,31 +109,6 @@ if mode == "📤 CSVアップロード":
 if mode == "📦 発注AI判定":
     st.header("📦 発注AI（利用可能在庫ベース）")
 
-    def fetch_table_cached(table_name):
-        if table_name not in st.session_state:
-            headers = {**HEADERS, "Prefer": "count=exact"}
-            dfs = []
-            offset = 0
-            limit = 1000
-            while True:
-                url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
-                res = requests.get(url, headers=headers)
-                if res.status_code == 416:
-                    break
-                if res.status_code not in [200, 206]:
-                    st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
-                    st.session_state[table_name] = pd.DataFrame()
-                    return
-                data = res.json()
-                if not data:
-                    break
-                dfs.append(pd.DataFrame(data))
-                offset += limit
-            df = pd.concat(dfs, ignore_index=True)
-            st.session_state[table_name] = df
-        st.write(f"📦 {table_name} 件数: {len(st.session_state[table_name])}")
-        return st.session_state[table_name]
-
     df_sales = fetch_table_cached("sales")
     df_purchase = fetch_table_cached("purchase_data")
 
@@ -229,8 +204,6 @@ if mode == "📦 発注AI判定":
             )
     else:
         st.info("現在、発注が必要な商品はありません。")
-
-
 
 
 # 商品情報検索
