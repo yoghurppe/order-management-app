@@ -119,19 +119,22 @@ if mode == "📤 CSVアップロード":
 
     sales_file = st.file_uploader("🧾 sales.csv アップロード", type="csv")
     if sales_file:
-        temp_path = "/tmp/sales.csv"
-        with open(temp_path, "wb") as f:
-            f.write(sales_file.read())
-        batch_upload_csv_to_supabase(temp_path, "sales")
+        with st.spinner("📤 sales.csv アップロード中..."):
+            temp_path = "/tmp/sales.csv"
+            with open(temp_path, "wb") as f:
+                f.write(sales_file.read())
+            batch_upload_csv_to_supabase(temp_path, "sales")
 
     purchase_file = st.file_uploader("📦 purchase_data.csv アップロード", type="csv")
     if purchase_file:
-        temp_path = "/tmp/purchase_data.csv"
-        with open(temp_path, "wb") as f:
-            f.write(purchase_file.read())
-        batch_upload_csv_to_supabase(temp_path, "purchase_data")
+        with st.spinner("📤 purchase_data.csv アップロード中..."):
+            temp_path = "/tmp/purchase_data.csv"
+            with open(temp_path, "wb") as f:
+                f.write(purchase_file.read())
+            batch_upload_csv_to_supabase(temp_path, "purchase_data")
 
 if mode == "📦 発注AI判定":
+    with st.spinner("📦 データを読み込み中..."):
     st.header("📦 発注AI（利用可能在庫ベース）")
 
     df_sales = fetch_table_cached("sales")
@@ -367,8 +370,7 @@ if mode == "📤 商品情報CSVアップロード":
             st.error(f"❌ item_master のアップロード中にエラー: {e}")
 
 if mode == "💰 仕入価格改善リスト":
-    st.header("💰 仕入価格改善リスト")
-
+with st.spinner("📊 データを読み込み中..."):
     df_sales = fetch_table_cached("sales")
     df_purchase = fetch_table_cached("purchase_data")
     df_item = fetch_table_cached("item_master")
