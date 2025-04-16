@@ -164,54 +164,54 @@ if mode == "📦 発注AI判定":
             stock = row.get("stock_available", 0)
             ordered = row.get("stock_ordered", 0)
             options = df_purchase[df_purchase["jan"] == jan].copy()
-        if options.empty:
-            continue
+            if options.empty:
+                continue
 
-        if stock >= sold:
-            need_qty = 0
-        else:
-            need_qty = sold - stock + math.ceil(sold * 0.5) - ordered
-            need_qty = max(need_qty, 0)
-
-        if need_qty <= 0:
-            continue
-
-        options = options[options["order_lot"] > 0]
-        options["diff"] = (options["order_lot"] - need_qty).abs()
-
-        smaller_lots = options[options["order_lot"] <= need_qty]
-
-        if not smaller_lots.empty:
-            best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
-        else:
-            near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.5) & (options["order_lot"] != 1)]
-            if not near_lots.empty:
-                best_option = near_lots.loc[near_lots["diff"].idxmin()]
+            if stock >= sold:
+                need_qty = 0
             else:
-                one_lot = options[options["order_lot"] == 1]
-                if not one_lot.empty:
-                    best_option = one_lot.iloc[0]
+                need_qty = sold - stock + math.ceil(sold * 0.5) - ordered
+                need_qty = max(need_qty, 0)
+
+            if need_qty <= 0:
+                continue
+
+            options = options[options["order_lot"] > 0]
+            options["diff"] = (options["order_lot"] - need_qty).abs()
+
+            smaller_lots = options[options["order_lot"] <= need_qty]
+
+            if not smaller_lots.empty:
+                best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
+            else:
+                near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.5) & (options["order_lot"] != 1)]
+                if not near_lots.empty:
+                    best_option = near_lots.loc[near_lots["diff"].idxmin()]
                 else:
-                    best_option = options.sort_values("order_lot").iloc[0]  # 最小ロットを選ぶ
+                    one_lot = options[options["order_lot"] == 1]
+                    if not one_lot.empty:
+                        best_option = one_lot.iloc[0]
+                    else:
+                        best_option = options.sort_values("order_lot").iloc[0]  # 最小ロットを選ぶ
 
-        sets = math.ceil(need_qty / best_option["order_lot"])
-        qty = sets * best_option["order_lot"]
-        total_cost = qty * best_option["price"]
+            sets = math.ceil(need_qty / best_option["order_lot"])
+            qty = sets * best_option["order_lot"]
+            total_cost = qty * best_option["price"]
 
-        best_plan = {
-            "jan": jan,
-            "販売実績": sold,
-            "在庫": stock,
-            "発注済": ordered,
-            "理論必要数": need_qty,
-            "発注数": qty,
-            "ロット": best_option["order_lot"],
-            "数量": round(qty / best_option["order_lot"], 2),
-            "単価": best_option["price"],
-            "総額": total_cost,
-            "仕入先": best_option.get("supplier", "不明")
-        }
-        results.append(best_plan)
+            best_plan = {
+                "jan": jan,
+                "販売実績": sold,
+                "在庫": stock,
+                "発注済": ordered,
+                "理論必要数": need_qty,
+                "発注数": qty,
+                "ロット": best_option["order_lot"],
+                "数量": round(qty / best_option["order_lot"], 2),
+                "単価": best_option["price"],
+                "総額": total_cost,
+                "仕入先": best_option.get("supplier", "不明")
+            }
+            results.append(best_plan)
 
     if results:
         result_df = pd.DataFrame(results)
