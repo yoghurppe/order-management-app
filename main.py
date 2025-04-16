@@ -159,12 +159,11 @@ if mode == "📦 発注AI判定":
     with st.spinner("🤖 発注AIを計算中..."):
         results = []
         for _, row in df_sales.iterrows():
-        jan = row["jan"]
-        sold = row["quantity_sold"]
-        stock = row.get("stock_available", 0)
-        ordered = row.get("stock_ordered", 0)
-
-        options = df_purchase[df_purchase["jan"] == jan].copy()
+            jan = row["jan"]
+            sold = row["quantity_sold"]
+            stock = row.get("stock_available", 0)
+            ordered = row.get("stock_ordered", 0)
+            options = df_purchase[df_purchase["jan"] == jan].copy()
         if options.empty:
             continue
 
