@@ -1,5 +1,3 @@
-st.set_page_config(page_title="発注AI（利用可能在庫で判断）", layout="wide")
-
 import streamlit as st
 import pandas as pd
 import requests
@@ -13,6 +11,7 @@ st.set_page_config(page_title="発注AI（利用可能在庫で判断）", layou
 # 🟢 ここからアプリの中身（言語選択など）
 language = st.sidebar.selectbox("言語 / Language", ["日本語", "中文"], key="language")
 
+# ユーザー表示用ラベルテキスト
 TEXT = {
     "日本語": {
         "title_order_ai": "発注AI（利用可能在庫で判断）",
@@ -42,6 +41,7 @@ TEXT = {
     }
 }
 
+# 列名マッピング
 COLUMN_NAMES = {
     "日本語": {
         "商品コード": "商品コード",
@@ -75,8 +75,10 @@ COLUMN_NAMES = {
     }
 }
 
+# タイトル表示
 st.title(TEXT[language]["title_order_ai"])
 
+# モード選択
 mode = st.sidebar.radio(TEXT[language]["mode_select"], [
     TEXT[language]["upload_csv"],
     TEXT[language]["order_ai"],
@@ -84,6 +86,7 @@ mode = st.sidebar.radio(TEXT[language]["mode_select"], [
     TEXT[language]["upload_item"],
     TEXT[language]["price_improve"]
 ])
+
 
 
 
