@@ -518,6 +518,7 @@ elif mode == "price_improve":
 
         current_prices[jan] = best_option["price"]
 
+    # 最安値取得
     min_prices = df_purchase.groupby("jan")["price"].min().to_dict()
 
     rows = []
@@ -525,14 +526,15 @@ elif mode == "price_improve":
         if jan in min_prices and min_prices[jan] < current_price:
             item = df_item[df_item["jan"] == jan].head(1)
             if not item.empty:
-                rows.append({
-                    "商品コード": item.iloc[0].get("商品コード", ""),
+                row = {
+                    "商品コード": item.iloc[0].get("item_code", ""),
                     "JAN": jan,
-                    "ブランド": item.iloc[0].get("ブランド", ""),
+                    "ブランド": item.iloc[0].get("brand", ""),
                     "現在の仕入価格": current_price,
                     "最安値の仕入価格": min_prices[jan],
                     "差分": round(min_prices[jan] - current_price, 2)
-                })
+                }
+                rows.append(row)
 
     if rows:
         df_result = pd.DataFrame(rows)
