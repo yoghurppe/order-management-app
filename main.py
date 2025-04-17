@@ -78,7 +78,33 @@ COLUMN_NAMES = {
 # タイトル表示
 st.title(TEXT[language]["title_order_ai"])
 
-# モード選択
+# モード選択（言語に依存しない内部キーで管理）
+MODE_KEYS = {
+    "upload_csv": {
+        "日本語": "CSVアップロード",
+        "中文": "上传CSV"
+    },
+    "order_ai": {
+        "日本語": "発注AI判定",
+        "中文": "订货AI判断"
+    },
+    "search_item": {
+        "日本語": "商品情報検索",
+        "中文": "商品信息查询"
+    },
+    "upload_item": {
+        "日本語": "商品情報CSVアップロード",
+        "中文": "上传商品信息CSV"
+    },
+    "price_improve": {
+        "日本語": "仕入価格改善リスト",
+        "中文": "进货价格优化清单"
+    }
+}
+
+mode_labels = [v[language] for v in MODE_KEYS.values()]
+mode_selection = st.sidebar.radio(TEXT[language]["mode_select"], mode_labels)
+mode = next(key for key, labels in MODE_KEYS.items() if labels[language] == mode_selection)
 mode = st.sidebar.radio(TEXT[language]["mode_select"], [
     TEXT[language]["upload_csv"],
     TEXT[language]["order_ai"],
@@ -86,8 +112,6 @@ mode = st.sidebar.radio(TEXT[language]["mode_select"], [
     TEXT[language]["upload_item"],
     TEXT[language]["price_improve"]
 ])
-
-
 
 
 def fetch_table_cached(table_name):
