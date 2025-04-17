@@ -441,7 +441,6 @@ elif mode == "upload_item":
             df = pd
 
 
-elif mode == "price_improve":
     st.subheader("💰 仕入価格改善モード")
 
     def fetch_table(table_name):
@@ -526,9 +525,9 @@ elif mode == "price_improve":
             item = df_item[df_item["jan"] == jan].head(1)
             if not item.empty:
                 rows.append({
-                    "商品コード": item.iloc[0].get("item_code", ""),
+                    "商品コード": item.iloc[0].get("商品コード", ""),
                     "JAN": jan,
-                    "ブランド": item.iloc[0].get("brand", ""),
+                    "ブランド": item.iloc[0].get("ブランド", ""),
                     "現在の仕入価格": current_price,
                     "最安値の仕入価格": min_prices[jan],
                     "差分": round(min_prices[jan] - current_price, 2)
@@ -542,6 +541,7 @@ elif mode == "price_improve":
         st.download_button("📥 改善リストCSVダウンロード", data=csv, file_name="price_improvement_list.csv", mime="text/csv")
     else:
         st.info("改善の余地がある商品は見つかりませんでした。")
+
 
 
 
