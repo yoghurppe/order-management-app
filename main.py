@@ -11,32 +11,33 @@ language = st.sidebar.selectbox("言語 / Language", ["日本語", "中文"], ke
 # ユーザー表示用ラベルテキスト
 TEXT = {
     "日本語": {
-        "title_order_ai": "\ud83d\udce6 発注AI（利用可能在庫で判断）",
+        "title_order_ai": "発注AI（利用可能在庫で判断）",
         "mode_select": "モードを選んでください",
-        "upload_csv": "\ud83d\udcc4 CSVアップロード",
-        "order_ai": "\ud83d\udce6 発注AI判定",
-        "search_item": "\ud83d\udd0d 商品情報検索",
-        "upload_item": "\ud83d\udcc4 商品情報CSVアップロード",
-        "price_improve": "\ud83d\udcb0 仕入価格改善リスト",
+        "upload_csv": "CSVアップロード",
+        "order_ai": "発注AI判定",
+        "search_item": "商品情報検索",
+        "upload_item": "商品情報CSVアップロード",
+        "price_improve": "仕入価格改善リスト",
         "search_keyword": "商品名・商品コードで検索",
         "search_brand": "ブランドで絞り込み",
         "search_type": "取扱区分で絞り込み",
-        "product_list": "\ud83d\udccb 商品一覧"
+        "product_list": "商品一覧"
     },
     "中文": {
-        "title_order_ai": "\ud83d\udce6 订货AI（根据可用库存）",
+        "title_order_ai": "订货AI（根据可用库存）",
         "mode_select": "请选择模式",
-        "upload_csv": "\ud83d\udcc4 上传CSV",
-        "order_ai": "\ud83d\udce6 订货AI判断",
-        "search_item": "\ud83d\udd0d 商品信息查询",
-        "upload_item": "\ud83d\udcc4 上传商品信息CSV",
-        "price_improve": "\ud83d\udcb0 进货价格优化清单",
+        "upload_csv": "上传CSV",
+        "order_ai": "订货AI判断",
+        "search_item": "商品信息查询",
+        "upload_item": "上传商品信息CSV",
+        "price_improve": "进货价格优化清单",
         "search_keyword": "按商品名称或编号搜索",
         "search_brand": "按品牌筛选",
         "search_type": "按分类筛选",
-        "product_list": "\ud83d\udccb 商品列表"
+        "product_list": "商品列表"
     }
 }
+
 
 # 列名マッピング
 COLUMN_NAMES = {
