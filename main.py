@@ -6,7 +6,7 @@ import math
 import re
 
 # 言語選択
-language = st.sidebar.selectbox("\ud83c\udf10 言語 / Language", ["日本語", "中文"], key="language")
+language = st.sidebar.selectbox("言語 / Language", ["日本語", "中文"], key="language")
 
 # ユーザー表示用ラベルテキスト
 TEXT = {
