@@ -125,7 +125,7 @@ elif mode == "upload_item":
 
 elif mode == "price_improve":
     st.subheader("💰 仕入価格改善モード")
-    st.write("ここに価格改善ロジックを実装") if labels[language] == mode_selection)
+    st.write("ここに価格改善ロジックを実装")
 
 
 
