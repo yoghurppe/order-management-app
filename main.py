@@ -280,12 +280,13 @@ if mode == "🔍 商品情報検索":
         df_view = df_view[df_view["取扱区分"] == type_filter]
 
     view_cols = [
-        "商品コード", "jan", "ブランド", "商品名", "取扱区分",
+        "商品コード", "jan", "ランク", "ブランド", "商品名", "取扱区分",
         "在庫", "利用可能", "発注済", "仕入価格", "ケース入数", "発注ロット", "重量"
     ]
     rename_map = {
         "商品コード": "商品コード/商品编号",
         "jan": "JAN",
+        "ランク": "ランク/等级",
         "ブランド": "ブランド/品牌",
         "商品名": "商品名/商品名称",
         "取扱区分": "取扱区分/分类",
@@ -297,7 +298,7 @@ if mode == "🔍 商品情報検索":
         "発注ロット": "発注ロット/订购单位",
         "重量": "重量/重量(g)"
     }
-    available_cols = [col for col in view_cols if col in df_view.columns]
+    available_cols = [col for col in view_cols if col in df.columns]
 
     st.subheader("📋 商品一覧")
     display_df = df_view[available_cols].sort_values(by="商品コード")
@@ -325,7 +326,8 @@ if mode == "📤 商品情報CSVアップロード":
             "手持": "在庫",
             "利用可能": "利用可能",
             "注文済": "発注済",
-            "名前": "商品コード"
+            "名前": "商品コード",
+            "商品ランク": "ランク"
         }, inplace=True)
 
         # 不要な列を削除
