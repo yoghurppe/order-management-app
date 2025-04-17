@@ -348,17 +348,22 @@ if mode == "📤 商品情報CSVアップロード":
         try:
             df = pd.read_csv(temp_path)
             df = preprocess_item_master(df)
-
-            # Supabaseテーブル初期化
+        
+            # Supabaseテーブル初期化（既存削除）
             requests.delete(f"{SUPABASE_URL}/rest/v1/item_master?id=gt.0", headers=HEADERS)
-
+        
             # 商品コードをキーに重複排除
             df = df.drop_duplicates(subset=["商品コード"], keep="last")
-
+        
+            # 🔽 ID付与
+            if "id" not in df.columns:
+                df.insert(0, "id", range(1, len(df) + 1))
+        
             # NaN・inf を JSON互換な None に変換
             df = df.replace({pd.NA: None, pd.NaT: None, float('nan'): None, float('inf'): None, -float('inf'): None})
             df = df.where(pd.notnull(df), None)
-
+        
+            # バッチPOST
             batch_size = 500
             for i in range(0, len(df), batch_size):
                 batch = df.iloc[i:i+batch_size].to_dict(orient="records")
