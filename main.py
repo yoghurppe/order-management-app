@@ -5,6 +5,9 @@ import os
 import math
 import re
 
+# ページ設定は最初に実行する必要がある
+st.set_page_config(page_title="発注AI（利用可能在庫で判断）")
+
 # 言語選択
 language = st.sidebar.selectbox("言語 / Language", ["日本語", "中文"], key="language")
 
@@ -37,7 +40,6 @@ TEXT = {
         "product_list": "商品列表"
     }
 }
-
 
 # 列名マッピング
 COLUMN_NAMES = {
@@ -73,8 +75,7 @@ COLUMN_NAMES = {
     }
 }
 
-# タイトル
-st.set_page_config(page_title=TEXT[language]["title_order_ai"])
+# タイトル表示
 st.title(TEXT[language]["title_order_ai"])
 
 # モード選択
