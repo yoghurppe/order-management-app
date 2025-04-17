@@ -526,7 +526,7 @@ elif mode == "price_improve":
             item = df_item[df_item["jan"] == jan].head(1)
             if not item.empty:
                 rows.append({
-                    "商品コード": item.iloc[0].get("item_code", ""),
+                    "商品コード": item.iloc[0].get("商品コード", ""),
                     "JAN": jan,
                     "ブランド": item.iloc[0].get("brand", ""),
                     "現在の仕入価格": current_price,
