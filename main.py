@@ -441,6 +441,7 @@ elif mode == "upload_item":
             df = pd
 
 
+elif mode == "price_improve":
     st.subheader("💰 仕入価格改善モード")
 
     def fetch_table(table_name):
@@ -541,6 +542,7 @@ elif mode == "upload_item":
         st.download_button("📥 改善リストCSVダウンロード", data=csv, file_name="price_improvement_list.csv", mime="text/csv")
     else:
         st.info("改善の余地がある商品は見つかりませんでした。")
+
 
 
 
