@@ -132,7 +132,6 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-st.set_page_config(page_title="発注AI（納品タイミング + 利用可能在庫）", layout="wide")
 st.title("📦 発注AI（利用可能在庫で判断）")
 
 mode = st.sidebar.radio("モードを選んでください", ["📤 CSVアップロード", "📦 発注AI判定", "🔍 商品情報検索", "📤 商品情報CSVアップロード", "💰 仕入価格改善リスト"])
