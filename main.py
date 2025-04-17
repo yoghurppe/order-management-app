@@ -388,7 +388,58 @@ elif mode == "search_item":
 
 elif mode == "upload_item":
     st.subheader("📤 商品情報CSVアップロードモード")
-    st.write("ここに商品情報アップロード処理を実装")
+
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    HEADERS = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    def normalize_jan(x):
+        try:
+            if re.fullmatch(r"\d+(\.0+)?", str(x)):
+                return str(int(float(x)))
+            else:
+                return str(x).strip()
+        except:
+            return ""
+
+    def preprocess_item_master(df):
+        df.rename(columns={
+            "UPCコード": "jan",
+            "表示名": "商品名",
+            "メーカー名": "ブランド",
+            "アイテム定義原価": "仕入価格",
+            "カートン入数": "ケース入数",
+            "発注ロット": "発注ロット",
+            "パッケージ重量(g)": "重量",
+            "手持": "在庫",
+            "利用可能": "利用可能",
+            "注文済": "発注済",
+            "名前": "商品コード",
+            "商品ランク": "ランク"
+        }, inplace=True)
+
+        df.drop(columns=["内部ID"], inplace=True, errors="ignore")
+        df["jan"] = df["jan"].apply(normalize_jan)
+
+        for col in ["ケース入数", "発注ロット", "在庫", "利用可能", "発注済"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).round().astype(int)
+
+        return df
+
+    item_file = st.file_uploader("🧾 item_master.csv アップロード", type="csv")
+    if item_file:
+        temp_path = "/tmp/item_master.csv"
+        with open(temp_path, "wb") as f:
+            f.write(item_file.read())
+
+        try:
+            df = pd
+
 
 elif mode == "price_improve":
     st.subheader("💰 仕入価格改善モード")
