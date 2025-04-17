@@ -236,7 +236,7 @@ if mode == "📦 発注AI判定":
         st.info("現在、発注が必要な商品はありません。")
 
 # 商品情報検索
-if st.sidebar.radio("モードを選択", ["🔍 商品情報検索", "📤 商品情報CSVアップロード"]) == "🔍 商品情報検索":
+if mode == "🔍 商品情報検索":
     st.header("🔍 商品情報DB検索")
 
     @st.cache_resource
@@ -280,13 +280,12 @@ if st.sidebar.radio("モードを選択", ["🔍 商品情報検索", "📤 商�
         df_view = df_view[df_view["取扱区分"] == type_filter]
 
     view_cols = [
-        "商品コード", "jan", "ランク", "ブランド", "商品名", "取扱区分",
+        "商品コード", "jan", "ブランド", "商品名", "取扱区分",
         "在庫", "利用可能", "発注済", "仕入価格", "ケース入数", "発注ロット", "重量"
     ]
     rename_map = {
         "商品コード": "商品コード/商品编号",
         "jan": "JAN",
-        "ランク": "ランク",
         "ブランド": "ブランド/品牌",
         "商品名": "商品名/商品名称",
         "取扱区分": "取扱区分/分类",
@@ -308,8 +307,10 @@ if st.sidebar.radio("モードを選択", ["🔍 商品情報検索", "📤 商�
     csv = display_df.to_csv(index=False).encode("utf-8-sig")
     st.download_button("📥 CSVダウンロード", data=csv, file_name="item_master_filtered.csv", mime="text/csv")
 
+
+
 # 商品情報CSVアップロード
-else:
+if mode == "📤 商品情報CSVアップロード":
     st.header("📤 商品情報CSVアップロード")
 
     def preprocess_item_master(df):
@@ -324,10 +325,12 @@ else:
             "手持": "在庫",
             "利用可能": "利用可能",
             "注文済": "発注済",
-            "名前": "商品コード",
-            "商品ランク": "ランク"
+            "名前": "商品コード"
         }, inplace=True)
+
+        # 不要な列を削除
         df.drop(columns=["内部ID"], inplace=True, errors="ignore")
+
         df["jan"] = df["jan"].apply(normalize_jan)
         return df
 
@@ -341,8 +344,13 @@ else:
             df = pd.read_csv(temp_path)
             df = preprocess_item_master(df)
 
+            # Supabaseテーブル初期化
             requests.delete(f"{SUPABASE_URL}/rest/v1/item_master?id=gt.0", headers=HEADERS)
+
+            # 商品コードをキーに重複排除
             df = df.drop_duplicates(subset=["商品コード"], keep="last")
+
+            # NaN・inf を JSON互換な None に変換
             df = df.replace({pd.NA: None, pd.NaT: None, float('nan'): None, float('inf'): None, -float('inf'): None})
             df = df.where(pd.notnull(df), None)
 
@@ -361,7 +369,6 @@ else:
                 st.success(f"✅ item_master に {len(df)} 件アップロード完了")
         except Exception as e:
             st.error(f"❌ item_master のアップロード中にエラー: {e}")
-
 
 if mode == "💰 仕入価格改善リスト":
     with st.spinner("📊 データを読み込み中..."):
