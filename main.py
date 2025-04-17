@@ -332,6 +332,10 @@ if mode == "📤 商品情報CSVアップロード":
         # 不要な列を削除
         df.drop(columns=["内部ID"], inplace=True, errors="ignore")
 
+        for col in ["ケース入数", "発注ロット", "在庫", "利用可能", "発注済"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).round().astype(int)
+    
         df["jan"] = df["jan"].apply(normalize_jan)
         return df
 
