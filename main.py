@@ -328,7 +328,63 @@ elif mode == "order_ai":
 
 elif mode == "search_item":
     st.subheader("🔍 商品情報検索モード")
-    st.write("ここに商品検索ロジックを実装")
+
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    HEADERS = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    def fetch_item_master():
+        url = f"{SUPABASE_URL}/rest/v1/item_master?select=*"
+        res = requests.get(url, headers=HEADERS)
+        if res.status_code == 200:
+            return pd.DataFrame(res.json())
+        st.error("item_master の取得に失敗しました")
+        return pd.DataFrame()
+
+    df_master = fetch_item_master()
+
+    if df_master.empty:
+        st.warning("商品情報データベースにデータが存在しません。")
+        st.stop()
+
+    df_master["jan"] = df_master["jan"].astype(str)
+    df_master["商品コード"] = df_master["商品コード"].astype(str)
+    df_master["商品名"] = df_master["商品名"].astype(str)
+
+    st.subheader(TEXT[language]["search_keyword"])
+    keyword = st.text_input(TEXT[language]["search_keyword"], "")
+    brand_filter = st.selectbox(TEXT[language]["search_brand"], ["すべて"] + sorted(df_master["ブランド"].dropna().unique()))
+    type_filter = st.selectbox(TEXT[language]["search_type"], ["すべて"] + sorted(df_master["取扱区分"].dropna().unique()))
+
+    df_view = df_master.copy()
+    if keyword:
+        df_view = df_view[
+            df_view["商品名"].str.contains(keyword, case=False, na=False) |
+            df_view["商品コード"].str.contains(keyword, case=False, na=False)
+        ]
+    if brand_filter != "すべて":
+        df_view = df_view[df_view["ブランド"] == brand_filter]
+    if type_filter != "すべて":
+        df_view = df_view[df_view["取扱区分"] == type_filter]
+
+    view_cols = [
+        "商品コード", "jan", "ランク", "ブランド", "商品名", "取扱区分",
+        "在庫", "利用可能", "発注済", "仕入価格", "ケース入数", "発注ロット", "重量"
+    ]
+    available_cols = [col for col in view_cols if col in df_view.columns]
+
+    display_df = df_view[available_cols].sort_values(by="商品コード")
+    display_df = display_df.rename(columns=COLUMN_NAMES[language])
+
+    st.subheader(TEXT[language]["product_list"])
+    st.dataframe(display_df)
+
+    csv = display_df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button("📥 CSVダウンロード", data=csv, file_name="item_master_filtered.csv", mime="text/csv")
 
 elif mode == "upload_item":
     st.subheader("📤 商品情報CSVアップロードモード")
