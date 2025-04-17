@@ -477,6 +477,18 @@ elif mode == "upload_item":
 elif mode == "price_improve":
     st.subheader("💰 仕入価格改善モード")
 
+    # 🔧 ここで HEADERS を定義してから fetch_table() を呼び出す
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    HEADERS = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    def fetch_table(table_name):
+        headers = {**HEADERS, "Prefer": "count=exact"}
+
     def fetch_table(table_name):
         headers = {**HEADERS, "Prefer": "count=exact"}
         dfs = []
