@@ -109,7 +109,89 @@ mode = next(key for key, labels in MODE_KEYS.items() if labels[language] == mode
 # 各モードの処理分岐
 if mode == "upload_csv":
     st.subheader("📤 CSVアップロードモード")
-    st.write("ここにCSVアップロードの処理を実装")
+
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    HEADERS = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    def normalize_jan(x):
+        try:
+            if re.fullmatch(r"\d+(\.0+)?", str(x)):
+                return str(int(float(x)))
+            else:
+                return str(x).strip()
+        except:
+            return ""
+
+    def preprocess_csv(df, table):
+        df.columns = df.columns.str.strip()
+        if table == "sales":
+            df.rename(columns={
+                "アイテム": "jan",
+                "取扱区分": "handling_type",
+                "販売数量": "quantity_sold",
+                "現在の手持数量": "stock_total",
+                "現在の利用可能数量": "stock_available",
+                "現在の注文済数量": "stock_ordered"
+            }, inplace=True)
+            for col in ["quantity_sold", "stock_total", "stock_available", "stock_ordered"]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+            df["jan"] = df["jan"].apply(normalize_jan)
+        if table == "purchase_data":
+            for col in ["order_lot", "price"]:
+                if col in df.columns:
+                    df[col] = df[col].astype(str).str.replace(",", "")
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+                    if col == "order_lot":
+                        df[col] = df[col].round().astype(int)
+            df["jan"] = df["jan"].apply(normalize_jan)
+        return df
+
+    def batch_upload_csv_to_supabase(file_path, table):
+        try:
+            df = pd.read_csv(file_path)
+            df = preprocess_csv(df, table)
+            url = f"{SUPABASE_URL}/rest/v1/{table}?id=gt.0"
+            requests.delete(url, headers=HEADERS)
+            if table == "purchase_data":
+                df = df.drop_duplicates(subset=["jan", "supplier", "order_lot"], keep="last")
+            else:
+                df = df.drop_duplicates(subset=["jan"], keep="last")
+            batch_size = 500
+            for i in range(0, len(df), batch_size):
+                batch = df.iloc[i:i+batch_size].where(pd.notnull(df.iloc[i:i+batch_size]), None).to_dict(orient="records")
+                res = requests.post(
+                    f"{SUPABASE_URL}/rest/v1/{table}",
+                    headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
+                    json=batch
+                )
+                if res.status_code not in [200, 201]:
+                    st.error(f"❌ バッチPOST失敗: {res.status_code} {res.text}")
+                    return
+            st.success(f"✅ {table} に {len(df)} 件アップロード完了")
+        except Exception as e:
+            st.error(f"❌ {table} のアップロード中にエラー: {e}")
+
+    sales_file = st.file_uploader("🧾 sales.csv アップロード", type="csv")
+    if sales_file:
+        with st.spinner("📤 sales.csv アップロード中..."):
+            temp_path = "/tmp/sales.csv"
+            with open(temp_path, "wb") as f:
+                f.write(sales_file.read())
+            batch_upload_csv_to_supabase(temp_path, "sales")
+
+    purchase_file = st.file_uploader("📦 purchase_data.csv アップロード", type="csv")
+    if purchase_file:
+        with st.spinner("📤 purchase_data.csv アップロード中..."):
+            temp_path = "/tmp/purchase_data.csv"
+            with open(temp_path, "wb") as f:
+                f.write(purchase_file.read())
+            batch_upload_csv_to_supabase(temp_path, "purchase_data")
 
 elif mode == "order_ai":
     st.subheader("📦 発注AIモード")
