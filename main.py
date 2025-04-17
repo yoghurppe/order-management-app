@@ -443,7 +443,106 @@ elif mode == "upload_item":
 
 elif mode == "price_improve":
     st.subheader("💰 仕入価格改善モード")
-    st.write("ここに価格改善ロジックを実装")
+
+    def fetch_table(table_name):
+        headers = {**HEADERS, "Prefer": "count=exact"}
+        dfs = []
+        offset = 0
+        limit = 1000
+        while True:
+            url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
+            res = requests.get(url, headers=headers)
+            if res.status_code == 416 or not res.json():
+                break
+            if res.status_code not in [200, 206]:
+                st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
+                return pd.DataFrame()
+            dfs.append(pd.DataFrame(res.json()))
+            offset += limit
+        return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+    with st.spinner("📊 データを読み込み中..."):
+        df_sales = fetch_table("sales")
+        df_purchase = fetch_table("purchase_data")
+        df_item = fetch_table("item_master")
+
+    def normalize_jan(x):
+        try:
+            if re.fullmatch(r"\d+(\.0+)?", str(x)):
+                return str(int(float(x)))
+            else:
+                return str(x).strip()
+        except:
+            return ""
+
+    df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
+    df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
+    df_item["jan"] = df_item["jan"].apply(normalize_jan)
+    df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
+
+    current_prices = {}
+    for _, row in df_sales.iterrows():
+        jan = row["jan"]
+        sold = row["quantity_sold"]
+        stock = row.get("stock_available", 0)
+        ordered = row.get("stock_ordered", 0)
+        options = df_purchase[df_purchase["jan"] == jan].copy()
+        if options.empty:
+            continue
+
+        if stock >= sold:
+            need_qty = 0
+        else:
+            need_qty = sold - stock + math.ceil(sold * 0.5) - ordered
+            need_qty = max(need_qty, 0)
+
+        if need_qty <= 0:
+            continue
+
+        options = options[options["order_lot"] > 0]
+        options["diff"] = (options["order_lot"] - need_qty).abs()
+
+        smaller_lots = options[options["order_lot"] <= need_qty]
+        if not smaller_lots.empty:
+            best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
+        else:
+            near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.5) & (options["order_lot"] != 1)]
+            if not near_lots.empty:
+                best_option = near_lots.loc[near_lots["diff"].idxmin()]
+            else:
+                one_lot = options[options["order_lot"] == 1]
+                if not one_lot.empty:
+                    best_option = one_lot.iloc[0]
+                else:
+                    best_option = options.sort_values("order_lot").iloc[0]
+
+        current_prices[jan] = best_option["price"]
+
+    min_prices = df_purchase.groupby("jan")["price"].min().to_dict()
+
+    rows = []
+    for jan, current_price in current_prices.items():
+        if jan in min_prices and min_prices[jan] < current_price:
+            item = df_item[df_item["jan"] == jan].head(1)
+            if not item.empty:
+                rows.append({
+                    "商品コード": item.iloc[0].get("item_code", ""),
+                    "JAN": jan,
+                    "ブランド": item.iloc[0].get("brand", ""),
+                    "現在の仕入価格": current_price,
+                    "最安値の仕入価格": min_prices[jan],
+                    "差分": round(min_prices[jan] - current_price, 2)
+                })
+
+    if rows:
+        df_result = pd.DataFrame(rows)
+        st.success(f"✅ 改善対象商品数: {len(df_result)} 件")
+        st.dataframe(df_result)
+        csv = df_result.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("📥 改善リストCSVダウンロード", data=csv, file_name="price_improvement_list.csv", mime="text/csv")
+    else:
+        st.info("改善の余地がある商品は見つかりませんでした。")
+
 
 
 
