@@ -5,10 +5,10 @@ import os
 import math
 import re
 
-# ページ設定は最初に実行する必要がある
+# 🟢 ページ設定はここで最初に実行
 st.set_page_config(page_title="発注AI（利用可能在庫で判断）")
 
-# 言語選択
+# 🟢 ここからアプリの中身（言語選択など）
 language = st.sidebar.selectbox("言語 / Language", ["日本語", "中文"], key="language")
 
 # ユーザー表示用ラベルテキスト
