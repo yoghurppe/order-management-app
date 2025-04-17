@@ -105,13 +105,29 @@ MODE_KEYS = {
 mode_labels = [v[language] for v in MODE_KEYS.values()]
 mode_selection = st.sidebar.radio(TEXT[language]["mode_select"], mode_labels)
 mode = next(key for key, labels in MODE_KEYS.items() if labels[language] == mode_selection)
-mode = st.sidebar.radio(TEXT[language]["mode_select"], [
-    TEXT[language]["upload_csv"],
-    TEXT[language]["order_ai"],
-    TEXT[language]["search_item"],
-    TEXT[language]["upload_item"],
-    TEXT[language]["price_improve"]
-])
+
+# 各モードの処理分岐
+if mode == "upload_csv":
+    st.subheader("📤 CSVアップロードモード")
+    st.write("ここにCSVアップロードの処理を実装")
+
+elif mode == "order_ai":
+    st.subheader("📦 発注AIモード")
+    st.write("ここに発注AIロジックを実装")
+
+elif mode == "search_item":
+    st.subheader("🔍 商品情報検索モード")
+    st.write("ここに商品検索ロジックを実装")
+
+elif mode == "upload_item":
+    st.subheader("📤 商品情報CSVアップロードモード")
+    st.write("ここに商品情報アップロード処理を実装")
+
+elif mode == "price_improve":
+    st.subheader("💰 仕入価格改善モード")
+    st.write("ここに価格改善ロジックを実装") if labels[language] == mode_selection)
+
+
 
 
 def fetch_table_cached(table_name):
