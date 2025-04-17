@@ -195,7 +195,136 @@ if mode == "upload_csv":
 
 elif mode == "order_ai":
     st.subheader("📦 発注AIモード")
-    st.write("ここに発注AIロジックを実装")
+
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    HEADERS = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    def fetch_table(table_name):
+        headers = {**HEADERS, "Prefer": "count=exact"}
+        dfs = []
+        offset = 0
+        limit = 1000
+        while True:
+            url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
+            res = requests.get(url, headers=headers)
+            if res.status_code == 416 or not res.json():
+                break
+            if res.status_code not in [200, 206]:
+                st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
+                return pd.DataFrame()
+            dfs.append(pd.DataFrame(res.json()))
+            offset += limit
+        return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+    def normalize_jan(x):
+        try:
+            if re.fullmatch(r"\d+(\.0+)?", str(x)):
+                return str(int(float(x)))
+            else:
+                return str(x).strip()
+        except:
+            return ""
+
+    with st.spinner("📦 データを読み込み中..."):
+        df_sales = fetch_table("sales")
+        df_purchase = fetch_table("purchase_data")
+
+    if df_sales.empty or df_purchase.empty:
+        st.warning("販売実績または仕入データが不足しています。")
+        st.stop()
+
+    df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
+    df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
+
+    df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
+    df_sales["stock_available"] = pd.to_numeric(df_sales["stock_available"], errors="coerce").fillna(0).astype(int)
+    df_sales["stock_ordered"] = pd.to_numeric(df_sales["stock_ordered"], errors="coerce").fillna(0).astype(int)
+    df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
+    df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
+
+    with st.spinner("🤖 発注AIを計算中..."):
+        results = []
+        for _, row in df_sales.iterrows():
+            jan = row["jan"]
+            sold = row["quantity_sold"]
+            stock = row.get("stock_available", 0)
+            ordered = row.get("stock_ordered", 0)
+            options = df_purchase[df_purchase["jan"] == jan].copy()
+            if options.empty:
+                continue
+
+            if stock >= sold:
+                need_qty = 0
+            else:
+                need_qty = sold - stock + math.ceil(sold * 0.5) - ordered
+                need_qty = max(need_qty, 0)
+
+            if need_qty <= 0:
+                continue
+
+            options = options[options["order_lot"] > 0]
+            options["diff"] = (options["order_lot"] - need_qty).abs()
+
+            smaller_lots = options[options["order_lot"] <= need_qty]
+            if not smaller_lots.empty:
+                best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
+            else:
+                near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.5) & (options["order_lot"] != 1)]
+                if not near_lots.empty:
+                    best_option = near_lots.loc[near_lots["diff"].idxmin()]
+                else:
+                    one_lot = options[options["order_lot"] == 1]
+                    if not one_lot.empty:
+                        best_option = one_lot.iloc[0]
+                    else:
+                        best_option = options.sort_values("order_lot").iloc[0]
+
+            sets = math.ceil(need_qty / best_option["order_lot"])
+            qty = sets * best_option["order_lot"]
+            total_cost = qty * best_option["price"]
+
+            results.append({
+                "jan": jan,
+                "販売実績": sold,
+                "在庫": stock,
+                "発注済": ordered,
+                "理論必要数": need_qty,
+                "発注数": qty,
+                "ロット": best_option["order_lot"],
+                "数量": round(qty / best_option["order_lot"], 2),
+                "単価": best_option["price"],
+                "総額": total_cost,
+                "仕入先": best_option.get("supplier", "不明")
+            })
+
+    if results:
+        result_df = pd.DataFrame(results)
+        column_order = ["jan", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
+        result_df = result_df[[col for col in column_order if col in result_df.columns]]
+        st.success(f"✅ 発注対象: {len(result_df)} 件")
+        st.dataframe(result_df)
+
+        csv = result_df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
+
+        st.markdown("---")
+        st.subheader("📦 仕入先別ダウンロード")
+        for supplier, group in result_df.groupby("仕入先"):
+            supplier_csv = group.to_csv(index=False).encode("utf-8-sig")
+            st.download_button(
+                label=f"📥 {supplier} 用 発注CSVダウンロード",
+                data=supplier_csv,
+                file_name=f"orders_{supplier}.csv",
+                mime="text/csv"
+            )
+    else:
+        st.info("現在、発注が必要な商品はありません。")
+
 
 elif mode == "search_item":
     st.subheader("🔍 商品情報検索モード")
