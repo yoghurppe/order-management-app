@@ -5,6 +5,87 @@ import os
 import math
 import re
 
+# 言語選択
+language = st.sidebar.selectbox("\ud83c\udf10 言語 / Language", ["日本語", "中文"], key="language")
+
+# ユーザー表示用ラベルテキスト
+TEXT = {
+    "日本語": {
+        "title_order_ai": "\ud83d\udce6 発注AI（利用可能在庫で判断）",
+        "mode_select": "モードを選んでください",
+        "upload_csv": "\ud83d\udcc4 CSVアップロード",
+        "order_ai": "\ud83d\udce6 発注AI判定",
+        "search_item": "\ud83d\udd0d 商品情報検索",
+        "upload_item": "\ud83d\udcc4 商品情報CSVアップロード",
+        "price_improve": "\ud83d\udcb0 仕入価格改善リスト",
+        "search_keyword": "商品名・商品コードで検索",
+        "search_brand": "ブランドで絞り込み",
+        "search_type": "取扱区分で絞り込み",
+        "product_list": "\ud83d\udccb 商品一覧"
+    },
+    "中文": {
+        "title_order_ai": "\ud83d\udce6 订货AI（根据可用库存）",
+        "mode_select": "请选择模式",
+        "upload_csv": "\ud83d\udcc4 上传CSV",
+        "order_ai": "\ud83d\udce6 订货AI判断",
+        "search_item": "\ud83d\udd0d 商品信息查询",
+        "upload_item": "\ud83d\udcc4 上传商品信息CSV",
+        "price_improve": "\ud83d\udcb0 进货价格优化清单",
+        "search_keyword": "按商品名称或编号搜索",
+        "search_brand": "按品牌筛选",
+        "search_type": "按分类筛选",
+        "product_list": "\ud83d\udccb 商品列表"
+    }
+}
+
+# 列名マッピング
+COLUMN_NAMES = {
+    "日本語": {
+        "商品コード": "商品コード",
+        "jan": "JAN",
+        "ランク": "ランク",
+        "ブランド": "ブランド",
+        "商品名": "商品名",
+        "取扱区分": "取扱区分",
+        "在庫": "在庫",
+        "利用可能": "利用可能",
+        "発注済": "発注済",
+        "仕入価格": "仕入価格",
+        "ケース入数": "ケース入数",
+        "発注ロット": "発注ロット",
+        "重量": "重量(g)"
+    },
+    "中文": {
+        "商品コード": "商品编号",
+        "jan": "条码",
+        "ランク": "等级",
+        "ブランド": "品牌",
+        "商品名": "商品名称",
+        "取扱区分": "分类",
+        "在庫": "库存",
+        "利用可能": "可用库存",
+        "発注済": "已订购",
+        "仕入価格": "进货价",
+        "ケース入数": "箱入数",
+        "発注ロット": "订购单位",
+        "重量": "重量(g)"
+    }
+}
+
+# タイトル
+st.set_page_config(page_title=TEXT[language]["title_order_ai"])
+st.title(TEXT[language]["title_order_ai"])
+
+# モード選択
+mode = st.sidebar.radio(TEXT[language]["mode_select"], [
+    TEXT[language]["upload_csv"],
+    TEXT[language]["order_ai"],
+    TEXT[language]["search_item"],
+    TEXT[language]["upload_item"],
+    TEXT[language]["price_improve"]
+])
+
+
 def fetch_table_cached(table_name):
     if table_name not in st.session_state:
         headers = {**HEADERS, "Prefer": "count=exact"}
