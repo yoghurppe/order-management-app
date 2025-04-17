@@ -462,24 +462,15 @@ elif mode == "price_improve":
         return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
     with st.spinner("📊 データを読み込み中..."):
-        df_sales = fetch_table("sales")
-        df_purchase = fetch_table("purchase_data")
-        df_item = fetch_table("item_master")
+        df_sales = fetch_table_cached("sales")
+        df_purchase = fetch_table_cached("purchase_data")
+        df_item = fetch_table_cached("item_master")
+        df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
+        df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
+        df_item["jan"] = df_item["jan"].apply(normalize_jan)
+        df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
-    def normalize_jan(x):
-        try:
-            if re.fullmatch(r"\d+(\.0+)?", str(x)):
-                return str(int(float(x)))
-            else:
-                return str(x).strip()
-        except:
-            return ""
-
-    df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
-    df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
-    df_item["jan"] = df_item["jan"].apply(normalize_jan)
-    df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
-
+    # 発注AIから現在の仕入価格を再現
     current_prices = {}
     for _, row in df_sales.iterrows():
         jan = row["jan"]
@@ -503,6 +494,7 @@ elif mode == "price_improve":
         options["diff"] = (options["order_lot"] - need_qty).abs()
 
         smaller_lots = options[options["order_lot"] <= need_qty]
+
         if not smaller_lots.empty:
             best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
         else:
@@ -544,10 +536,6 @@ elif mode == "price_improve":
         st.download_button("📥 改善リストCSVダウンロード", data=csv, file_name="price_improvement_list.csv", mime="text/csv")
     else:
         st.info("改善の余地がある商品は見つかりませんでした。")
-
-
-
-
 
 
 
