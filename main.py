@@ -438,7 +438,40 @@ elif mode == "upload_item":
             f.write(item_file.read())
 
         try:
-            df = pd
+            df = pd.read_csv(temp_path)
+            df = preprocess_item_master(df)
+        
+            # Supabaseテーブル初期化（既存削除）
+            requests.delete(f"{SUPABASE_URL}/rest/v1/item_master?id=gt.0", headers=HEADERS)
+        
+            # 商品コードをキーに重複排除
+            df = df.drop_duplicates(subset=["商品コード"], keep="last")
+        
+            # 🔽 ID付与
+            if "id" not in df.columns:
+                df.insert(0, "id", range(1, len(df) + 1))
+        
+            # NaN・inf を JSON互換な None に変換
+            df = df.replace({pd.NA: None, pd.NaT: None, float('nan'): None, float('inf'): None, -float('inf'): None})
+            df = df.where(pd.notnull(df), None)
+        
+            # バッチPOST
+            batch_size = 500
+            for i in range(0, len(df), batch_size):
+                batch = df.iloc[i:i+batch_size].to_dict(orient="records")
+                res = requests.post(
+                    f"{SUPABASE_URL}/rest/v1/item_master",
+                    headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
+                    json=batch
+                )
+                if res.status_code not in [200, 201]:
+                    st.error(f"❌ バッチPOST失敗: {res.status_code} {res.text}")
+                    break
+            else:
+                st.success(f"✅ item_master に {len(df)} 件アップロード完了")
+
+        except Exception as e:
+            st.error(f"❌ item_master のアップロード中にエラー: {e}")
 
 
 elif mode == "price_improve":
