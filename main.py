@@ -298,7 +298,6 @@ if mode == "🔍 商品情報検索":
         "発注ロット": "発注ロット/订购单位",
         "重量": "重量/重量(g)"
     }
-    available_cols = [col for col in view_cols if col in df.columns]
 
     st.subheader("📋 商品一覧")
     display_df = df_view[available_cols].sort_values(by="商品コード")
