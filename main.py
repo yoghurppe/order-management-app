@@ -528,7 +528,7 @@ elif mode == "price_improve":
                 rows.append({
                     "商品コード": item.iloc[0].get("商品コード", ""),
                     "JAN": jan,
-                    "ブランド": item.iloc[0].get("brand", ""),
+                    "ブランド": item.iloc[0].get("ブランド", ""),
                     "現在の仕入価格": current_price,
                     "最安値の仕入価格": min_prices[jan],
                     "差分": round(min_prices[jan] - current_price, 2)
