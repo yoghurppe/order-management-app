@@ -62,7 +62,7 @@ COLUMN_NAMES = {
         "商品コード": "商品编号",
         "jan": "条码",
         "ランク": "等级",
-        "メーカー名": "品牌",
+        "メーカー名": "制造商名称",
         "商品名": "商品名称",
         "取扱区分": "分类",
         "在庫": "库存",
@@ -371,7 +371,7 @@ elif mode == "search_item":
     keyword_code = st.text_input("商品コード / JAN", "")            # ★追加
     
     maker_filter = st.selectbox(                                   # ★ラベル変更
-        "メーカーで絞り込み", 
+        "メーカー名で絞り込み", 
         ["すべて"] + sorted(df_master["メーカー名"].dropna().unique())
     )
     
