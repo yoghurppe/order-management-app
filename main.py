@@ -326,6 +326,7 @@ elif mode == "order_ai":
         st.info("現在、発注が必要な商品はありません。")
 
 
+# 🔍 商品情報検索モード -----------------------------
 elif mode == "search_item":
     st.subheader("🔍 商品情報検索モード")
 
@@ -337,13 +338,22 @@ elif mode == "search_item":
         "Content-Type": "application/json"
     }
 
+    # ✅ ここを fetch_table と同じバッチ版に変更
     def fetch_item_master():
-        url = f"{SUPABASE_URL}/rest/v1/item_master?select=*"
-        res = requests.get(url, headers=HEADERS)
-        if res.status_code == 200:
-            return pd.DataFrame(res.json())
-        st.error("item_master の取得に失敗しました")
-        return pd.DataFrame()
+        headers = {**HEADERS, "Prefer": "count=exact"}
+        dfs = []
+        offset, limit = 0, 1000  # Supabase 既定と合わせる
+        while True:
+            url = f"{SUPABASE_URL}/rest/v1/item_master?select=*&offset={offset}&limit={limit}"
+            res = requests.get(url, headers=headers)
+            if res.status_code == 416 or not res.json():
+                break
+            if res.status_code not in [200, 206]:
+                st.error(f"item_master の取得に失敗: {res.status_code} / {res.text}")
+                return pd.DataFrame()
+            dfs.append(pd.DataFrame(res.json()))
+            offset += limit
+        return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
     df_master = fetch_item_master()
 
