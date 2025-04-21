@@ -22,7 +22,7 @@ TEXT = {
         "upload_item": "商品情報CSVアップロード",
         "price_improve": "仕入価格改善リスト",
         "search_keyword": "商品名・商品コードで検索",
-        "search_brand": "ブランドで絞り込み",
+        "search_brand": "メーカー名で絞り込み",
         "search_type": "取扱区分で絞り込み",
         "product_list": "商品一覧"
     },
@@ -47,7 +47,7 @@ COLUMN_NAMES = {
         "商品コード": "商品コード",
         "jan": "JAN",
         "ランク": "ランク",
-        "ブランド": "ブランド",
+        "メーカー名": "メーカー名",
         "商品名": "商品名",
         "取扱区分": "取扱区分",
         "在庫": "在庫",
@@ -62,7 +62,7 @@ COLUMN_NAMES = {
         "商品コード": "商品编号",
         "jan": "条码",
         "ランク": "等级",
-        "ブランド": "品牌",
+        "メーカー名": "品牌",
         "商品名": "商品名称",
         "取扱区分": "分类",
         "在庫": "库存",
@@ -372,7 +372,7 @@ elif mode == "search_item":
     
     maker_filter = st.selectbox(                                   # ★ラベル変更
         "メーカーで絞り込み", 
-        ["すべて"] + sorted(df_master["ブランド"].dropna().unique())
+        ["すべて"] + sorted(df_master["メーカー名"].dropna().unique())
     )
     
     rank_filter = st.selectbox(                                    # ★追加
@@ -399,9 +399,9 @@ elif mode == "search_item":
             df_view["jan"].str.contains(keyword_code, case=False, na=False)
         ]
     
-    # メーカー
+    # メーカー名
     if maker_filter != "すべて":
-        df_view = df_view[df_view["ブランド"] == maker_filter]
+        df_view = df_view[df_view["メーカー名"] == maker_filter]
     
     # ランク
     if rank_filter != "すべて":
@@ -413,7 +413,7 @@ elif mode == "search_item":
     
     # --- 一覧表示 -------------------------------------------------
     view_cols = [
-        "商品コード", "jan", "ランク", "ブランド", "商品名", "取扱区分",
+        "商品コード", "jan", "ランク", "メーカー名", "商品名", "取扱区分",
         "在庫", "利用可能", "発注済", "仕入価格", "ケース入数", "発注ロット", "重量"
     ]
     available_cols = [col for col in view_cols if col in df_view.columns]
@@ -451,7 +451,7 @@ elif mode == "upload_item":
         df.rename(columns={
             "UPCコード": "jan",
             "表示名": "商品名",
-            "メーカー名": "ブランド",
+            "メーカー名": "メーカー名",
             "アイテム定義原価": "仕入価格",
             "カートン入数": "ケース入数",
             "発注ロット": "発注ロット",
@@ -615,7 +615,7 @@ elif mode == "price_improve":
                 row = {
                     "商品コード": item.iloc[0].get("item_code", ""),
                     "JAN": jan,
-                    "ブランド": item.iloc[0].get("brand", ""),
+                    "メーカー名": item.iloc[0].get("brand", ""),
                     "現在の仕入価格": current_price,
                     "最安値の仕入価格": min_prices[jan],
                     "差分": round(min_prices[jan] - current_price, 2)
