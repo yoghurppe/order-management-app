@@ -365,22 +365,53 @@ elif mode == "search_item":
     df_master["商品コード"] = df_master["商品コード"].astype(str)
     df_master["商品名"] = df_master["商品名"].astype(str)
 
+    # --- 検索 UI -------------------------------------------------
     st.subheader(TEXT[language]["search_keyword"])
-    keyword = st.text_input(TEXT[language]["search_keyword"], "")
-    brand_filter = st.selectbox(TEXT[language]["search_brand"], ["すべて"] + sorted(df_master["ブランド"].dropna().unique()))
-    type_filter = st.selectbox(TEXT[language]["search_type"], ["すべて"] + sorted(df_master["取扱区分"].dropna().unique()))
-
+    keyword_name = st.text_input("商品名・キーワード", "")            # 既存
+    keyword_code = st.text_input("商品コード / JAN", "")            # ★追加
+    
+    maker_filter = st.selectbox(                                   # ★ラベル変更
+        "メーカーで絞り込み", 
+        ["すべて"] + sorted(df_master["ブランド"].dropna().unique())
+    )
+    
+    rank_filter = st.selectbox(                                    # ★追加
+        "ランクで絞り込み",
+        ["すべて"] + sorted(df_master["ランク"].dropna().unique())
+    )
+    
+    type_filter = st.selectbox(TEXT[language]["search_type"], ["すべて"] + 
+                                sorted(df_master["取扱区分"].dropna().unique()))
+    
+    # --- フィルタリング ------------------------------------------
     df_view = df_master.copy()
-    if keyword:
+    
+    # 商品名キーワード
+    if keyword_name:
         df_view = df_view[
-            df_view["商品名"].str.contains(keyword, case=False, na=False) |
-            df_view["商品コード"].str.contains(keyword, case=False, na=False)
+            df_view["商品名"].str.contains(keyword_name, case=False, na=False)
         ]
-    if brand_filter != "すべて":
-        df_view = df_view[df_view["ブランド"] == brand_filter]
+    
+    # 商品コード / JAN キーワード
+    if keyword_code:
+        df_view = df_view[
+            df_view["商品コード"].str.contains(keyword_code, case=False, na=False) |
+            df_view["jan"].str.contains(keyword_code, case=False, na=False)
+        ]
+    
+    # メーカー
+    if maker_filter != "すべて":
+        df_view = df_view[df_view["ブランド"] == maker_filter]
+    
+    # ランク
+    if rank_filter != "すべて":
+        df_view = df_view[df_view["ランク"] == rank_filter]
+    
+    # 取扱区分
     if type_filter != "すべて":
         df_view = df_view[df_view["取扱区分"] == type_filter]
-
+    
+    # --- 一覧表示 -------------------------------------------------
     view_cols = [
         "商品コード", "jan", "ランク", "ブランド", "商品名", "取扱区分",
         "在庫", "利用可能", "発注済", "仕入価格", "ケース入数", "発注ロット", "重量"
