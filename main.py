@@ -109,7 +109,7 @@ mode = next(key for key, labels in MODE_KEYS.items() if labels[language] == mode
 
 # 各モードの処理分岐
 if mode == "home":
-    st.subheader("🏠 トップページ")
+    st.subheader("🏠 " + TEXT[language]["title_order_ai"])
 
     if language == "日本語":
         st.markdown("""
