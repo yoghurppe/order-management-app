@@ -467,34 +467,6 @@ elif mode == "price_improve":
 
         current_prices[jan] = best_option["price"]
 
-        if rows:
-            df_result = pd.DataFrame(rows)
-        
-            # ✅ 多言語対応カラム名に変換
-            column_translation = {
-                "日本語": {
-                    "商品コード": "商品コード",
-                    "JAN": "JAN",
-                    "メーカー名": "メーカー名",
-                    "現在の仕入価格": "現在の仕入価格",
-                    "最安値の仕入価格": "最安値の仕入価格",
-                    "差分": "差分"
-                },
-                "中文": {
-                    "商品コード": "商品编号",
-                    "JAN": "条码",
-                    "メーカー名": "制造商名称",
-                    "現在の仕入価格": "当前进货价",
-                    "最安値の仕入価格": "最低进货价",
-                    "差分": "差额"
-                }
-            }
-        
-            df_result = df_result.rename(columns=column_translation[language])
-        
-            st.success(f"✅ 改善対象商品数: {len(df_result)} 件")
-            st.dataframe(df_result)
-
     # 最安値取得
     min_prices = df_purchase.groupby("jan")["price"].min().to_dict()
 
@@ -521,6 +493,43 @@ elif mode == "price_improve":
         st.download_button("📥 改善リストCSVダウンロード", data=csv, file_name="price_improvement_list.csv", mime="text/csv")
     else:
         st.info("改善の余地がある商品は見つかりませんでした。")
+
+    if rows:
+        df_result = pd.DataFrame(rows)
+    
+        # ✅ 多言語対応カラム名に変換
+        column_translation = {
+            "日本語": {
+                "商品コード": "商品コード",
+                "JAN": "JAN",
+                "メーカー名": "メーカー名",
+                "現在の仕入価格": "現在の仕入価格",
+                "最安値の仕入価格": "最安値の仕入価格",
+                "差分": "差分"
+            },
+            "中文": {
+                "商品コード": "商品编号",
+                "JAN": "条码",
+                "メーカー名": "制造商名称",
+                "現在の仕入価格": "当前进货价",
+                "最安値の仕入価格": "最低进货价",
+                "差分": "差额"
+            }
+        }
+    
+        df_result = df_result.rename(columns=column_translation[language])
+    
+        st.success(f"✅ 改善対象商品数: {len(df_result)} 件")
+        st.dataframe(df_result)
+    
+        csv = df_result.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            "📥 改善リストCSVダウンロード",
+            data=csv,
+            file_name="price_improvement_list.csv",
+            mime="text/csv"
+        )
+
 
 elif mode == "csv_upload":
     st.subheader("📤 CSVアップロードモード")
