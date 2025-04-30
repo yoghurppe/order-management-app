@@ -103,6 +103,8 @@ mode_labels = [v[language] for v in MODE_KEYS.values()]
 mode_selection = st.sidebar.radio(TEXT[language]["mode_select"], mode_labels)
 mode = next(key for key, labels in MODE_KEYS.items() if labels[language] == mode_selection)
 
+st.write("🔍 st.secrets 全体:", st.secrets)
+
 # 各モードの処理分岐
 if mode == "order_ai":
     st.subheader("📦 発注AIモード")
