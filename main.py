@@ -457,6 +457,14 @@ elif mode == "price_improve":
 elif mode == "csv_upload":
     st.subheader("📤 CSVアップロードモード")
 
+    # 🔐 パスワード認証
+    correct_password = st.secrets.get("UPLOAD_PASSWORD", "pass1234")  # デフォルトは "pass1234"
+    input_password = st.text_input("🔑 パスワードを入力してください", type="password")
+
+    if input_password != correct_password:
+        st.warning("正しいパスワードを入力してください。")
+        st.stop()
+
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
     HEADERS = {
