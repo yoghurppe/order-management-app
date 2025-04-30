@@ -80,7 +80,10 @@ st.title(TEXT[language]["title_order_ai"])
 
 # モード選択（言語に依存しない内部キーで管理）
 MODE_KEYS = {
-
+    "home": {
+        "日本語": "🏠 トップページ",
+        "中文": "🏠 主页"
+    },
     "order_ai": {
         "日本語": "発注AI判定",
         "中文": "订货AI判断"
@@ -100,12 +103,25 @@ MODE_KEYS = {
 }
 
 mode_labels = [v[language] for v in MODE_KEYS.values()]
-mode_selection = st.sidebar.radio(TEXT[language]["mode_select"], mode_labels)
+mode_selection = st.sidebar.radio(TEXT[language]["mode_select"], mode_labels, index=0)
 mode = next(key for key, labels in MODE_KEYS.items() if labels[language] == mode_selection)
 
 
 # 各モードの処理分岐
-if mode == "order_ai":
+if mode == "home":
+    st.subheader("🏠 トップページ")
+
+    st.markdown("""
+    #### ご利用ありがとうございます。
+    左のメニューから操作を選んでください。
+    - 📦 発注AI
+    - 📤 CSVアップロード
+    - 🔍 商品情報検索
+    - 💰 仕入価格改善リスト
+    """)
+
+
+elif mode == "order_ai":
     st.subheader("📦 発注AIモード")
 
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
