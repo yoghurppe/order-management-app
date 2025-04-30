@@ -6,7 +6,7 @@ import math
 import re
 
 # 🟢 ページ設定はここで最初に実行
-st.set_page_config(page_title="発注AI（利用可能在庫で判断）", layout="wide")
+st.set_page_config(page_title="管理補助システム", layout="wide")
 
 # 🟢 ここからアプリの中身（言語選択など）
 language = st.sidebar.selectbox("言語 / Language", ["日本語", "中文"], key="language")
@@ -14,7 +14,7 @@ language = st.sidebar.selectbox("言語 / Language", ["日本語", "中文"], ke
 # ユーザー表示用ラベルテキスト
 TEXT = {
     "日本語": {
-        "title_order_ai": "発注AI（利用可能在庫で判断）",
+        "title_order_ai": "管理補助システム",
         "mode_select": "モードを選んでください",
         "upload_csv": "CSVアップロード",
         "order_ai": "発注AI判定",
@@ -27,7 +27,7 @@ TEXT = {
         "product_list": "商品一覧"
     },
     "中文": {
-        "title_order_ai": "订货AI（根据可用库存）",
+        "title_order_ai": "管理支持系统",
         "mode_select": "请选择模式",
         "upload_csv": "上传CSV",
         "order_ai": "订货AI判断",
