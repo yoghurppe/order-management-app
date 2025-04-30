@@ -24,7 +24,13 @@ TEXT = {
         "search_keyword": "商品名・商品コードで検索",
         "search_brand": "メーカー名で絞り込み",
         "search_type": "取扱区分で絞り込み",
-        "product_list": "商品一覧"
+        "product_list": "商品一覧",
+        "search_keyword": "商品名・商品コードで検索",
+        "search_brand": "メーカー名で絞り込み",
+        "search_type": "取扱区分で絞り込み",
+        "search_rank": "ランクで絞り込み",
+        "search_code": "商品コード / JAN",
+        "all": "すべて"
     },
     "中文": {
         "title_order_ai": "管理支持系统",
@@ -37,7 +43,13 @@ TEXT = {
         "search_keyword": "按商品名称或编号搜索",
         "search_brand": "按品牌筛选",
         "search_type": "按分类筛选",
-        "product_list": "商品列表"
+        "product_list": "商品列表",
+        "search_keyword": "按商品名称或编号搜索",
+        "search_brand": "按制造商筛选",
+        "search_type": "按分类筛选",
+        "search_rank": "按等级筛选",
+        "search_code": "商品编号 / 条码",
+        "all": "全部"
     }
 }
 
@@ -304,21 +316,23 @@ elif mode == "search_item":
 
     # --- 検索 UI -------------------------------------------------
     st.subheader(TEXT[language]["search_keyword"])
-    keyword_name = st.text_input("商品名・キーワード", "")            # 既存
-    keyword_code = st.text_input("商品コード / JAN", "")            # ★追加
+    keyword_name = st.text_input(TEXT[language]["search_keyword"], "")
+    keyword_code = st.text_input(TEXT[language]["search_code"], "")
     
-    maker_filter = st.selectbox(                                   # ★ラベル変更
-        "メーカー名で絞り込み", 
-        ["すべて"] + sorted(df_master["メーカー名"].dropna().unique())
+    maker_filter = st.selectbox(
+        TEXT[language]["search_brand"],
+        [TEXT[language]["all"]] + sorted(df_master["メーカー名"].dropna().unique())
     )
     
-    rank_filter = st.selectbox(                                    # ★追加
-        "ランクで絞り込み",
-        ["すべて"] + sorted(df_master["ランク"].dropna().unique())
+    rank_filter = st.selectbox(
+        TEXT[language]["search_rank"],
+        [TEXT[language]["all"]] + sorted(df_master["ランク"].dropna().unique())
     )
     
-    type_filter = st.selectbox(TEXT[language]["search_type"], ["すべて"] + 
-                                sorted(df_master["取扱区分"].dropna().unique()))
+    type_filter = st.selectbox(
+        TEXT[language]["search_type"],
+        [TEXT[language]["all"]] + sorted(df_master["取扱区分"].dropna().unique())
+    )
     
     # --- フィルタリング ------------------------------------------
     df_view = df_master.copy()
@@ -337,15 +351,15 @@ elif mode == "search_item":
         ]
     
     # メーカー名
-    if maker_filter != "すべて":
+    if maker_filter != TEXT[language]["all"]:
         df_view = df_view[df_view["メーカー名"] == maker_filter]
     
     # ランク
-    if rank_filter != "すべて":
+    if rank_filter != TEXT[language]["all"]:
         df_view = df_view[df_view["ランク"] == rank_filter]
     
     # 取扱区分
-    if type_filter != "すべて":
+    if type_filter != TEXT[language]["all"]:
         df_view = df_view[df_view["取扱区分"] == type_filter]
     
     # --- 一覧表示 -------------------------------------------------
