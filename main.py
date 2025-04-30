@@ -89,6 +89,26 @@ COLUMN_NAMES = {
     }
 }
 
+# 🔐 item_master 最新更新日を取得（sidebar表示用）
+SUPABASE_URL_PRE = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY_PRE = st.secrets["SUPABASE_KEY"]
+HEADERS_PRE = {
+    "apikey": SUPABASE_KEY_PRE,
+    "Authorization": f"Bearer {SUPABASE_KEY_PRE}",
+    "Content-Type": "application/json"
+}
+
+def fetch_latest_item_update():
+    url = f"{SUPABASE_URL_PRE}/rest/v1/item_master?select=updated_at&order=updated_at.desc&limit=1"
+    res = requests.get(url, headers=HEADERS_PRE)
+    if res.status_code == 200 and res.json():
+        dt = pd.to_datetime(res.json()[0]["updated_at"], errors="coerce")
+        if pd.notnull(dt):
+            return f"（{dt.strftime('%-m.%d update')}）"
+    return ""
+
+item_master_update_text = fetch_latest_item_update()
+
 # タイトル表示
 st.title(TEXT[language]["title_order_ai"])
 
@@ -99,8 +119,8 @@ MODE_KEYS = {
         "中文": "🏠 主页"
     },
     "search_item": {
-        "日本語": "商品情報検索",
-        "中文": "商品信息查询"
+        "日本語": f"🔍 商品情報検索{item_master_update_text}",
+        "中文": f"🔍 商品信息查询{item_master_update_text}"
     },
     "price_improve": {
         "日本語": "仕入価格改善リスト",
