@@ -111,15 +111,24 @@ mode = next(key for key, labels in MODE_KEYS.items() if labels[language] == mode
 if mode == "home":
     st.subheader("🏠 トップページ")
 
-    st.markdown("""
-    #### ご利用ありがとうございます。
-    左のメニューから操作を選んでください。
-    - 📦 発注AI
-    - 📤 CSVアップロード
-    - 🔍 商品情報検索
-    - 💰 仕入価格改善リスト
-    """)
-
+    if language == "日本語":
+        st.markdown("""
+        #### ご利用ありがとうございます。
+        左のメニューから操作を選んでください。
+        - 📦 発注AI
+        - 📤 CSVアップロード
+        - 🔍 商品情報検索
+        - 💰 仕入価格改善リスト
+        """)
+    else:
+        st.markdown("""
+        #### 感谢您的使用。
+        请从左侧菜单中选择操作模式。
+        - 📦 订货AI
+        - 📤 上传CSV
+        - 🔍 商品信息查询
+        - 💰 进货价格优化清单
+        """)
 
 elif mode == "order_ai":
     st.subheader("📦 発注AIモード")
