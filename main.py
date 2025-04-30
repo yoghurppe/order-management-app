@@ -103,7 +103,6 @@ mode_labels = [v[language] for v in MODE_KEYS.values()]
 mode_selection = st.sidebar.radio(TEXT[language]["mode_select"], mode_labels)
 mode = next(key for key, labels in MODE_KEYS.items() if labels[language] == mode_selection)
 
-st.write("🔍 st.secrets 全体:", st.secrets)
 
 # 各モードの処理分岐
 if mode == "order_ai":
@@ -462,9 +461,6 @@ elif mode == "csv_upload":
     # 🔐 パスワード認証（まず入力欄を表示）
     input_password = st.text_input("🔑 パスワードを入力してください", type="password")
     correct_password = st.secrets.get("UPLOAD_PASSWORD", "pass1234")
-
-    # デバッグ出力（開発中のみ）
-    st.write("🔍 DEBUG: 入力 =", input_password, "/ 正解 =", correct_password)
 
     if input_password != correct_password:
         st.warning("正しいパスワードを入力してください。")
