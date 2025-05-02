@@ -218,7 +218,7 @@ elif mode == "order_ai":
     df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
     df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
-    with st.spinner("🤖 発注AIを計算中..."):
+    with st.spinner("🤖 発注AIが計算をしています..."):
         results = []
         for _, row in df_sales.iterrows():
             jan = row["jan"]
