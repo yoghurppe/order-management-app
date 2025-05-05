@@ -204,13 +204,15 @@ elif mode == "order_ai":
     with st.spinner("📦 データを読み込み中..."):
         df_sales = fetch_table("sales")
         df_purchase = fetch_table("purchase_data")
+        df_master = fetch_table("item_master")  # ← item_masterも取得
 
-    if df_sales.empty or df_purchase.empty:
-        st.warning("販売実績または仕入データが不足しています。")
+    if df_sales.empty or df_purchase.empty or df_master.empty:
+        st.warning("必要なデータが不足しています。")
         st.stop()
 
     df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
     df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
+    df_master["jan"] = df_master["jan"].apply(normalize_jan)
 
     df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
     df_sales["stock_available"] = pd.to_numeric(df_sales["stock_available"], errors="coerce").fillna(0).astype(int)
@@ -275,8 +277,22 @@ elif mode == "order_ai":
 
     if results:
         result_df = pd.DataFrame(results)
-        column_order = ["jan", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
+
+        # item_master を JANで結合して商品名・取扱区分を追加
+        result_df = pd.merge(
+            result_df,
+            df_master[["jan", "商品名", "取扱区分"]],
+            on="jan",
+            how="left"
+        )
+
+        # 取扱中止商品を除外
+        result_df = result_df[result_df["取扱区分"] != "取扱中止"]
+
+        # 表示順序
+        column_order = ["jan", "商品名", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
         result_df = result_df[[col for col in column_order if col in result_df.columns]]
+
         st.success(f"✅ 発注対象: {len(result_df)} 件")
         st.dataframe(result_df)
 
@@ -295,6 +311,7 @@ elif mode == "order_ai":
             )
     else:
         st.info("現在、発注が必要な商品はありません。")
+
 
 
 # 🔍 商品情報検索モード -----------------------------
