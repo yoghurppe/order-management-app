@@ -286,6 +286,9 @@ elif mode == "order_ai":
             how="left"
         )
 
+        # 商品名が無い商品を除外
+        result_df = result_df[result_df["商品名"].notna()]
+
         # 取扱中止商品を除外
         result_df = result_df[result_df["取扱区分"] != "取扱中止"]
 
