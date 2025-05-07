@@ -30,7 +30,11 @@ if st.session_state.authenticated or ("auth_token=valid" in str(cookie)):
     # 🔒 ログアウト機能（クッキー削除 + リロード）
     if st.sidebar.button("🔒 ログアウト"):
         st.session_state.authenticated = False
-        st_javascript("document.cookie = 'auth_token=; Max-Age=0'; location.reload();")
+        st_javascript("""
+            document.cookie = 'auth_token=; Max-Age=0';
+            setTimeout(() => location.reload(), 100);
+        """)
+
 
 else:
     st.title("🔐 認証が必要です")
