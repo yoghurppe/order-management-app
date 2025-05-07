@@ -11,48 +11,34 @@ from streamlit_javascript import st_javascript
 # ページ設定
 st.set_page_config(page_title="管理補助システム", layout="wide")
 
-# ハッシュ済みパスワード（例: smikie0826 → MD5）
-PASSWORD_HASH = "0f754d47528b6393d510866d26f508de"
+# 🔑 パスワード（MD5ハッシュ化済）: 例「admin123」
+PASSWORD_HASH = "0f754d47528b6393d510866d26f508de"  # MD5("smikie0826")
 
-# セッション認証フラグ初期化
+# 🧠 セッション状態
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
-# クッキーを取得
+# 🍪 クッキー確認
 cookie = st_javascript("document.cookie")
 
-# ✅ ログイン状態チェック（セッション or クッキー）
+# ✅ 認証済み or クッキー有効ならスルー
 if st.session_state.authenticated or ("auth_token=valid" in str(cookie)):
     st.session_state.authenticated = True
 
-    # 🔒 ログアウトボタン（クッキー削除＋リロード）
+    # 🔒 ログアウト機能（クッキー削除 + リロード）
     if st.sidebar.button("🔒 ログアウト"):
         st.session_state.authenticated = False
-        st_javascript("""
-            document.cookie = 'auth_token=; Max-Age=0; path=/;';
-            window.location.href = window.location.href;
-        """)
-        st.stop()
-
-    # 🎉 ここから認証後のメインアプリを記述
-    st.title("🎉 認証済みエリアへようこそ！")
-    st.write("ここに本編機能を書くことができます")
+        st_javascript("document.cookie = 'auth_token=; Max-Age=0'; location.reload();")
 
 else:
-    # 🔐 認証フォーム
     st.title("🔐 認証が必要です")
+    password = st.text_input("パスワードを入力", type="password")
 
-    with st.form("login_form"):
-        raw_input = st.text_input("パスワードを入力", type="password")
-        password = raw_input.strip()
-        submitted = st.form_submit_button("ログイン")
-
-    if submitted:
+    if st.button("ログイン"):
         hashed = hashlib.md5(password.encode()).hexdigest()
-
         if hashed == PASSWORD_HASH:
             st.session_state.authenticated = True
-            st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400; path=/'")
+            st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400'")  # 24時間有効
             st.success("✅ 認証成功、リロードします")
             time.sleep(1)
             st.experimental_rerun()
@@ -60,7 +46,6 @@ else:
             st.error("❌ パスワードが違います")
 
     st.stop()
-
 # 🟢 ここからアプリの中身（言語選択など）
 language = st.sidebar.selectbox("言語 / Language", ["日本語", "中文"], key="language")
 
