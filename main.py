@@ -38,18 +38,19 @@ if st.session_state.authenticated or ("auth_token=valid" in str(cookie)):
 
 else:
     st.title("🔐 認証が必要です")
-    
-    # 🔧 strip() 追加して改行や余分なスペースを除去
-    password = st.text_input("パスワードを入力", type="password").strip()
 
-    if st.button("ログイン"):
+    with st.form("login_form"):
+        password = st.text_input("パスワードを入力", type="password").strip()
+        submitted = st.form_submit_button("ログイン")
+
+    if submitted:
         hashed = hashlib.md5(password.encode()).hexdigest()
         st.write("入力されたハッシュ:", hashed)
         st.write("正しいハッシュ:", PASSWORD_HASH)
 
         if hashed == PASSWORD_HASH:
             st.session_state.authenticated = True
-            st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400'")  # 24時間有効
+            st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400'")
             st.success("✅ 認証成功、リロードします")
             time.sleep(1)
             st.experimental_rerun()
