@@ -12,7 +12,7 @@ from streamlit_javascript import st_javascript
 st.set_page_config(page_title="管理補助システム", layout="wide")
 
 # ハッシュ済みパスワード（例: smikie0826 → MD5）
-PASSWORD_HASH = "64fcdfd9862765a5ec2e2b405a6c71f1"
+PASSWORD_HASH = "0f754d47528b6393d510866d26f508de"
 
 # セッション認証フラグ初期化
 if "authenticated" not in st.session_state:
