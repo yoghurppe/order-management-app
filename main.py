@@ -32,7 +32,8 @@ if st.session_state.authenticated or ("auth_token=valid" in str(cookie)):
             document.cookie = 'auth_token=; Max-Age=0; path=/';
             setTimeout(() => location.reload(), 100);
         """)
-        st.stop()
+        st.experimental_rerun()
+
 
 else:
     st.title("🔐 認証が必要です")
