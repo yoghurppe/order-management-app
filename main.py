@@ -6,35 +6,33 @@ import math
 import re
 import hashlib
 import time
-
-# 🟢 ページ設定はここで最初に実行
-st.set_page_config(page_title="管理補助システム", layout="wide")
-
-# ✅ streamlit-javascript が必要です
 from streamlit_javascript import st_javascript
 
-# 🔑 パスワード（MD5ハッシュ化済）: 例「admin123」
-PASSWORD_HASH = "0f754d47528b6393d510866d26f508de"  # MD5("smikie0826")
+# ページ設定
+st.set_page_config(page_title="管理補助システム", layout="wide")
 
-# 🧠 セッション状態
+# ハッシュ済みパスワード
+PASSWORD_HASH = "64fcdfd9862765a5ec2e2b405a6c71f1"  # smikie0826 の MD5
+
+# 認証状態の管理
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
-# 🍪 クッキー確認
+# クッキー取得
 cookie = st_javascript("document.cookie")
 
-# ✅ 認証済み or クッキー有効ならスルー
+# ✅ クッキー or セッション状態で認証済み判定
 if st.session_state.authenticated or ("auth_token=valid" in str(cookie)):
     st.session_state.authenticated = True
 
-    # 🔒 ログアウト機能（クッキー削除 + リロード）
+    # 🔒 ログアウト処理（cookie削除＋ページリロード）
     if st.sidebar.button("🔒 ログアウト"):
         st.session_state.authenticated = False
         st_javascript("""
-            document.cookie = 'auth_token=; Max-Age=0';
+            document.cookie = 'auth_token=; Max-Age=0; path=/';
             setTimeout(() => location.reload(), 100);
         """)
-
+        st.stop()
 
 else:
     st.title("🔐 認証が必要です")
@@ -49,7 +47,7 @@ else:
 
         if hashed == PASSWORD_HASH:
             st.session_state.authenticated = True
-            st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400'")
+            st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400; path=/'")  # 24時間
             st.success("✅ 認証成功、リロードします")
             time.sleep(1)
             st.experimental_rerun()
