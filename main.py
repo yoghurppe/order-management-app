@@ -14,7 +14,7 @@ st.set_page_config(page_title="管理補助システム", layout="wide")
 from streamlit_javascript import st_javascript
 
 # 🔑 パスワード（MD5ハッシュ化済）: 例「admin123」
-PASSWORD_HASH = "0192023a7bbd73250516f069df18b500"  # MD5("admin123")
+PASSWORD_HASH = "64fcdfd9862765a5ec2e2b405a6c71f1"  # MD5("smikie0826")
 
 # 🧠 セッション状態
 if "authenticated" not in st.session_state:
