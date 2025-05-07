@@ -32,7 +32,7 @@ if st.session_state.authenticated or ("auth_token=valid" in str(cookie)):
             document.cookie = 'auth_token=; Max-Age=0; path=/';
             setTimeout(() => location.reload(), 100);
         """)
-        st.experimental_rerun()
+        st.stop()  # ← Python側の処理をここで止めるだけで十分
 
 
 else:
