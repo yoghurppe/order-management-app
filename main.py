@@ -40,7 +40,8 @@ else:
     st.title("🔐 認証が必要です")
 
     with st.form("login_form"):
-        password = st.text_input("パスワードを入力", type="password").strip()
+        raw_input = st.text_input("パスワードを入力", type="password")
+        password = raw_input.strip()
         submitted = st.form_submit_button("ログイン")
 
     if submitted:
