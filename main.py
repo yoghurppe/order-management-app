@@ -42,6 +42,8 @@ else:
 
     if st.button("ログイン"):
         hashed = hashlib.md5(password.encode()).hexdigest()
+        st.write("入力されたハッシュ:", hashed)  # ← 追加
+        st.write("正しいハッシュ:", PASSWORD_HASH)  # ← 追加
         if hashed == PASSWORD_HASH:
             st.session_state.authenticated = True
             st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400'")  # 24時間有効
