@@ -32,13 +32,17 @@ if st.session_state.authenticated or ("auth_token=valid" in str(cookie)):
 
 else:
     st.title("🔐 認証が必要です")
-    password = st.text_input("パスワードを入力", type="password")
 
-    if st.button("ログイン"):
+    # ✅ エンターキー対応フォーム
+    with st.form("login_form"):
+        password = st.text_input("パスワードを入力", type="password")
+        submitted = st.form_submit_button("ログイン")
+
+    if submitted:
         hashed = hashlib.md5(password.encode()).hexdigest()
         if hashed == PASSWORD_HASH:
             st.session_state.authenticated = True
-            st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400'")  # 24時間有効
+            st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400'")
             st.success("✅ 認証成功、リロードします")
             time.sleep(1)
             st.experimental_rerun()
@@ -46,6 +50,7 @@ else:
             st.error("❌ パスワードが違います")
 
     st.stop()
+    
 # 🟢 ここからアプリの中身（言語選択など）
 language = st.sidebar.selectbox("言語 / Language", ["日本語", "中文"], key="language")
 
