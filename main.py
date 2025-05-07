@@ -46,8 +46,6 @@ else:
 
     if submitted:
         hashed = hashlib.md5(password.encode()).hexdigest()
-        st.write("入力されたハッシュ:", hashed)
-        st.write("正しいハッシュ:", PASSWORD_HASH)
 
         if hashed == PASSWORD_HASH:
             st.session_state.authenticated = True
