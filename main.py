@@ -4,9 +4,50 @@ import requests
 import os
 import math
 import re
+import hashlib
+import time
 
 # 🟢 ページ設定はここで最初に実行
 st.set_page_config(page_title="管理補助システム", layout="wide")
+
+# ✅ streamlit-javascript が必要です
+from streamlit_javascript import st_javascript
+
+# 🔑 パスワード（MD5ハッシュ化済）: 例「admin123」
+PASSWORD_HASH = "0192023a7bbd73250516f069df18b500"  # MD5("admin123")
+
+# 🧠 セッション状態
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+# 🍪 クッキー確認
+cookie = st_javascript("document.cookie")
+
+# ✅ 認証済み or クッキー有効ならスルー
+if st.session_state.authenticated or ("auth_token=valid" in str(cookie)):
+    st.session_state.authenticated = True
+
+    # 🔒 ログアウト機能（クッキー削除 + リロード）
+    if st.sidebar.button("🔒 ログアウト"):
+        st.session_state.authenticated = False
+        st_javascript("document.cookie = 'auth_token=; Max-Age=0'; location.reload();")
+
+else:
+    st.title("🔐 認証が必要です")
+    password = st.text_input("パスワードを入力", type="password")
+
+    if st.button("ログイン"):
+        hashed = hashlib.md5(password.encode()).hexdigest()
+        if hashed == PASSWORD_HASH:
+            st.session_state.authenticated = True
+            st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400'")  # 24時間有効
+            st.success("✅ 認証成功、リロードします")
+            time.sleep(1)
+            st.experimental_rerun()
+        else:
+            st.error("❌ パスワードが違います")
+
+    st.stop()
 
 # 🟢 ここからアプリの中身（言語選択など）
 language = st.sidebar.selectbox("言語 / Language", ["日本語", "中文"], key="language")
