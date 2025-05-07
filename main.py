@@ -29,7 +29,9 @@ if st.session_state.authenticated or ("auth_token=valid" in str(cookie)):
     if st.sidebar.button("🔒 ログアウト"):
         st.session_state.authenticated = False
         st_javascript("""
-            document.cookie = 'auth_token=; Max-Age=0; path=/';
+            document.cookie = 'auth_token=; Max-Age=0; path=/;';
+            document.cookie = 'auth_token=; Max-Age=0; path=/; SameSite=Lax;';
+            document.cookie = 'auth_token=; Max-Age=0; path=/; Secure;';
             window.location.href = window.location.href;
         """)
         st.stop()
