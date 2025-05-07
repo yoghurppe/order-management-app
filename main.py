@@ -11,31 +11,35 @@ from streamlit_javascript import st_javascript
 # ページ設定
 st.set_page_config(page_title="管理補助システム", layout="wide")
 
-# ハッシュ済みパスワード
-PASSWORD_HASH = "64fcdfd9862765a5ec2e2b405a6c71f1"  # smikie0826 の MD5
+# ハッシュ済みパスワード（例: smikie0826 → MD5）
+PASSWORD_HASH = "64fcdfd9862765a5ec2e2b405a6c71f1"
 
-# 認証状態の管理
+# セッション認証フラグ初期化
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
-# クッキー取得
+# クッキーを取得
 cookie = st_javascript("document.cookie")
 
-# ✅ クッキー or セッション状態で認証済み判定
+# ✅ ログイン状態チェック（セッション or クッキー）
 if st.session_state.authenticated or ("auth_token=valid" in str(cookie)):
     st.session_state.authenticated = True
 
-    # 🔒 ログアウト処理（cookie削除＋ページリロード）
+    # 🔒 ログアウトボタン（クッキー削除＋リロード）
     if st.sidebar.button("🔒 ログアウト"):
         st.session_state.authenticated = False
         st_javascript("""
             document.cookie = 'auth_token=; Max-Age=0; path=/';
-            setTimeout(() => location.reload(), 100);
+            window.location.href = window.location.href;
         """)
-        st.stop()  # ← Python側の処理をここで止めるだけで十分
+        st.stop()
 
+    # 🎉 ここから認証後のメインアプリを記述
+    st.title("🎉 認証済みエリアへようこそ！")
+    st.write("ここに本編機能を書くことができます")
 
 else:
+    # 🔐 認証フォーム
     st.title("🔐 認証が必要です")
 
     with st.form("login_form"):
@@ -48,7 +52,7 @@ else:
 
         if hashed == PASSWORD_HASH:
             st.session_state.authenticated = True
-            st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400; path=/'")  # 24時間
+            st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400; path=/'")
             st.success("✅ 認証成功、リロードします")
             time.sleep(1)
             st.experimental_rerun()
