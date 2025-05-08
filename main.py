@@ -292,21 +292,21 @@ elif mode == "order_ai":
         
         # 発注AIメイン処理
         results = []
-        for _, row in df_sales.iterrows():
-            jan = row["jan"]
-        
-            if jan in recent_jans:
-                continue  # 直近で発注済みのJANはスキップ
-        
-            options = df_purchase[df_purchase["jan"] == jan].copy()
-            if options.empty:
-                continue
-        
-                    # ランクAなら、ロット未満またはロット=1ならスキップ
-                    if rank == "A":
-                        min_lot = options["order_lot"].min()
-                        if need_qty < min_lot or min_lot == 1:
-                            continue
+            for _, row in df_sales.iterrows():
+                jan = row["jan"]
+            
+                if jan in recent_jans:
+                    continue  # 直近で発注済みのJANはスキップ
+            
+                options = df_purchase[df_purchase["jan"] == jan].copy()
+                if options.empty:
+                    continue
+            
+                        # ランクAなら、ロット未満またはロット=1ならスキップ
+                        if rank == "A":
+                            min_lot = options["order_lot"].min()
+                            if need_qty < min_lot or min_lot == 1:
+                                continue
 
             options = options[options["order_lot"] > 0]
             options["diff"] = (options["order_lot"] - need_qty).abs()
