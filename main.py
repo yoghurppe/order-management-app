@@ -209,7 +209,9 @@ if mode == "home":
 
 elif mode == "order_ai":
     st.subheader("📦 発注AIモード")
-
+    st.write("sales columns:", df_sales.columns)
+    st.write("first results dict:", results[0] if results else "no results")
+    st.write("result_df columns:", result_df.columns)
     # ──────────────────────────────
     # 🎛 接続情報
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
