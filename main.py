@@ -296,17 +296,21 @@ elif mode == "order_ai":
             jan = row["jan"]
         
             if jan in recent_jans:
-                continue  # 直近で発注済みのJANはスキップ
+                continue
         
             options = df_purchase[df_purchase["jan"] == jan].copy()
             if options.empty:
                 continue
         
-                    # ランクAなら、ロット未満またはロット=1ならスキップ
-                    if rank == "A":
-                        min_lot = options["order_lot"].min()
-                        if need_qty < min_lot or min_lot == 1:
-                            continue
+            rank_row = df_master[df_master["jan"] == jan]
+            rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
+            multiplier = rank_multiplier.get(rank, 1.0)
+        
+            # ここに正しい深さで rank == "A" を入れる
+            if rank == "A":
+                min_lot = options["order_lot"].min()
+                if need_qty < min_lot or min_lot == 1:
+                    continue
 
             options = options[options["order_lot"] > 0]
             options["diff"] = (options["order_lot"] - need_qty).abs()
