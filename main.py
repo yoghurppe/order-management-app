@@ -355,7 +355,7 @@ elif mode == "order_ai":
         # 商品名・取扱区分を付与
         result_df = pd.merge(
             result_df,
-            df_master[["jan", "商品名", "取扱区分","ランク"]],
+            df_master[["jan", "商品名", "取扱区分", "ランク"]],
             on="jan",
             how="left"
         )
