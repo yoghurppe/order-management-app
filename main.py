@@ -284,7 +284,6 @@ elif mode == "order_ai":
         today = date.today()
         yesterday = today - timedelta(days=1)
         recent_jans = df_history[df_history["order_date"].isin([today, yesterday])]["jan"].dropna().astype(str).apply(normalize_jan).unique().tolist()
-        st.write("⏱️ 除外対象JAN（今日・昨日）：", recent_jans)
     
         results = []
         for _, row in df_sales.iterrows():
