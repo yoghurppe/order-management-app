@@ -769,11 +769,18 @@ elif mode == "csv_upload":
 
         with st.spinner("📤 purchase_history.csv を処理中..."):
             try:
-                df = pd.read_csv(order_file, skiprows=4, encoding="utf-8", sep=",")
-                st.write("🔍 読み込まれた列名:", df.columns.tolist())  # ← デバッグ出力
+                # カンマ区切りで失敗した場合、タブ区切りで試す
+                try:
+                    df = pd.read_csv(order_file, skiprows=4, encoding="utf-8", sep=",")
+                    if len(df.columns) == 1:
+                        raise ValueError("カンマ区切りで列が分かれませんでした")
+                except Exception:
+                    df = pd.read_csv(order_file, skiprows=4, encoding="utf-8", sep="\t")
         
-                if len(df.columns) == 1:
-                    st.error("❌ このCSVはカンマで区切られていない可能性があります。TSVや全角カンマではないか確認してください。")
+                st.write("🔍 読み込まれた列名:", df.columns.tolist())
+        
+                if len(df.columns) < 4:
+                    st.error("❌ このCSVはカンマやタブで正しく区切られていない可能性があります。Excelで開いてカンマ区切り形式で保存してください。")
                     st.stop()
         
                 df = preprocess_purchase_history(df)
