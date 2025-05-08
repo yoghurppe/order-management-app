@@ -789,13 +789,20 @@ elif mode == "csv_upload":
     order_file = st.file_uploader("📓 purchase_history.csv アップロード", type="csv")
     if order_file:
         def preprocess_purchase_history(df):
-            df.columns = ["jan_or_label", "date", "order_id", "quantity"]
+            # 合計行など除外
+            df = df[~df["jan_or_label"].astype(str).str.contains("合計", na=False)]
+        
+            # JAN補完
             df["jan"] = df["jan_or_label"].where(df["jan_or_label"].astype(str).str.match(r"^\d{13}$"))
             df["jan"] = df["jan"].fillna(method="ffill")
+        
+            # 必須列が揃っている行だけを残す
             df = df[df["date"].notna() & df["order_id"].notna()]
+        
+            # 整形
             df = df[["jan", "date", "order_id", "quantity"]].copy()
-            df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
             df["jan"] = df["jan"].apply(normalize_jan)
+            df["quantity"] = pd.to_numeric(df["quantity"].astype(str).str.replace(",", ""), errors="coerce").fillna(0).astype(int)
             df.rename(columns={"date": "order_date"}, inplace=True)
             return df
 
