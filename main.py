@@ -277,44 +277,50 @@ elif mode == "order_ai":
 
     with st.spinner("🤖 発注AIが計算をしています..."):
         from datetime import date, timedelta
-        
-        # 除外JAN取得
+    
+        # 📌 昨日・今日に発注済みのJANを除外
         df_history = fetch_table("purchase_history")
         df_history["order_date"] = pd.to_datetime(df_history["order_date"], errors="coerce").dt.date
         today = date.today()
         yesterday = today - timedelta(days=1)
-        
-        recent_jans = df_history[
-            df_history["order_date"].isin([today, yesterday])
-        ]["jan"].dropna().astype(str).apply(normalize_jan).unique().tolist()
-        
-        st.write("⏱️ 除外対象JAN（今日・昨日）:", recent_jans)
-        
-        # 発注AIメイン処理
+        recent_jans = df_history[df_history["order_date"].isin([today, yesterday])]["jan"].dropna().astype(str).apply(normalize_jan).unique().tolist()
+        st.write("⏱️ 除外対象JAN（今日・昨日）：", recent_jans)
+    
         results = []
         for _, row in df_sales.iterrows():
             jan = row["jan"]
-        
-            if jan in recent_jans:
-                continue
-        
-            options = df_purchase[df_purchase["jan"] == jan].copy()
-            if options.empty:
-                continue
-        
+            sold = row["quantity_sold"]
+            stock = row.get("stock_available", 0)
+            ordered = row.get("stock_ordered", 0)
+    
+            # ランク倍率取得
             rank_row = df_master[df_master["jan"] == jan]
             rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
             multiplier = rank_multiplier.get(rank, 1.0)
-        
-            # ここに正しい深さで rank == "A" を入れる
+    
+            # 理論必要数
+            need_qty = math.ceil(sold * multiplier) - stock - ordered
+            need_qty = max(need_qty, 0)
+    
+            # 除外条件（昨日・今日発注）
+            if jan in recent_jans:
+                continue
+    
+            if need_qty <= 0:
+                continue
+    
+            options = df_purchase[df_purchase["jan"] == jan].copy()
+            if options.empty:
+                continue
+    
             if rank == "A":
                 min_lot = options["order_lot"].min()
                 if need_qty < min_lot or min_lot == 1:
                     continue
-
+    
             options = options[options["order_lot"] > 0]
             options["diff"] = (options["order_lot"] - need_qty).abs()
-
+    
             smaller_lots = options[options["order_lot"] <= need_qty]
             if not smaller_lots.empty:
                 best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
@@ -328,11 +334,11 @@ elif mode == "order_ai":
                         best_option = one_lot.iloc[0]
                     else:
                         best_option = options.sort_values("order_lot").iloc[0]
-
+    
             sets = math.ceil(need_qty / best_option["order_lot"])
             qty = sets * best_option["order_lot"]
             total_cost = qty * best_option["price"]
-
+    
             results.append({
                 "jan": jan,
                 "販売実績": sold,
@@ -347,6 +353,7 @@ elif mode == "order_ai":
                 "仕入先": best_option.get("supplier", "不明"),
                 "ランク": rank
             })
+
 
     if results:
         result_df = pd.DataFrame(results)
