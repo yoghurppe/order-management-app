@@ -276,15 +276,21 @@ elif mode == "order_ai":
     }
 
     with st.spinner("🤖 発注AIが計算をしています..."):
+        from datetime import date, timedelta
+        df_history = fetch_table("purchase_history")
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        recent_jans = df_history[
+            pd.to_datetime(df_history["order_date"], errors="coerce").dt.date.isin([today, yesterday])
+        ]["jan"].unique().tolist()
+    
         results = []
         for _, row in df_sales.iterrows():
             jan = row["jan"]
-            sold = row["quantity_sold"]
-            stock = row.get("stock_available", 0)
-            ordered = row.get("stock_ordered", 0)
-            options = df_purchase[df_purchase["jan"] == jan].copy()
-            if options.empty:
-                continue
+    
+            if jan in recent_jans:
+                continue  # ⛔ 昨日・今日に発注済 → スキップ
+
 
             rank_row = df_master[df_master["jan"] == jan]
             rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
