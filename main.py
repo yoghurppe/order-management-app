@@ -291,31 +291,33 @@ elif mode == "order_ai":
             sold = row["quantity_sold"]
             stock = row.get("stock_available", 0)
             ordered = row.get("stock_ordered", 0)
-    
-            # ランク倍率取得
+        
+            # ランク倍率
             rank_row = df_master[df_master["jan"] == jan]
             rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
             multiplier = rank_multiplier.get(rank, 1.0)
-    
+        
             # 理論必要数
             need_qty = math.ceil(sold * multiplier) - stock - ordered
             need_qty = max(need_qty, 0)
-    
-            # 除外条件（昨日・今日発注）
+        
+            # 除外JAN（昨日・今日発注済）
             if jan in recent_jans:
                 continue
-    
+        
+            # 新条件：発注点を下回った場合のみ候補に
+            reorder_point = math.floor(sold * 0.7)
+            current_total = stock + ordered
+            if current_total >= reorder_point:
+                continue
+        
             if need_qty <= 0:
                 continue
-    
+        
             options = df_purchase[df_purchase["jan"] == jan].copy()
             if options.empty:
                 continue
-    
-            if rank == "A":
-                min_lot = options["order_lot"].min()
-                if need_qty < min_lot or min_lot == 1:
-                    continue
+
     
             options = options[options["order_lot"] > 0]
             options["diff"] = (options["order_lot"] - need_qty).abs()
