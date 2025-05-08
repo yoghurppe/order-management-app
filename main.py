@@ -247,7 +247,7 @@ elif mode == "order_ai":
     with st.spinner("📦 データを読み込み中..."):
         df_sales = fetch_table("sales")
         df_purchase = fetch_table("purchase_data")
-        df_master = fetch_table("item_master")  # ← item_masterも取得
+        df_master = fetch_table("item_master")
 
     if df_sales.empty or df_purchase.empty or df_master.empty:
         st.warning("必要なデータが不足しています。")
@@ -263,6 +263,13 @@ elif mode == "order_ai":
     df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
     df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
+    rank_multiplier = {
+        "Aランク": 1.5,
+        "Bランク": 1.2,
+        "Cランク": 1.0,
+        "TEST": 1.5
+    }
+
     with st.spinner("🤖 発注AIが計算をしています..."):
         results = []
         for _, row in df_sales.iterrows():
@@ -274,10 +281,14 @@ elif mode == "order_ai":
             if options.empty:
                 continue
 
+            rank_row = df_master[df_master["jan"] == jan]
+            rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
+            multiplier = rank_multiplier.get(rank, 1.0)
+
             if stock >= sold:
                 need_qty = 0
             else:
-                need_qty = sold - stock + math.ceil(sold * 0.5) - ordered
+                need_qty = math.ceil(sold * multiplier) - stock - ordered
                 need_qty = max(need_qty, 0)
 
             if need_qty <= 0:
@@ -315,13 +326,13 @@ elif mode == "order_ai":
                 "数量": round(qty / best_option["order_lot"], 2),
                 "単価": best_option["price"],
                 "総額": total_cost,
-                "仕入先": best_option.get("supplier", "不明")
+                "仕入先": best_option.get("supplier", "不明"),
+                "ランク": rank
             })
 
     if results:
         result_df = pd.DataFrame(results)
 
-        # item_master を JANで結合して商品名・取扱区分を追加
         result_df = pd.merge(
             result_df,
             df_master[["jan", "商品名", "取扱区分"]],
@@ -329,14 +340,10 @@ elif mode == "order_ai":
             how="left"
         )
 
-        # 商品名が無い商品を除外
         result_df = result_df[result_df["商品名"].notna()]
-
-        # 取扱中止商品を除外
         result_df = result_df[result_df["取扱区分"] != "取扱中止"]
 
-        # 表示順序
-        column_order = ["jan", "商品名", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
+        column_order = ["jan", "商品名", "ランク", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
         result_df = result_df[[col for col in column_order if col in result_df.columns]]
 
         st.success(f"✅ 発注対象: {len(result_df)} 件")
@@ -357,6 +364,7 @@ elif mode == "order_ai":
             )
     else:
         st.info("現在、発注が必要な商品はありません。")
+
 
 
 
