@@ -625,9 +625,9 @@ elif mode == "price_improve":
 
 
 elif mode == "csv_upload":
-    st.subheader("📤 CSVアップロードモード")
+    st.subheader("📄 CSVアップロードモード")
 
-    # 🔐 パスワード認証（まず入力欄を表示）
+    # 🔐 パスワード認証
     input_password = st.text_input("🔑 パスワードを入力してください", type="password")
     correct_password = st.secrets.get("UPLOAD_PASSWORD", "pass1234")
 
@@ -691,7 +691,7 @@ elif mode == "csv_upload":
     def upload_file(file, table_name):
         if not file:
             return
-        with st.spinner(f"📤 {file.name} アップロード中..."):
+        with st.spinner(f"📄 {file.name} アップロード中..."):
             temp_path = f"/tmp/{file.name}"
             with open(temp_path, "wb") as f:
                 f.write(file.read())
@@ -723,7 +723,7 @@ elif mode == "csv_upload":
             except Exception as e:
                 st.error(f"❌ {table_name} アップロード中にエラー: {e}")
 
-    sales_file = st.file_uploader("🧾 sales.csv アップロード", type="csv")
+    sales_file = st.file_uploader("📎 sales.csv アップロード", type="csv")
     if sales_file:
         upload_file(sales_file, "sales")
 
@@ -735,36 +735,45 @@ elif mode == "csv_upload":
     if item_file:
         upload_file(item_file, "item_master")
 
-    st.markdown("---")
-    st.subheader("🧾 発注履歴（purchase_history）CSV アップロード")
-
-    order_file = st.file_uploader("📤 発注履歴CSV（NetSuiteレポート形式）をアップロード", type="csv")
+    order_file = st.file_uploader("📓 purchase_history.csv アップロード", type="csv")
     if order_file:
-        try:
-            df_raw = pd.read_csv(order_file, skiprows=4, names=["jan_or_label", "date", "order_id", "quantity"])
-            df_raw["jan"] = df_raw["jan_or_label"].where(df_raw["jan_or_label"].astype(str).str.match(r"^\d{13}$"))
-            df_raw["jan"] = df_raw["jan"].fillna(method="ffill")
-            df_cleaned = df_raw[df_raw["date"].notna() & df_raw["order_id"].notna()]
-            df_cleaned = df_cleaned[["jan", "date", "order_id", "quantity"]].copy()
-            df_cleaned["quantity"] = pd.to_numeric(df_cleaned["quantity"], errors="coerce").fillna(0).astype(int)
-            df_cleaned["jan"] = df_cleaned["jan"].apply(normalize_jan)
+        def preprocess_purchase_history(df):
+            df.columns = ["jan_or_label", "date", "order_id", "quantity"]
+            df["jan"] = df["jan_or_label"].where(df["jan_or_label"].astype(str).str.match(r"^\d{13}$"))
+            df["jan"] = df["jan"].fillna(method="ffill")
+            df = df[df["date"].notna() & df["order_id"].notna()]
+            df = df[["jan", "date", "order_id", "quantity"]].copy()
+            df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
+            df["jan"] = df["jan"].apply(normalize_jan)
+            df.rename(columns={"date": "order_date"}, inplace=True)
+            return df
 
-            st.dataframe(df_cleaned)
+        def upload_purchase_history(df):
+            try:
+                requests.delete(f"{SUPABASE_URL}/rest/v1/purchase_history?id=gt.0", headers=HEADERS)
+                df = df.drop_duplicates(subset=["jan", "order_date", "order_id"], keep="last")
+                df = df.replace({pd.NA: None, pd.NaT: None, float("nan"): None}).where(pd.notnull(df), None)
+                for i in range(0, len(df), 500):
+                    batch = df.iloc[i:i+500].to_dict(orient="records")
+                    res = requests.post(
+                        f"{SUPABASE_URL}/rest/v1/purchase_history",
+                        headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
+                        json=batch
+                    )
+                    if res.status_code not in [200, 201]:
+                        st.error(f"❌ purchase_history バッチPOST失敗: {res.status_code} {res.text}")
+                        return
+                st.success(f"✅ purchase_history に {len(df)} 件アップロード完了")
+            except Exception as e:
+                st.error(f"❌ purchase_history アップロード中にエラー: {e}")
 
-            if st.button("📤 発注履歴をSupabaseに登録"):
-                records = df_cleaned.to_dict(orient="records")
-                res = requests.post(
-                    f"{SUPABASE_URL}/rest/v1/purchase_history",
-                    headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
-                    json=records
-                )
-                if res.status_code in [200, 201]:
-                    st.success("✅ 発注履歴の登録が完了しました")
-                else:
-                    st.error(f"❌ 登録エラー: {res.status_code} / {res.text}")
-
-        except Exception as e:
-            st.error(f"❌ 整形エラー: {e}")
+        with st.spinner("📄 purchase_history.csv を処理中..."):
+            try:
+                df = pd.read_csv(order_file, skiprows=4)
+                df = preprocess_purchase_history(df)
+                upload_purchase_history(df)
+            except Exception as e:
+                st.error(f"❌ 処理エラー: {e}")
 
 
 
