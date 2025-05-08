@@ -769,11 +769,14 @@ elif mode == "csv_upload":
 
         with st.spinner("📤 purchase_history.csv を処理中..."):
             try:
-                df = pd.read_csv(order_file, skiprows=4, encoding="utf-8", sep=",")  # ← 修正
+                df = pd.read_csv(order_file, skiprows=4, encoding="utf-8", sep=",")
+                st.write("🔍 読み込まれた列名:", df.columns.tolist())  # ← デバッグ出力
+        
+                if len(df.columns) == 1:
+                    st.error("❌ このCSVはカンマで区切られていない可能性があります。TSVや全角カンマではないか確認してください。")
+                    st.stop()
+        
                 df = preprocess_purchase_history(df)
                 upload_purchase_history(df)
             except Exception as e:
                 st.error(f"❌ 処理エラー: {e}")
-
-
-
