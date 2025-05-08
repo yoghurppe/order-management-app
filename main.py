@@ -735,4 +735,36 @@ elif mode == "csv_upload":
     if item_file:
         upload_file(item_file, "item_master")
 
+    st.markdown("---")
+    st.subheader("🧾 発注履歴（purchase_history）CSV アップロード")
+
+    order_file = st.file_uploader("📤 発注履歴CSV（NetSuiteレポート形式）をアップロード", type="csv")
+    if order_file:
+        try:
+            df_raw = pd.read_csv(order_file, skiprows=4, names=["jan_or_label", "date", "order_id", "quantity"])
+            df_raw["jan"] = df_raw["jan_or_label"].where(df_raw["jan_or_label"].astype(str).str.match(r"^\d{13}$"))
+            df_raw["jan"] = df_raw["jan"].fillna(method="ffill")
+            df_cleaned = df_raw[df_raw["date"].notna() & df_raw["order_id"].notna()]
+            df_cleaned = df_cleaned[["jan", "date", "order_id", "quantity"]].copy()
+            df_cleaned["quantity"] = pd.to_numeric(df_cleaned["quantity"], errors="coerce").fillna(0).astype(int)
+            df_cleaned["jan"] = df_cleaned["jan"].apply(normalize_jan)
+
+            st.dataframe(df_cleaned)
+
+            if st.button("📤 発注履歴をSupabaseに登録"):
+                records = df_cleaned.to_dict(orient="records")
+                res = requests.post(
+                    f"{SUPABASE_URL}/rest/v1/purchase_history",
+                    headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
+                    json=records
+                )
+                if res.status_code in [200, 201]:
+                    st.success("✅ 発注履歴の登録が完了しました")
+                else:
+                    st.error(f"❌ 登録エラー: {res.status_code} / {res.text}")
+
+        except Exception as e:
+            st.error(f"❌ 整形エラー: {e}")
+
+
 
