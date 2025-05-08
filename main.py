@@ -769,22 +769,12 @@ elif mode == "csv_upload":
 
         with st.spinner("📤 purchase_history.csv を処理中..."):
             try:
-                try:
-                    df = pd.read_csv(order_file, encoding="utf-8", sep=",", header=4)
-                    if len(df.columns) == 1:
-                        raise ValueError("カンマ区切りで列が分かれませんでした")
-                except Exception:
-                    df = pd.read_csv(order_file, encoding="utf-8", sep="\t", header=4)
-        
-                st.write("🔍 読み込まれた列名:", df.columns.tolist())
-        
-                if len(df.columns) < 4:
-                    st.error("❌ 正しい列数が読み取れませんでした。CSV形式と文字コードをご確認ください。")
-                    st.stop()
+                df = pd.read_csv(order_file, skiprows=6, encoding="utf-8", sep=",", header=0)
+                df.columns = ["jan_or_label", "date", "order_id", "quantity"]
+                st.write("🔍 読み込まれた列:", df.columns.tolist())
+                st.write(df.head())
         
                 df = preprocess_purchase_history(df)
                 upload_purchase_history(df)
             except Exception as e:
                 st.error(f"❌ 処理エラー: {e}")
-
-
