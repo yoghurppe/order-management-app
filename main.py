@@ -277,19 +277,22 @@ elif mode == "order_ai":
 
     with st.spinner("🤖 発注AIが計算をしています..."):
         from datetime import date, timedelta
+        
         df_history = fetch_table("purchase_history")
         today = date.today()
         yesterday = today - timedelta(days=1)
-        recent_jans = df_history[
-            pd.to_datetime(df_history["order_date"], errors="coerce").dt.date.isin([today, yesterday])
-        ]["jan"].unique().tolist()
-    
-        results = []
+        
+        # order_date列を日付型に変換し、昨日・今日のJANを取得
+        df_history["order_date"] = pd.to_datetime(df_history["order_date"], errors="coerce").dt.date
+        recent_jans = df_history[df_history["order_date"].isin([today, yesterday])]["jan"].unique().tolist()
+        
+        st.write("⏱️ 除外対象JAN（今日・昨日）:", recent_jans)  # ← デバッグ確認用
+        
+        # 発注AIループ内にこれを入れる
         for _, row in df_sales.iterrows():
             jan = row["jan"]
-    
             if jan in recent_jans:
-                continue  # ⛔ 昨日・今日に発注済 → スキップ
+                continue  # 昨日・今日に発注済 → 除外
 
 
             rank_row = df_master[df_master["jan"] == jan]
