@@ -264,9 +264,9 @@ elif mode == "order_ai":
     df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
     rank_multiplier = {
-        "Aランク": 1.5,
-        "Bランク": 1.2,
-        "Cランク": 1.0,
+        "A": 1.5,
+        "B": 1.2,
+        "C": 1.0,
         "TEST": 1.5
     }
 
@@ -293,6 +293,12 @@ elif mode == "order_ai":
 
             if need_qty <= 0:
                 continue
+
+            # ランクAなら、ロット未満またはロット=1ならスキップ
+            if rank == "A":
+                min_lot = options["order_lot"].min()
+                if need_qty < min_lot or min_lot == 1:
+                    continue
 
             options = options[options["order_lot"] > 0]
             options["diff"] = (options["order_lot"] - need_qty).abs()
