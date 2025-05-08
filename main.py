@@ -173,11 +173,16 @@ MODE_KEYS = {
         "日本語": "発注AI判定",
         "中文": "订货AI判断"
     },
+    "purchase_history": {
+        "日本語": "📜 発注履歴",
+        "中文": "📜 订货记录"
+    },
     "csv_upload": {
         "日本語": "CSVアップロード",
         "中文": "上传CSV"
     },
 }
+
 
 mode_labels = [v[language] for v in MODE_KEYS.values()]
 mode_selection = st.sidebar.radio(TEXT[language]["mode_select"], mode_labels, index=0)
@@ -477,6 +482,52 @@ elif mode == "search_item":
 
     csv = display_df.to_csv(index=False).encode("utf-8-sig")
     st.download_button("📥 CSVダウンロード", data=csv, file_name="item_master_filtered.csv", mime="text/csv")
+
+
+
+elif mode == "purchase_history":
+    st.subheader("📜 発注履歴")
+
+    # Supabase API設定（共通HEADERSが前にあれば再利用）
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    HEADERS = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    # フィルター入力
+    jan_filter = st.text_input("🔍 JANで検索（部分一致）", "")
+
+    @st.cache_data(ttl=60)
+    def fetch_purchase_history():
+        url = f"{SUPABASE_URL}/rest/v1/purchase_history?select=*"
+        res = requests.get(url, headers=HEADERS)
+        if res.status_code == 200:
+            return pd.DataFrame(res.json())
+        else:
+            st.error("❌ 発注履歴データの取得に失敗しました")
+            return pd.DataFrame()
+
+    df = fetch_purchase_history()
+
+    # 整形・フィルター・並び順
+    if not df.empty:
+        df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce").dt.date
+        df = df.sort_values("jan")
+
+        if jan_filter:
+            df = df[df["jan"].str.contains(jan_filter, na=False)]
+
+        df_show = df[["jan", "quantity", "order_date", "order_id"]]
+
+        st.success(f"✅ 発注履歴 件数: {len(df_show)} 件")
+        st.dataframe(df_show, use_container_width=True)
+    else:
+        st.info("発注履歴データが存在しません。")
+
+
 
 elif mode == "price_improve":
     st.subheader("💰 " + TEXT[language]["price_improve"])
