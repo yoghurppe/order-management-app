@@ -767,9 +767,9 @@ elif mode == "csv_upload":
             except Exception as e:
                 st.error(f"❌ purchase_history アップロード中にエラー: {e}")
 
-        with st.spinner("📄 purchase_history.csv を処理中..."):
+        with st.spinner("📤 purchase_history.csv を処理中..."):
             try:
-                df = pd.read_csv(order_file, skiprows=4)
+                df = pd.read_csv(order_file, skiprows=4, encoding="utf-8", sep=",")  # ← 修正
                 df = preprocess_purchase_history(df)
                 upload_purchase_history(df)
             except Exception as e:
