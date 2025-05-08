@@ -820,11 +820,16 @@ elif mode == "csv_upload":
 
         with st.spinner("📤 purchase_history.csv を処理中..."):
             try:
-                df = pd.read_csv(order_file, skiprows=6, encoding="utf-8", sep=",", header=0)
+                df = pd.read_csv(
+                    order_file,
+                    skiprows=6,
+                    encoding="utf-8",
+                    sep=",",
+                    header=0,
+                    quotechar='"',
+                    thousands=","
+                )
                 df.columns = ["jan_or_label", "date", "order_id", "quantity"]
-                st.write("🔍 読み込まれた列:", df.columns.tolist())
-                st.write(df.head())
-        
                 df = preprocess_purchase_history(df)
                 upload_purchase_history(df)
             except Exception as e:
