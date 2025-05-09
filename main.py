@@ -503,7 +503,6 @@ elif mode == "search_item":
 elif mode == "purchase_history":
     st.subheader("📜 発注履歴")
 
-    # Supabase API設定（共通HEADERSが前にあれば再利用）
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
     HEADERS = {
@@ -512,8 +511,9 @@ elif mode == "purchase_history":
         "Content-Type": "application/json"
     }
 
-    # フィルター入力
+    # 🔍 検索フォーム
     jan_filter = st.text_input("🔍 JANで検索（部分一致）", "")
+    order_id_filter = st.text_input("🔍 Order IDで検索（部分一致）", "")  # 追加！
 
     @st.cache_data(ttl=60)
     def fetch_purchase_history():
@@ -527,13 +527,14 @@ elif mode == "purchase_history":
 
     df = fetch_purchase_history()
 
-    # 整形・フィルター・並び順
     if not df.empty:
         df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce").dt.date
         df = df.sort_values("jan")
 
         if jan_filter:
             df = df[df["jan"].str.contains(jan_filter, na=False)]
+        if order_id_filter:
+            df = df[df["order_id"].astype(str).str.contains(order_id_filter, na=False)]  # 追加！
 
         df_show = df[["jan", "quantity", "order_date", "order_id"]]
 
