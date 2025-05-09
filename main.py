@@ -530,9 +530,21 @@ elif mode == "purchase_history":
         "Content-Type": "application/json"
     }
 
-    # 🔍 検索フォーム
-    jan_filter = st.text_input("🔍 JANで検索（部分一致）", "")
-    order_id_filter = st.text_input("🔍 Order IDで検索（部分一致）", "")  # 追加！
+    # ---------- 🔍 検索フォーム ----------
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # 従来の単一キーワード（部分一致）
+        jan_filter_single = st.text_input("🔍 JANで検索（部分一致）", "")
+        order_id_filter   = st.text_input("🔍 Order IDで検索（部分一致）", "")
+
+    with col2:
+        # ⭐ 複数 JAN 入力欄（改行／カンマ区切り）
+        jan_filter_multi = st.text_area(
+            "🔍 複数JAN入力（改行またはカンマ区切り）",
+            placeholder="例:\n4901234567890\n4987654321098",
+            height=120,
+        )
 
     @st.cache_data(ttl=60)
     def fetch_purchase_history():
@@ -540,27 +552,38 @@ elif mode == "purchase_history":
         res = requests.get(url, headers=HEADERS)
         if res.status_code == 200:
             return pd.DataFrame(res.json())
-        else:
-            st.error("❌ 発注履歴データの取得に失敗しました")
-            return pd.DataFrame()
+        st.error("❌ 発注履歴データの取得に失敗しました")
+        return pd.DataFrame()
 
     df = fetch_purchase_history()
 
-    if not df.empty:
-        df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce").dt.date
-        df = df.sort_values("jan")
-
-        if jan_filter:
-            df = df[df["jan"].str.contains(jan_filter, na=False)]
-        if order_id_filter:
-            df = df[df["order_id"].astype(str).str.contains(order_id_filter, na=False)]  # 追加！
-
-        df_show = df[["jan", "quantity", "order_date", "order_id"]]
-
-        st.success(f"✅ 発注履歴 件数: {len(df_show)} 件")
-        st.dataframe(df_show, use_container_width=True)
-    else:
+    if df.empty:
         st.info("発注履歴データが存在しません。")
+        st.stop()
+
+    # ------------- 🧹 フィルタリング -------------
+    import re
+
+    df["jan"]        = df["jan"].astype(str)
+    df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce").dt.date
+
+    # ① 複数 JAN リストを整形
+    jan_list = [j.strip() for j in re.split(r"[,\n\r]+", jan_filter_multi) if j.strip()]
+
+    if jan_list:  # 最優先
+        df = df[df["jan"].isin(jan_list)]
+    elif jan_filter_single:
+        df = df[df["jan"].str.contains(jan_filter_single, na=False)]
+
+    if order_id_filter:
+        df = df[df["order_id"].astype(str).str.contains(order_id_filter, na=False)]
+
+    # ------------- 📋 表示 -------------
+    df_show = df[["jan", "quantity", "order_date", "order_id"]].sort_values("jan")
+
+    st.success(f"✅ 発注履歴 件数: {len(df_show)} 件")
+    st.dataframe(df_show, use_container_width=True)
+
 
 
 
