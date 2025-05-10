@@ -512,12 +512,31 @@ elif mode == "search_item":
         .rename(columns=COLUMN_NAMES[language])
     )
 
-    st.subheader(TEXT[language]["product_list"])
-    st.dataframe(display_df)
+    #️⃣ 追加: 件数カウント
+    row_count = len(display_df)
+
+    #️⃣ 追加: ヘッダー行を左右 2 カラムで表示
+    h_left, h_right = st.columns([1, 0.15])        # 右側を少し細く
+    h_left.subheader(TEXT[language]["product_list"])
+    # HTMLで右寄せ & 同行内表示
+    h_right.markdown(
+        f"<h4 style='text-align:right; margin-top: 0.6em;'>{row_count:,}件</h4>",
+        unsafe_allow_html=True
+    )
+
+    # ✏️ 変更: ↓ 旧 subheader 行は不要なのでコメントアウト or 削除
+    # st.subheader(TEXT[language]["product_list"])
+
+    st.dataframe(display_df, use_container_width=True)
 
     csv = display_df.to_csv(index=False).encode("utf-8-sig")
-    st.download_button("📥 CSVダウンロード", data=csv,
-                       file_name="item_master_filtered.csv", mime="text/csv")
+    st.download_button(
+        "📥 CSVダウンロード",
+        data=csv,
+        file_name="item_master_filtered.csv",
+        mime="text/csv",
+    )
+
 
 
 elif mode == "purchase_history":
