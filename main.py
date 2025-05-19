@@ -308,7 +308,7 @@ elif mode == "order_ai":
                 continue
         
             # 新条件：発注点を下回った場合のみ候補に
-            reorder_point = math.floor(sold * 0.7)
+            reorder_point = max(math.floor(sold * 0.7), 1)
             current_total = stock + ordered
             if current_total >= reorder_point:
                 continue
