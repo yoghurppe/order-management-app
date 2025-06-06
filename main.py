@@ -291,8 +291,13 @@ elif mode == "order_ai":
     df_purchase["order_lot"]   = pd.to_numeric(df_purchase["order_lot"],   errors="coerce").fillna(0).astype(int)
     df_purchase["price"]       = pd.to_numeric(df_purchase["price"],       errors="coerce").fillna(0)
 
-    # ランク倍率
-    rank_multiplier = {"A": 1.5, "B": 1.2, "C": 1.0, "TEST": 1.5}
+    # --- ランク倍率（空欄→1.2 で底上げ） ---
+    rank_series = df_master.loc[df_master["jan"] == jan, "ランク"]
+    
+    # 1行以上あれば先頭を取得、なければ空文字
+    rank = str(rank_series.iloc[0]).strip() if not rank_series.empty else ""
+    
+    multiplier = rank_multiplier.get(rank, 1.2)
 
     # ──────────────────────────────────────────────
     # 5. 除外 JAN（昨日・今日に発注済）
