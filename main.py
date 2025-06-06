@@ -295,8 +295,11 @@ elif mode == "order_ai":
     rank_series = df_master.loc[df_master["jan"] == jan, "ランク"]
     
     # 1行以上あれば先頭を取得、なければ空文字
-    rank = str(rank_series.iloc[0]).strip() if not rank_series.empty else ""
-    
+    rank = (
+        str(df_master.loc[df_master["jan"] == jan, "ランク"].iloc[0]).strip()
+        if (df_master["jan"] == jan).any()
+        else ""
+    )
     multiplier = rank_multiplier.get(rank, 1.2)
 
     # ──────────────────────────────────────────────
