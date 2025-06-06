@@ -238,19 +238,24 @@ elif mode == "order_ai":
     # 2. 共通関数
     # ──────────────────────────────────────────────
     def fetch_table(table_name: str, limit: int = 1000) -> pd.DataFrame:
-        """Supabase から大型テーブルをバッチ取得"""
+        """Supabase から大型テーブルをバッチ取得（416 は正常終了とみなす）"""
         headers = {**HEADERS, "Prefer": "count=exact"}
         dfs, offset = [], 0
         while True:
             url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
             res = requests.get(url, headers=headers)
-            if res.status_code in (416, 200) and not res.json():
+    
+            if res.status_code == 416:               # ← ★ 追加：範囲外なら終了
                 break
-            if res.status_code not in (200, 206):
+            if res.status_code not in (200, 206):    # それ以外のエラーは報告
                 st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
                 return pd.DataFrame()
+            if not res.json():                       # データが空なら終了
+                break
+    
             dfs.append(pd.DataFrame(res.json()))
             offset += limit
+    
         return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
     def normalize_jan(x) -> str:
