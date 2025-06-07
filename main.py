@@ -6,6 +6,7 @@ import math
 import re
 import hashlib
 import time
+from zoneinfo import ZoneInfo
 from streamlit_javascript import st_javascript
 
 # ページ設定
