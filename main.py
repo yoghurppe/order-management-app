@@ -134,7 +134,7 @@ COLUMN_NAMES = {
     }
 }
 
-# 🔐 item_master 最新更新日を取得（sidebar表示用）
+# 🔐 Supabase接続設定
 SUPABASE_URL_PRE = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY_PRE = st.secrets["SUPABASE_KEY"]
 HEADERS_PRE = {
@@ -143,13 +143,15 @@ HEADERS_PRE = {
     "Content-Type": "application/json"
 }
 
+# 📅 item_master の最新更新日時を JST 表示で取得
 def fetch_latest_item_update():
     url = f"{SUPABASE_URL_PRE}/rest/v1/item_master?select=updated_at&order=updated_at.desc&limit=1"
     res = requests.get(url, headers=HEADERS_PRE)
     if res.status_code == 200 and res.json():
-        dt = pd.to_datetime(res.json()[0]["updated_at"], errors="coerce")
+        dt = pd.to_datetime(res.json()[0]["updated_at"], errors="coerce", utc=True)
         if pd.notnull(dt):
-            return f"（{dt.strftime('%-m.%d update')}）"
+            dt_jst = dt.tz_convert(ZoneInfo("Asia/Tokyo"))
+            return f"（{dt_jst.strftime('%-m.%d update')}）"
     return ""
 
 item_master_update_text = fetch_latest_item_update()
