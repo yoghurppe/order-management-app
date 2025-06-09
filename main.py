@@ -968,6 +968,7 @@ elif mode == "monthly_sales":
         df_sales["jan"] = df_sales["jan"].astype(str)
         df_sales = df_sales[df_sales["jan"].str.match(r"^\d{13}$")]  # 13桁JANのみ対象
         df_sales.rename(columns={"quantity_sold": "販売数"}, inplace=True)
+        df_sales["stock_ordered"] = df_sales["stock_ordered"].fillna(0).astype(int)
     else:
         st.error("salesテーブルに 'jan' 列が存在しません。")
         st.stop()
@@ -975,6 +976,7 @@ elif mode == "monthly_sales":
     # 🔗 jan でマージ
     df_joined = pd.merge(df_master, df_sales, on="jan", how="left")
     df_joined["販売数"] = df_joined["販売数"].fillna(0).astype(int)
+    df_joined["発注済"] = df_joined["stock_ordered"].fillna(0).astype(int) 
     
     # ✅ 販売数が1以上のみ表示
     df_joined = df_joined[df_joined["販売数"] > 0]
@@ -1034,7 +1036,7 @@ elif mode == "monthly_sales":
 
     # ---------- 📋 表示 ----------
     view_cols = [
-        "商品コード", "jan", "ランク", "メーカー名", "商品名", "取扱区分", "販売数", "在庫", "利用可能"
+        "商品コード", "jan", "ランク", "メーカー名", "商品名", "取扱区分", "販売数", "在庫", "利用可能","発注済"
     ]
     available_cols = [c for c in view_cols if c in df_view.columns]
 
