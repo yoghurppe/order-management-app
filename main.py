@@ -958,17 +958,24 @@ elif mode == "monthly_sales":
         st.warning("商品情報または販売実績データが存在しません。")
         st.stop()
     
+    # item_master整形
     df_master["jan"] = df_master["jan"].astype(str)
     df_master["商品コード"] = df_master["商品コード"].astype(str)
     df_master["商品名"] = df_master["商品名"].astype(str)
     
-    # ✅ salesテーブル整形
-    df_sales["jan"] = df_sales["jan"].astype(str)
-    df_sales = df_sales[df_sales["jan"].str.match(r"^\\d{13}$")]  # 13桁JANだけ
-    df_sales.rename(columns={"quantity_sold": "sales"}, inplace=True)
+    # ✅ sales整形（janが存在するか & 文字列に変換して13桁のみ残す）
+    if "jan" in df_sales.columns:
+        df_sales["jan"] = df_sales["jan"].astype(str)
+        df_sales = df_sales[df_sales["jan"].str.match(r"^\d{13}$")]  # ← 修正済み
+        df_sales.rename(columns={"quantity_sold": "sales"}, inplace=True)
+    else:
+        st.error("salesテーブルに 'jan' 列が存在しません。")
+        st.stop()
     
-    # 🔗 janでマージ
+    # 🔗 janで結合
     df_joined = pd.merge(df_master, df_sales, on="jan", how="left")
+    
+    # 欠損を0に補完
     df_joined["sales"] = df_joined["sales"].fillna(0).astype(int)
 
     # ---------- 🔍 検索 UI ----------
