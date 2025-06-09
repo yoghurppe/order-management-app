@@ -174,6 +174,10 @@ MODE_KEYS = {
         "日本語": "仕入価格改善リスト",
         "中文": "进货价格优化清单"
     },
+    "monthly_sales": {
+        "日本語": "販売実績（直近1ヶ月）",
+        "中文": "销售业绩（最近一个月）"
+    },
     "order_ai": {
         "日本語": "発注AI判定",
         "中文": "订货AI判断"
@@ -917,3 +921,129 @@ elif mode == "csv_upload":
                 upload_purchase_history(df)
             except Exception as e:
                 st.error(f"❌ 処理エラー: {e}")
+
+# 🆕 販売実績（直近1ヶ月）モード -----------------------------
+elif mode == "monthly_sales":
+    st.subheader("📊 販売実績（直近1ヶ月）")
+
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    HEADERS = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    # ✅ データ取得関数
+    def fetch_data(table_name):
+        headers = {**HEADERS, "Prefer": "count=exact"}
+        dfs = []
+        offset, limit = 0, 1000
+        while True:
+            url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
+            res = requests.get(url, headers=headers)
+            if res.status_code == 416 or not res.json():
+                break
+            if res.status_code not in [200, 206]:
+                st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
+                return pd.DataFrame()
+            dfs.append(pd.DataFrame(res.json()))
+            offset += limit
+        return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+    df_master = fetch_data("item_master")
+    df_sales = fetch_data("sales")
+
+    if df_master.empty or df_sales.empty:
+        st.warning("商品情報または販売実績データが存在しません。")
+        st.stop()
+
+    df_master["jan"] = df_master["jan"].astype(str)
+    df_master["商品コード"] = df_master["商品コード"].astype(str)
+    df_master["商品名"] = df_master["商品名"].astype(str)
+
+    # 🔗 JOIN（janキーで結合）
+    df_joined = pd.merge(df_master, df_sales, on="jan", how="left")
+    df_joined["sales"] = df_joined["sales"].fillna(0).astype(int)
+
+    # ---------- 🔍 検索 UI ----------
+    col1, col2 = st.columns(2)
+
+    with col1:
+        keyword_name = st.text_input(TEXT[language]["search_keyword"], "")
+        keyword_code = st.text_input(TEXT[language]["search_code"], "")
+
+    with col2:
+        jan_filter_multi = st.text_area(
+            TEXT[language]["multi_jan"],
+            placeholder="例:\n4901234567890\n4987654321098",
+            height=120,
+        )
+
+    maker_filter = st.selectbox(
+        TEXT[language]["search_brand"],
+        [TEXT[language]["all"]] + sorted(df_joined["メーカー名"].dropna().unique())
+    )
+    rank_filter = st.selectbox(
+        TEXT[language]["search_rank"],
+        [TEXT[language]["all"]] + sorted(df_joined["ランク"].dropna().unique())
+    )
+    type_filter = st.selectbox(
+        TEXT[language]["search_type"],
+        [TEXT[language]["all"]] + sorted(df_joined["取扱区分"].dropna().unique())
+    )
+
+    import re
+    jan_list = [j.strip() for j in re.split(r"[,\n\r]+", jan_filter_multi) if j.strip()]
+
+    df_view = df_joined.copy()
+
+    if jan_list:
+        df_view = df_view[df_view["jan"].isin(jan_list)]
+    elif keyword_code:
+        df_view = df_view[
+            df_view["商品コード"].str.contains(keyword_code, case=False, na=False) |
+            df_view["jan"].str.contains(keyword_code, case=False, na=False)
+        ]
+
+    if keyword_name:
+        df_view = df_view[df_view["商品名"].str.contains(keyword_name, case=False, na=False)]
+
+    if maker_filter != TEXT[language]["all"]:
+        df_view = df_view[df_view["メーカー名"] == maker_filter]
+
+    if rank_filter != TEXT[language]["all"]:
+        df_view = df_view[df_view["ランク"] == rank_filter]
+
+    if type_filter != TEXT[language]["all"]:
+        df_view = df_view[df_view["取扱区分"] == type_filter]
+
+    # ---------- 📋 表示 ----------
+    view_cols = [
+        "商品コード", "jan", "ランク", "メーカー名", "商品名", "取扱区分", "sales", "在庫", "利用可能"
+    ]
+    available_cols = [c for c in view_cols if c in df_view.columns]
+
+    display_df = (
+        df_view[available_cols]
+        .sort_values(by="sales", ascending=False)
+        .rename(columns=COLUMN_NAMES[language])
+    )
+
+    row_count = len(display_df)
+    h_left, h_right = st.columns([1, 0.15])
+    h_left.subheader(TEXT[language]["product_list"])
+    h_right.markdown(
+        f"<h4 style='text-align:right; margin-top: 0.6em;'>{row_count:,}件</h4>",
+        unsafe_allow_html=True
+    )
+
+    st.dataframe(display_df, use_container_width=True)
+
+    csv = display_df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        "📥 CSVダウンロード",
+        data=csv,
+        file_name="monthly_sales_filtered.csv",
+        mime="text/csv",
+    )
