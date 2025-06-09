@@ -1040,7 +1040,7 @@ elif mode == "monthly_sales":
 
     display_df = (
         df_view[available_cols]
-        .sort_values(by="sales", ascending=False)
+        .sort_values(by="jan")
         .rename(columns=COLUMN_NAMES[language])
     )
 
