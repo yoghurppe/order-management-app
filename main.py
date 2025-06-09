@@ -954,6 +954,8 @@ elif mode == "monthly_sales":
     df_master = fetch_data("item_master")
     df_sales = fetch_data("sales")
 
+    df_sales.rename(columns={"quantity_sold": "sales"}, inplace=True)
+
     if df_master.empty or df_sales.empty:
         st.warning("商品情報または販売実績データが存在しません。")
         st.stop()
