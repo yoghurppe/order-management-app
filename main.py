@@ -953,18 +953,21 @@ elif mode == "monthly_sales":
 
     df_master = fetch_data("item_master")
     df_sales = fetch_data("sales")
-
-    df_sales.rename(columns={"quantity_sold": "sales"}, inplace=True)
-
+    
     if df_master.empty or df_sales.empty:
         st.warning("商品情報または販売実績データが存在しません。")
         st.stop()
-
+    
     df_master["jan"] = df_master["jan"].astype(str)
     df_master["商品コード"] = df_master["商品コード"].astype(str)
     df_master["商品名"] = df_master["商品名"].astype(str)
-
-    # 🔗 JOIN（janキーで結合）
+    
+    # ✅ salesテーブル整形
+    df_sales["jan"] = df_sales["jan"].astype(str)
+    df_sales = df_sales[df_sales["jan"].str.match(r"^\\d{13}$")]  # 13桁JANだけ
+    df_sales.rename(columns={"quantity_sold": "sales"}, inplace=True)
+    
+    # 🔗 janでマージ
     df_joined = pd.merge(df_master, df_sales, on="jan", how="left")
     df_joined["sales"] = df_joined["sales"].fillna(0).astype(int)
 
