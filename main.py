@@ -959,35 +959,29 @@ elif mode == "monthly_sales":
         st.stop()
     
     # item_master 整形
-    df_master["jan"] = df_master["jan"].astype(str)
     df_master["商品コード"] = df_master["商品コード"].astype(str)
+    df_master["jan"] = df_master["jan"].astype(str)
     df_master["商品名"] = df_master["商品名"].astype(str)
     
     # ✅ sales 整形
     if "jan" in df_sales.columns:
-        df_sales["jan"] = df_sales["jan"].astype(str)
-        df_sales = df_sales[df_sales["jan"].str.match(r"^[0-9A-Za-z\\-]+$")]  # 英数字＋ハイフン許可
+        df_sales["商品コード"] = df_sales["jan"].astype(str)  # ← ここで商品コードとして扱う
+        df_sales = df_sales[df_sales["商品コード"].str.match(r"^[0-9A-Za-z\-]+$")]  # 英数字＋ハイフンのみ
         df_sales.rename(columns={"quantity_sold": "販売数"}, inplace=True)
-        df_sales["stock_ordered"] = df_sales["stock_ordered"].fillna(0).astype(int)
+        df_sales["発注済"] = pd.to_numeric(df_sales["stock_ordered"], errors="coerce").fillna(0).astype(int)
     else:
         st.error("salesテーブルに 'jan' 列が存在しません。")
         st.stop()
     
-    # janでマージ（sales優先）
-    df_joined = pd.merge(df_sales, df_master, on="jan", how="left")
+    # ✅ 商品コードでマージ（sales左優先）
+    df_joined = pd.merge(df_sales, df_master, on="商品コード", how="left")
     
-    # 商品コードには sales 側のjanを使う（アルファベット対応）
-    df_joined["商品コード"] = df_joined["jan"]  # ← ここが sales 側の "アイテム" 値
+    # JANは item_master 側のものをそのまま使う
+    df_joined["販売数"] = pd.to_numeric(df_joined.get("販売数", 0), errors="coerce").fillna(0).astype(int)
     
-    # jan（JANコード）はそのまま（item_master側が生きてる）
-    # → 上書きや再指定は不要！
-    
-    # 販売数・発注済
-    df_joined["販売数"] = df_joined["販売数"].fillna(0).astype(int)
-    df_joined["発注済"] = df_joined["stock_ordered"].fillna(0).astype(int)
-        
-    # ✅ 販売数が1以上のみ表示
+    # ✅ 販売数 > 0 のみに限定
     df_joined = df_joined[df_joined["販売数"] > 0]
+
 
 
     # ---------- 🔍 検索 UI ----------
