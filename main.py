@@ -958,27 +958,23 @@ elif mode == "monthly_sales":
         st.warning("商品情報または販売実績データが存在しません。")
         st.stop()
     
-    # === item_master 整形 ===
-    df_master["商品コード"] = df_master["商品コード"].astype(str)
+    # item_master 整形
     df_master["jan"] = df_master["jan"].astype(str)
-    df_master["商品名"] = df_master["商品名"].astype(str)
-    df_master["メーカー名"] = df_master["メーカー名"].astype(str)
-    # 他に必要な列も文字列変換
+    df_master["商品コード"] = df_master["商品コード"].astype(str)
+    df_master = df_master.rename(columns={"jan": "JAN"})  # ← これがないと後でJAN使えない
     
-    # === sales 整形 ===
-    if "jan" in df_sales.columns:
-        df_sales["商品コード"] = df_sales["jan"].astype(str)  # ← 表示・検索・結合キー
-        df_sales = df_sales[df_sales["商品コード"].str.match(r"^[0-9A-Za-z\-]+$")]  # 英数字＋ハイフン
-        df_sales.rename(columns={"quantity_sold": "販売数"}, inplace=True)
-    else:
-        st.error("sales テーブルに 'jan' 列が存在しません。")
-        st.stop()
+    # sales 側整形（商品コード＝sales.jan）
+    df_sales["商品コード"] = df_sales["jan"].astype(str)
+    df_sales.rename(columns={"quantity_sold": "販売数"}, inplace=True)
     
-    # === マージ：商品コードでマッチ（sales優先） ===
+    # マージ
     df_joined = pd.merge(df_sales, df_master, on="商品コード", how="left")
-
-    # 🔧 jan を定義（JAN列からコピー）
-    df_joined["jan"] = df_joined["JAN"]
+    
+    # item_master 側の JAN を jan として再付与（存在確認つき）
+    if "JAN" in df_joined.columns:
+        df_joined["jan"] = df_joined["JAN"]
+    else:
+        st.warning("⚠️ item_master 側からJANが取得できませんでした。")
     
     # === 欠損補完 ===
     df_joined["販売数"] = pd.to_numeric(df_joined["販売数"], errors="coerce").fillna(0).astype(int)
