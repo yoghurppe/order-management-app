@@ -960,30 +960,23 @@ elif mode == "monthly_sales":
     
     # item_master 整形
     df_master["jan"] = df_master["jan"].astype(str)
+    df_master["商品コード"] = df_master["商品コード"].astype(str)
     df_master["商品名"] = df_master["商品名"].astype(str)
-    df_master["メーカー名"] = df_master["メーカー名"].astype(str)
-    # 他にも必要な列があればここで整形
     
     # ✅ sales 整形
     if "jan" in df_sales.columns:
         df_sales["jan"] = df_sales["jan"].astype(str)
-        df_sales = df_sales[df_sales["jan"].str.match(r"^\d{13}$")]  # ← JAN13桁のみ許可
+        df_sales = df_sales[df_sales["jan"].str.match(r"^\d{13}$")]  # 13桁JANのみ対象
         df_sales.rename(columns={"quantity_sold": "販売数"}, inplace=True)
-        df_sales["商品コード"] = df_sales["jan"]  # ← 商品コードとして sales.jan を使う
-        df_sales["発注済"] = pd.to_numeric(df_sales["stock_ordered"], errors="coerce").fillna(0).astype(int)
+        df_sales["stock_ordered"] = df_sales["stock_ordered"].fillna(0).astype(int)
     else:
         st.error("salesテーブルに 'jan' 列が存在しません。")
         st.stop()
     
-    # 🔗 janで結合（13桁JANをキーに）
-    df_joined = pd.merge(df_sales, df_master, on="jan", how="left")
-    
-    # ✅ 表示・検索用に「商品コード」として sales側 jan を活用
-    # ※ すでに df_sales["商品コード"] に設定済なのでOK
-    
-    # ✅ 販売数整形 & フィルタ
-    df_joined["販売数"] = pd.to_numeric(df_joined["販売数"], errors="coerce").fillna(0).astype(int)
-    df_joined = df_joined[df_joined["販売数"] > 0]
+    # 🔗 jan でマージ
+    df_joined = pd.merge(df_master, df_sales, on="jan", how="left")
+    df_joined["販売数"] = df_joined["販売数"].fillna(0).astype(int)
+    df_joined["発注済"] = df_joined["stock_ordered"].fillna(0).astype(int)
 
 
 
