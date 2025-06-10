@@ -962,26 +962,26 @@ elif mode == "monthly_sales":
     df_master["商品コード"] = df_master["商品コード"].astype(str)
     df_master["jan"] = df_master["jan"].astype(str)
     df_master["商品名"] = df_master["商品名"].astype(str)
-    df_master = df_master.rename(columns={"jan": "JAN"})  # ← rename jan → JAN
+    df_master = df_master.rename(columns={"jan": "JAN"})  # ← jan → JAN に変更して明示
     
-    # sales 整形
+    # ✅ sales 整形
     if "jan" in df_sales.columns:
-        df_sales["商品コード"] = df_sales["jan"].astype(str)
-        df_sales = df_sales[df_sales["商品コード"].str.match(r"^[0-9A-Za-z\-]+$")]
+        df_sales["商品コード"] = df_sales["jan"].astype(str)  # ← sales の jan を 商品コード扱いに
+        df_sales = df_sales[df_sales["商品コード"].str.match(r"^[0-9A-Za-z\-]+$")]  # 英数字 + ハイフンのみ許可
         df_sales.rename(columns={"quantity_sold": "販売数"}, inplace=True)
         df_sales["発注済"] = pd.to_numeric(df_sales["stock_ordered"], errors="coerce").fillna(0).astype(int)
     else:
         st.error("salesテーブルに 'jan' 列が存在しません。")
         st.stop()
     
-    # マージ（商品コードで）
+    # 🔗 商品コードでマージ（sales主導）
     df_joined = pd.merge(df_sales, df_master, on="商品コード", how="left")
     
-    # JAN列を復活させる
+    # item_master 側の JAN を復活（rename済の "JAN" 列を jan に格納）
     df_joined["jan"] = df_joined["JAN"]
     
-    # 販売数とフィルター
-    df_joined["販売数"] = pd.to_numeric(df_joined.get("販売数", 0), errors="coerce").fillna(0).astype(int)
+    # 販売数整形 + フィルタ
+    df_joined["販売数"] = pd.to_numeric(df_joined["販売数"], errors="coerce").fillna(0).astype(int)
     df_joined = df_joined[df_joined["販売数"] > 0]
 
 
