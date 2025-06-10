@@ -976,6 +976,9 @@ elif mode == "monthly_sales":
     
     # === マージ：商品コードでマッチ（sales優先） ===
     df_joined = pd.merge(df_sales, df_master, on="商品コード", how="left")
+
+    # 🔧 jan を定義（JAN列からコピー）
+    df_joined["jan"] = df_joined["JAN"]
     
     # === 欠損補完 ===
     df_joined["販売数"] = pd.to_numeric(df_joined["販売数"], errors="coerce").fillna(0).astype(int)
