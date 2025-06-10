@@ -973,14 +973,16 @@ elif mode == "monthly_sales":
         st.error("salesテーブルに 'jan' 列が存在しません。")
         st.stop()
     
-    # 🔗 jan でマージ（sales側のjanが商品コードになるように、先にsalesを左側にする）
+    # janでマージ（sales優先）
     df_joined = pd.merge(df_sales, df_master, on="jan", how="left")
     
-    # ✅ 列の調整
-    df_joined["商品コード"] = df_joined["jan"]                      # ← salesのjanを商品コードに使う
-    df_joined["jan"] = df_master.set_index("jan").loc[df_joined["商品コード"], "jan"].values  # ← master側janで再上書き
+    # 商品コードには sales 側のjanを使う（アルファベット対応）
+    df_joined["商品コード"] = df_joined["jan"]  # ← ここが sales 側の "アイテム" 値
     
-    # ✅ 販売数・発注済
+    # jan（JANコード）はそのまま（item_master側が生きてる）
+    # → 上書きや再指定は不要！
+    
+    # 販売数・発注済
     df_joined["販売数"] = df_joined["販売数"].fillna(0).astype(int)
     df_joined["発注済"] = df_joined["stock_ordered"].fillna(0).astype(int)
         
