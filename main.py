@@ -1050,7 +1050,7 @@ elif mode == "monthly_sales":
 
     display_df = (
         df_view[available_cols]
-        .sort_values(by="jan")
+        .sort_values(by="商品コード")  # ← ここが商品コードでのソート
         .rename(columns=COLUMN_NAMES[language])
     )
 
