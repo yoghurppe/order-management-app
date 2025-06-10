@@ -981,7 +981,10 @@ elif mode == "monthly_sales":
     df_joined["販売数"] = pd.to_numeric(df_joined["販売数"], errors="coerce").fillna(0).astype(int)
     df_joined["発注済"] = pd.to_numeric(df_joined.get("stock_ordered", 0), errors="coerce").fillna(0).astype(int)
     
-    # === フィルター：販売実績がある商品だけ ===
+    # 販売数を数値に変換して補完（これが超重要）
+    df_joined["販売数"] = pd.to_numeric(df_joined["販売数"], errors="coerce").fillna(0).astype(int)
+    
+    # ここでフィルターを適用（NaNや"0"も除外される）
     df_joined = df_joined[df_joined["販売数"] > 0]
 
 
