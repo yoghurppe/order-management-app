@@ -251,10 +251,7 @@ elif mode == "order_ai":
 
     def normalize_jan(x):
         try:
-            if re.fullmatch(r"\d+(\.0+)?", str(x)):
-                return str(int(float(x)))
-            else:
-                return str(x).strip()
+            return str(x).strip()
         except:
             return ""
 
