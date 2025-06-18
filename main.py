@@ -362,50 +362,46 @@ elif mode == "order_ai":
             })
 
 
-if results:
-    result_df = pd.DataFrame(results)
+        if results:
+            result_df = pd.DataFrame(results)
+        
+            df_master["商品コード"] = df_master["商品コード"].astype(str).str.strip()
+            result_df["jan"] = result_df["jan"].astype(str).str.strip()
+        
+            df_temp = df_master[["商品コード", "商品名", "取扱区分"]].copy()
+            df_temp.rename(columns={"商品コード": "jan"}, inplace=True)
+        
+            result_df = pd.merge(result_df, df_temp, on="jan", how="left")
+        
+            if "商品名" in result_df.columns:
+                result_df = result_df[result_df["商品名"].notna()]
+            if "取扱区分" in result_df.columns:
+                result_df = result_df[result_df["取扱区分"] != "取扱中止"]
+            else:
+                st.warning("⚠️『取扱区分』列が存在しません。")
+        
+            column_order = ["jan", "商品名", "ランク", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
+            result_df = result_df[[col for col in column_order if col in result_df.columns]]
+        
+            st.success(f"✅ 発注対象: {len(result_df)} 件")
+            st.dataframe(result_df)
+        
+            csv = result_df.to_csv(index=False).encode("utf-8-sig")
+            st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
+        
+            st.markdown("---")
+            st.subheader("📦 仕入先別ダウンロード")
+            for supplier, group in result_df.groupby("仕入先"):
+                supplier_csv = group.to_csv(index=False).encode("utf-8-sig")
+                st.download_button(
+                    label=f"📥 {supplier} 用 発注CSVダウンロード",
+                    data=supplier_csv,
+                    file_name=f"orders_{supplier}.csv",
+                    mime="text/csv"
+                )
+        else:
+            st.info("現在、発注が必要な商品はありません。")
 
-    df_master["商品コード"] = df_master["商品コード"].astype(str).str.strip()
-    result_df["jan"] = result_df["jan"].astype(str).str.strip()
-
-    df_temp = df_master[["商品コード", "商品名", "取扱区分"]].copy()
-    df_temp.rename(columns={"商品コード": "jan"}, inplace=True)
-
-    result_df = pd.merge(result_df, df_temp, on="jan", how="left")
-
-    # 安全なフィルタリング処理
-    if "商品名" in result_df.columns:
-        result_df = result_df[result_df["商品名"].notna()]
-    if "取扱区分" in result_df.columns:
-        result_df = result_df[result_df["取扱区分"] != "取扱中止"]
-    else:
-        st.warning("⚠️『取扱区分』列が存在しません。")
-
-    # 表示用列順
-    column_order = ["jan", "商品名", "ランク", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
-    result_df = result_df[[col for col in column_order if col in result_df.columns]]
-
-    # 表示・出力
-    st.success(f"✅ 発注対象: {len(result_df)} 件")
-    st.dataframe(result_df)
-
-    csv = result_df.to_csv(index=False).encode("utf-8-sig")
-    st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
-
-    st.markdown("---")
-    st.subheader("📦 仕入先別ダウンロード")
-    for supplier, group in result_df.groupby("仕入先"):
-        supplier_csv = group.to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            label=f"📥 {supplier} 用 発注CSVダウンロード",
-            data=supplier_csv,
-            file_name=f"orders_{supplier}.csv",
-            mime="text/csv"
-        )
-else:
-    st.info("現在、発注が必要な商品はありません。")
-
-        st.info("現在、発注が必要な商品はありません。")
 
 # 🔍 商品情報検索モード -----------------------------
 elif mode == "search_item":
