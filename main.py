@@ -830,9 +830,17 @@ elif mode == "csv_upload":
             with open(temp_path, "wb") as f:
                 f.write(file.read())
             try:
-                df = pd.read_csv(temp_path)
+                # ✅ 安定読み込み
+                df = pd.read_csv(
+                    temp_path,
+                    sep=",",
+                    engine="python",
+                    on_bad_lines="skip"
+                )
                 df = preprocess_csv(df, table_name)
+
                 requests.delete(f"{SUPABASE_URL}/rest/v1/{table_name}?id=gt.0", headers=HEADERS)
+
                 if table_name == "purchase_data":
                     df = df.drop_duplicates(subset=["jan", "supplier", "order_lot"], keep="last")
                 elif table_name == "item_master":
@@ -843,6 +851,7 @@ elif mode == "csv_upload":
                     df = df.drop_duplicates(subset=["jan"], keep="last")
 
                 df = df.replace({pd.NA: None, pd.NaT: None, float("nan"): None}).where(pd.notnull(df), None)
+
                 for i in range(0, len(df), 500):
                     batch = df.iloc[i:i+500].to_dict(orient="records")
                     res = requests.post(
@@ -853,6 +862,7 @@ elif mode == "csv_upload":
                     if res.status_code not in [200, 201]:
                         st.error(f"❌ {table_name} バッチPOST失敗: {res.status_code} {res.text}")
                         return
+
                 st.success(f"✅ {table_name} に {len(df)} 件アップロード完了")
             except Exception as e:
                 st.error(f"❌ {table_name} アップロード中にエラー: {e}")
@@ -872,17 +882,10 @@ elif mode == "csv_upload":
     order_file = st.file_uploader("📓 purchase_history.csv アップロード", type="csv")
     if order_file:
         def preprocess_purchase_history(df):
-            # 合計行など除外
             df = df[~df["jan_or_label"].astype(str).str.contains("合計", na=False)]
-        
-            # JAN補完
             df["jan"] = df["jan_or_label"].where(df["jan_or_label"].astype(str).str.match(r"^\d{13}$"))
             df["jan"] = df["jan"].fillna(method="ffill")
-        
-            # 必須列が揃っている行だけを残す
             df = df[df["date"].notna() & df["order_id"].notna()]
-        
-            # 整形
             df = df[["jan", "date", "order_id", "quantity"]].copy()
             df["jan"] = df["jan"].apply(normalize_jan)
             df["quantity"] = pd.to_numeric(df["quantity"].astype(str).str.replace(",", ""), errors="coerce").fillna(0).astype(int)
@@ -915,15 +918,15 @@ elif mode == "csv_upload":
                     skiprows=6,
                     encoding="utf-8",
                     sep=",",
-                    header=0,
-                    quotechar='"',
-                    thousands=","
+                    engine="python",
+                    on_bad_lines="skip"
                 )
                 df.columns = ["jan_or_label", "date", "order_id", "quantity"]
                 df = preprocess_purchase_history(df)
                 upload_purchase_history(df)
             except Exception as e:
                 st.error(f"❌ 処理エラー: {e}")
+
 
 # 🆕 販売実績（直近1ヶ月）モード -----------------------------
 elif mode == "monthly_sales":
