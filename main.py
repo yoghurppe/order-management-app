@@ -761,7 +761,6 @@ elif mode == "price_improve":
 elif mode == "csv_upload":
     st.subheader("📄 CSVアップロードモード")
 
-    # 🔐 パスワード認証
     input_password = st.text_input("🔑 パスワードを入力してください", type="password")
     correct_password = st.secrets.get("UPLOAD_PASSWORD", "pass1234")
 
@@ -769,26 +768,9 @@ elif mode == "csv_upload":
         st.warning("正しいパスワードを入力してください。")
         st.stop()
 
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-    HEADERS = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    def normalize_jan(x):
-        try:
-            if re.fullmatch(r"\d+(\.0+)?", str(x)):
-                return str(int(float(x)))
-            else:
-                return str(x).strip()
-        except:
-            return ""
-
     def preprocess_csv(df, table):
         df.columns = df.columns.str.replace("　", "").str.replace("\ufeff", "").str.strip()
-    
+
         if table == "sales":
             st.write("📝 sales 列名:", df.columns.tolist())
             item_col = None
@@ -800,7 +782,7 @@ elif mode == "csv_upload":
                 df.rename(columns={item_col: "jan"}, inplace=True)
             else:
                 raise ValueError(f"❌ 'アイテム' 列が見つかりません！列名: {df.columns.tolist()}")
-    
+
             df.rename(columns={
                 "取扱区分": "handling_type",
                 "販売数量": "quantity_sold",
@@ -808,13 +790,13 @@ elif mode == "csv_upload":
                 "現在の利用可能数量": "stock_available",
                 "現在の注文済数量": "stock_ordered"
             }, inplace=True)
-    
+
             for col in ["quantity_sold", "stock_total", "stock_available", "stock_ordered"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
-    
+
             df["jan"] = df["jan"].apply(normalize_jan)
-    
+
         elif table == "purchase_data":
             for col in ["order_lot", "price"]:
                 if col in df.columns:
@@ -823,7 +805,7 @@ elif mode == "csv_upload":
                     if col == "order_lot":
                         df[col] = df[col].round().astype(int)
             df["jan"] = df["jan"].apply(normalize_jan)
-    
+
         elif table == "item_master":
             st.write("📝 item_master 列名:", df.columns.tolist())
             upc_col = None
@@ -831,12 +813,12 @@ elif mode == "csv_upload":
                 if "UPC" in col:
                     upc_col = col
                     break
-    
+
             if upc_col:
                 df.rename(columns={upc_col: "jan"}, inplace=True)
             else:
                 raise ValueError(f"❌ 'UPCコード' 列が見つかりません！列名: {df.columns.tolist()}")
-    
+
             df.rename(columns={
                 "表示名": "商品名", "メーカー名": "メーカー名",
                 "アイテム定義原価": "仕入価格", "カートン入数": "ケース入数",
@@ -845,31 +827,30 @@ elif mode == "csv_upload":
                 "注文済": "発注済", "名前": "商品コード",
                 "商品ランク": "ランク"
             }, inplace=True)
-    
+
             df.drop(columns=["内部ID"], inplace=True, errors="ignore")
             df["jan"] = df["jan"].apply(normalize_jan)
-    
+
             for col in ["ケース入数", "発注ロット", "在庫", "利用可能", "発注済"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).round().astype(int)
-    
-        return df
 
+        return df
 
     def upload_file(file, table_name):
         if not file:
             return
-        with st.spinner(f"📄 {file.name} アップロード中..."):
+        with st.spinner(f"📤 {file.name} アップロード中..."):
             temp_path = f"/tmp/{file.name}"
             with open(temp_path, "wb") as f:
                 f.write(file.read())
             try:
-                # ✅ 安定読み込み
                 df = pd.read_csv(
                     temp_path,
                     sep=",",
                     engine="python",
-                    on_bad_lines="skip"
+                    on_bad_lines="skip",
+                    encoding="utf-8-sig"
                 )
                 df = preprocess_csv(df, table_name)
 
@@ -898,6 +879,7 @@ elif mode == "csv_upload":
                         return
 
                 st.success(f"✅ {table_name} に {len(df)} 件アップロード完了")
+
             except Exception as e:
                 st.error(f"❌ {table_name} アップロード中にエラー: {e}")
 
@@ -912,54 +894,6 @@ elif mode == "csv_upload":
     item_file = st.file_uploader("📋 item_master.csv アップロード", type="csv")
     if item_file:
         upload_file(item_file, "item_master")
-
-    order_file = st.file_uploader("📓 purchase_history.csv アップロード", type="csv")
-    if order_file:
-        def preprocess_purchase_history(df):
-            df = df[~df["jan_or_label"].astype(str).str.contains("合計", na=False)]
-            df["jan"] = df["jan_or_label"].where(df["jan_or_label"].astype(str).str.match(r"^\d{13}$"))
-            df["jan"] = df["jan"].fillna(method="ffill")
-            df = df[df["date"].notna() & df["order_id"].notna()]
-            df = df[["jan", "date", "order_id", "quantity"]].copy()
-            df["jan"] = df["jan"].apply(normalize_jan)
-            df["quantity"] = pd.to_numeric(df["quantity"].astype(str).str.replace(",", ""), errors="coerce").fillna(0).astype(int)
-            df.rename(columns={"date": "order_date"}, inplace=True)
-            return df
-
-        def upload_purchase_history(df):
-            try:
-                requests.delete(f"{SUPABASE_URL}/rest/v1/purchase_history?id=gt.0", headers=HEADERS)
-                df = df.drop_duplicates(subset=["jan", "order_date", "order_id"], keep="last")
-                df = df.replace({pd.NA: None, pd.NaT: None, float("nan"): None}).where(pd.notnull(df), None)
-                for i in range(0, len(df), 500):
-                    batch = df.iloc[i:i+500].to_dict(orient="records")
-                    res = requests.post(
-                        f"{SUPABASE_URL}/rest/v1/purchase_history",
-                        headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
-                        json=batch
-                    )
-                    if res.status_code not in [200, 201]:
-                        st.error(f"❌ purchase_history バッチPOST失敗: {res.status_code} {res.text}")
-                        return
-                st.success(f"✅ purchase_history に {len(df)} 件アップロード完了")
-            except Exception as e:
-                st.error(f"❌ purchase_history アップロード中にエラー: {e}")
-
-        with st.spinner("📤 purchase_history.csv を処理中..."):
-            try:
-                df = pd.read_csv(
-                    order_file,
-                    skiprows=6,
-                    encoding="utf-8",
-                    sep=",",
-                    engine="python",
-                    on_bad_lines="skip"
-                )
-                df.columns = ["jan_or_label", "date", "order_id", "quantity"]
-                df = preprocess_purchase_history(df)
-                upload_purchase_history(df)
-            except Exception as e:
-                st.error(f"❌ 処理エラー: {e}")
 
 
 
