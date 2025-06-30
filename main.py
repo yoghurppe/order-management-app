@@ -788,15 +788,35 @@ elif mode == "csv_upload":
 
     def preprocess_csv(df, table):
         df.columns = df.columns.str.strip()
-        if table == "sales":
-            df.rename(columns={
-                "アイテム": "jan", "取扱区分": "handling_type", "販売数量": "quantity_sold",
-                "現在の手持数量": "stock_total", "現在の利用可能数量": "stock_available", "現在の注文済数量": "stock_ordered"
-            }, inplace=True)
-            for col in ["quantity_sold", "stock_total", "stock_available", "stock_ordered"]:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
-            df["jan"] = df["jan"].apply(normalize_jan)
+    if table == "sales":
+        df.columns = df.columns.str.replace("　", "").str.replace("\ufeff", "").str.strip()
+        st.write("📝 sales 列名:", df.columns.tolist())
+    
+        # アイテム列を自動検出
+        item_col = None
+        for col in df.columns:
+            if "アイテム" in col:
+                item_col = col
+                break
+    
+        if item_col:
+            df.rename(columns={item_col: "jan"}, inplace=True)
+    else:
+        raise ValueError(f"❌ 'アイテム' 列が見つかりません！列名: {df.columns.tolist()}")
+
+    df.rename(columns={
+        "取扱区分": "handling_type",
+        "販売数量": "quantity_sold",
+        "現在の手持数量": "stock_total",
+        "現在の利用可能数量": "stock_available",
+        "現在の注文済数量": "stock_ordered"
+    }, inplace=True)
+
+    for col in ["quantity_sold", "stock_total", "stock_available", "stock_ordered"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+
+    df["jan"] = df["jan"].apply(normalize_jan)
 
         elif table == "purchase_data":
             for col in ["order_lot", "price"]:
