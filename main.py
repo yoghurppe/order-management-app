@@ -306,6 +306,12 @@ elif mode == "order_ai":
             # 理論必要数
             need_qty = math.ceil(sold * multiplier) - stock - ordered
             need_qty = max(need_qty, 0)
+
+            # ✅ 改善条件: 在庫が 1 以下で販売実績が 1 以上なら最低 1 発注
+            if stock <= 1 and sold >= 1 and need_qty_raw <= 0:
+                need_qty = 1
+            else:
+                need_qty = max(need_qty_raw, 0)
         
             # 除外JAN（昨日・今日発注済）
             if jan in recent_jans:
