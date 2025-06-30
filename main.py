@@ -787,40 +787,32 @@ elif mode == "csv_upload":
             return ""
 
     def preprocess_csv(df, table):
-        df.columns = df.columns.str.strip()
-        if table == "sales":
+        # ✅ 全角スペース・BOM除去
+        df.columns = df.columns.str.replace("　", "").str.replace("\ufeff", "").str.strip()
+    
+        if table == "item_master":
+            # ✅ デバッグログで確認
+            st.write("📝 解析後の列名:", df.columns.tolist())
+    
             df.rename(columns={
-                "アイテム": "jan", "取扱区分": "handling_type", "販売数量": "quantity_sold",
-                "現在の手持数量": "stock_total", "現在の利用可能数量": "stock_available", "現在の注文済数量": "stock_ordered"
-            }, inplace=True)
-            for col in ["quantity_sold", "stock_total", "stock_available", "stock_ordered"]:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
-            df["jan"] = df["jan"].apply(normalize_jan)
-
-        elif table == "purchase_data":
-            for col in ["order_lot", "price"]:
-                if col in df.columns:
-                    df[col] = df[col].astype(str).str.replace(",", "")
-                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-                    if col == "order_lot":
-                        df[col] = df[col].round().astype(int)
-            df["jan"] = df["jan"].apply(normalize_jan)
-
-        elif table == "item_master":
-            df.rename(columns={
-                "UPCコード": "jan", "表示名": "商品名", "メーカー名": "メーカー名",
+                "UPCコード": "jan",
+                "表示名": "商品名", "メーカー名": "メーカー名",
                 "アイテム定義原価": "仕入価格", "カートン入数": "ケース入数",
                 "発注ロット": "発注ロット", "パッケージ重量(g)": "重量",
                 "手持": "在庫", "利用可能": "利用可能", "注文済": "発注済",
                 "名前": "商品コード", "商品ランク": "ランク"
             }, inplace=True)
+    
+            if "jan" not in df.columns:
+                raise ValueError("❌ 'UPCコード' → 'jan' 変換後に 'jan' 列がありません！列名を再確認！")
+    
             df.drop(columns=["内部ID"], inplace=True, errors="ignore")
             df["jan"] = df["jan"].apply(normalize_jan)
             for col in ["ケース入数", "発注ロット", "在庫", "利用可能", "発注済"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).round().astype(int)
         return df
+
 
     def upload_file(file, table_name):
         if not file:
