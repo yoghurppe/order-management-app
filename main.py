@@ -787,32 +787,40 @@ elif mode == "csv_upload":
             return ""
 
     def preprocess_csv(df, table):
-        # ✅ 全角スペース・BOM除去
-        df.columns = df.columns.str.replace("　", "").str.replace("\ufeff", "").str.strip()
-    
-        if table == "item_master":
-            # ✅ デバッグログで確認
-            st.write("📝 解析後の列名:", df.columns.tolist())
-    
+        df.columns = df.columns.str.strip()
+        if table == "sales":
             df.rename(columns={
-                "UPCコード": "jan",
-                "表示名": "商品名", "メーカー名": "メーカー名",
+                "アイテム": "jan", "取扱区分": "handling_type", "販売数量": "quantity_sold",
+                "現在の手持数量": "stock_total", "現在の利用可能数量": "stock_available", "現在の注文済数量": "stock_ordered"
+            }, inplace=True)
+            for col in ["quantity_sold", "stock_total", "stock_available", "stock_ordered"]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+            df["jan"] = df["jan"].apply(normalize_jan)
+
+        elif table == "purchase_data":
+            for col in ["order_lot", "price"]:
+                if col in df.columns:
+                    df[col] = df[col].astype(str).str.replace(",", "")
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+                    if col == "order_lot":
+                        df[col] = df[col].round().astype(int)
+            df["jan"] = df["jan"].apply(normalize_jan)
+
+        elif table == "item_master":
+            df.rename(columns={
+                "UPCコード": "jan", "表示名": "商品名", "メーカー名": "メーカー名",
                 "アイテム定義原価": "仕入価格", "カートン入数": "ケース入数",
                 "発注ロット": "発注ロット", "パッケージ重量(g)": "重量",
                 "手持": "在庫", "利用可能": "利用可能", "注文済": "発注済",
                 "名前": "商品コード", "商品ランク": "ランク"
             }, inplace=True)
-    
-            if "jan" not in df.columns:
-                raise ValueError("❌ 'UPCコード' → 'jan' 変換後に 'jan' 列がありません！列名を再確認！")
-    
             df.drop(columns=["内部ID"], inplace=True, errors="ignore")
             df["jan"] = df["jan"].apply(normalize_jan)
             for col in ["ケース入数", "発注ロット", "在庫", "利用可能", "発注済"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).round().astype(int)
         return df
-
 
     def upload_file(file, table_name):
         if not file:
@@ -835,37 +843,12 @@ elif mode == "csv_upload":
 
                 if table_name == "purchase_data":
                     df = df.drop_duplicates(subset=["jan", "supplier", "order_lot"], keep="last")
-                elif table == "item_master":
-                    # 全角・BOM除去
-                    df.columns = df.columns.str.replace("　", "").str.replace("\ufeff", "").str.strip()
-                    st.write("📝 解析後の列名:", df.columns.tolist())
-                
-                    # UPCを含む列名を自動で探して jan にする
-                    upc_col = None
-                    for col in df.columns:
-                        if "UPC" in col:
-                            upc_col = col
-                            break
-                
-                    if upc_col:
-                        df.rename(columns={upc_col: "jan"}, inplace=True)
-                    else:
-                        raise ValueError(f"❌ 'UPCコード' 列が見つかりません！列名: {df.columns.tolist()}")
-                
-                    df.rename(columns={
-                        "表示名": "商品名", "メーカー名": "メーカー名",
-                        "アイテム定義原価": "仕入価格", "カートン入数": "ケース入数",
-                        "発注ロット": "発注ロット", "パッケージ重量(g)": "重量",
-                        "手持": "在庫", "利用可能": "利用可能", "注文済": "発注済",
-                        "名前": "商品コード", "商品ランク": "ランク"
-                    }, inplace=True)
-                
-                    df.drop(columns=["内部ID"], inplace=True, errors="ignore")
-                    df["jan"] = df["jan"].apply(normalize_jan)
-                    for col in ["ケース入数", "発注ロット", "在庫", "利用可能", "発注済"]:
-                        if col in df.columns:
-                            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).round().astype(int)
-
+                elif table_name == "item_master":
+                    df = df.drop_duplicates(subset=["商品コード"], keep="last")
+                    if "id" not in df.columns:
+                        df.insert(0, "id", range(1, len(df) + 1))
+                else:
+                    df = df.drop_duplicates(subset=["jan"], keep="last")
 
                 df = df.replace({pd.NA: None, pd.NaT: None, float("nan"): None}).where(pd.notnull(df), None)
 
@@ -943,6 +926,7 @@ elif mode == "csv_upload":
                 upload_purchase_history(df)
             except Exception as e:
                 st.error(f"❌ 処理エラー: {e}")
+
 
 
 # 🆕 販売実績（直近1ヶ月）モード -----------------------------
