@@ -224,200 +224,202 @@ if mode == "home":
 elif mode == "order_ai":
     st.subheader("📦 発注AIモード")
 
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-    HEADERS = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    def fetch_table(table_name):
-        headers = {**HEADERS, "Prefer": "count=exact"}
-        dfs = []
-        offset = 0
-        limit = 1000
-        while True:
-            url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
-            res = requests.get(url, headers=headers)
-            if res.status_code == 416 or not res.json():
-                break
-            if res.status_code not in [200, 206]:
-                st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
-                return pd.DataFrame()
-            dfs.append(pd.DataFrame(res.json()))
-            offset += limit
-        return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
-
-    def normalize_jan(x):
-        try:
-            return str(x).strip()
-        except:
-            return ""
-
-    # 🔵 モード切り替え（通常 / JD）
+    # 🔵 モード切替
     ai_mode = st.radio("発注AIモードを選択", ["通常モード", "JDモード"], index=0)
 
-    with st.spinner("📦 データを読み込み中..."):
-        df_sales = fetch_table("sales")
-        df_purchase = fetch_table("purchase_data")
-        df_master = fetch_table("item_master")
+    # ✅ 計算開始ボタン
+    if st.button("🤖 計算を開始する"):
+        SUPABASE_URL = st.secrets["SUPABASE_URL"]
+        SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+        HEADERS = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json"
+        }
 
-        if ai_mode == "JDモード":
-            df_warehouse = fetch_table("warehouse_stock")
+        def fetch_table(table_name):
+            headers = {**HEADERS, "Prefer": "count=exact"}
+            dfs = []
+            offset = 0
+            limit = 1000
+            while True:
+                url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
+                res = requests.get(url, headers=headers)
+                if res.status_code == 416 or not res.json():
+                    break
+                if res.status_code not in [200, 206]:
+                    st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
+                    return pd.DataFrame()
+                dfs.append(pd.DataFrame(res.json()))
+                offset += limit
+            return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
-    if df_sales.empty or df_purchase.empty or df_master.empty:
-        st.warning("必要なデータが不足しています。")
-        st.stop()
-    if ai_mode == "JDモード" and df_warehouse.empty:
-        st.warning("JDモード用の warehouse_stock データが不足しています。")
-        st.stop()
+        def normalize_jan(x):
+            try:
+                return str(x).strip()
+            except:
+                return ""
 
-    df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
-    df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
-    df_master["jan"] = df_master["jan"].apply(normalize_jan)
-    if ai_mode == "JDモード":
-        df_warehouse["product_code"] = df_warehouse["product_code"].apply(normalize_jan)
-        df_warehouse["stock_available"] = pd.to_numeric(df_warehouse["stock_available"], errors="coerce").fillna(0).astype(int)
-
-    df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
-    df_sales["stock_available"] = pd.to_numeric(df_sales["stock_available"], errors="coerce").fillna(0).astype(int)
-    df_sales["stock_ordered"] = pd.to_numeric(df_sales["stock_ordered"], errors="coerce").fillna(0).astype(int)
-    df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
-    df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
-
-    rank_multiplier = {
-        "A": 1.5,
-        "B": 1.2,
-        "C": 1.0,
-        "TEST": 1.5
-    }
-
-    with st.spinner("🤖 発注AIが計算をしています..."):
-        from datetime import date, timedelta
-        import math
-
-        df_history = fetch_table("purchase_history")
-        df_history["order_date"] = pd.to_datetime(df_history["order_date"], errors="coerce").dt.date
-        today = date.today()
-        yesterday = today - timedelta(days=1)
-        recent_jans = df_history[df_history["order_date"].isin([today, yesterday])]["jan"].dropna().astype(str).apply(normalize_jan).unique().tolist()
-
-        results = []
-        for _, row in df_sales.iterrows():
-            jan = row["jan"]
-            sold = row["quantity_sold"]
-
-            # 🔄 在庫引用元切替
+        with st.spinner("📦 データを読み込み中..."):
+            df_sales = fetch_table("sales")
+            df_purchase = fetch_table("purchase_data")
+            df_master = fetch_table("item_master")
             if ai_mode == "JDモード":
-                stock_row = df_warehouse[df_warehouse["product_code"] == jan]
-                stock = stock_row["stock_available"].values[0] if not stock_row.empty else 0
-            else:
-                stock = row.get("stock_available", 0)
+                df_warehouse = fetch_table("warehouse_stock")
 
-            ordered = row.get("stock_ordered", 0)
+        if df_sales.empty or df_purchase.empty or df_master.empty:
+            st.warning("必要なデータが不足しています。")
+            st.stop()
+        if ai_mode == "JDモード" and df_warehouse.empty:
+            st.warning("JDモード用の warehouse_stock データが不足しています。")
+            st.stop()
 
-            rank_row = df_master[df_master["jan"] == jan]
-            rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
-            multiplier = rank_multiplier.get(rank, 1.0)
+        df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
+        df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
+        df_master["jan"] = df_master["jan"].apply(normalize_jan)
+        if ai_mode == "JDモード":
+            df_warehouse["product_code"] = df_warehouse["product_code"].apply(normalize_jan)
+            df_warehouse["stock_available"] = pd.to_numeric(df_warehouse["stock_available"], errors="coerce").fillna(0).astype(int)
 
-            need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
+        df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
+        df_sales["stock_available"] = pd.to_numeric(df_sales["stock_available"], errors="coerce").fillna(0).astype(int)
+        df_sales["stock_ordered"] = pd.to_numeric(df_sales["stock_ordered"], errors="coerce").fillna(0).astype(int)
+        df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
+        df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
-            if stock <= 1 and sold >= 1 and need_qty_raw <= 0:
-                need_qty = 1
-            else:
-                need_qty = max(need_qty_raw, 0)
+        rank_multiplier = {
+            "A": 1.5,
+            "B": 1.2,
+            "C": 1.0,
+            "TEST": 1.5
+        }
 
-            if jan in recent_jans:
-                continue
+        with st.spinner("🤖 発注AIが計算をしています..."):
+            from datetime import date, timedelta
+            import math
 
-            reorder_point = max(math.floor(sold * 0.7), 1)
-            current_total = stock + ordered
-            if current_total > reorder_point:
-                continue
+            df_history = fetch_table("purchase_history")
+            df_history["order_date"] = pd.to_datetime(df_history["order_date"], errors="coerce").dt.date
+            today = date.today()
+            yesterday = today - timedelta(days=1)
+            recent_jans = df_history[df_history["order_date"].isin([today, yesterday])]["jan"].dropna().astype(str).apply(normalize_jan).unique().tolist()
 
-            if need_qty <= 0:
-                continue
+            results = []
+            for _, row in df_sales.iterrows():
+                jan = row["jan"]
+                sold = row["quantity_sold"]
 
-            options = df_purchase[df_purchase["jan"] == jan].copy()
-            if options.empty:
-                continue
-
-            options = options[options["order_lot"] > 0]
-            options["diff"] = (options["order_lot"] - need_qty).abs()
-
-            smaller_lots = options[options["order_lot"] <= need_qty]
-            if not smaller_lots.empty:
-                best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
-            else:
-                near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.5) & (options["order_lot"] != 1)]
-                if not near_lots.empty:
-                    best_option = near_lots.loc[near_lots["diff"].idxmin()]
+                # 🔄 在庫引用元切替
+                if ai_mode == "JDモード":
+                    stock_row = df_warehouse[df_warehouse["product_code"] == jan]
+                    stock = stock_row["stock_available"].values[0] if not stock_row.empty else 0
                 else:
-                    one_lot = options[options["order_lot"] == 1]
-                    if not one_lot.empty:
-                        best_option = one_lot.iloc[0]
+                    stock = row.get("stock_available", 0)
+
+                ordered = row.get("stock_ordered", 0)
+
+                rank_row = df_master[df_master["jan"] == jan]
+                rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
+                multiplier = rank_multiplier.get(rank, 1.0)
+
+                need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
+
+                if stock <= 1 and sold >= 1 and need_qty_raw <= 0:
+                    need_qty = 1
+                else:
+                    need_qty = max(need_qty_raw, 0)
+
+                if jan in recent_jans:
+                    continue
+
+                reorder_point = max(math.floor(sold * 0.7), 1)
+                current_total = stock + ordered
+                if current_total > reorder_point:
+                    continue
+
+                if need_qty <= 0:
+                    continue
+
+                options = df_purchase[df_purchase["jan"] == jan].copy()
+                if options.empty:
+                    continue
+
+                options = options[options["order_lot"] > 0]
+                options["diff"] = (options["order_lot"] - need_qty).abs()
+
+                smaller_lots = options[options["order_lot"] <= need_qty]
+                if not smaller_lots.empty:
+                    best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
+                else:
+                    near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.5) & (options["order_lot"] != 1)]
+                    if not near_lots.empty:
+                        best_option = near_lots.loc[near_lots["diff"].idxmin()]
                     else:
-                        best_option = options.sort_values("order_lot").iloc[0]
+                        one_lot = options[options["order_lot"] == 1]
+                        if not one_lot.empty:
+                            best_option = one_lot.iloc[0]
+                        else:
+                            best_option = options.sort_values("order_lot").iloc[0]
 
-            sets = math.ceil(need_qty / best_option["order_lot"])
-            qty = sets * best_option["order_lot"]
-            total_cost = qty * best_option["price"]
+                sets = math.ceil(need_qty / best_option["order_lot"])
+                qty = sets * best_option["order_lot"]
+                total_cost = qty * best_option["price"]
 
-            results.append({
-                "jan": jan,
-                "販売実績": sold,
-                "在庫": stock,
-                "発注済": ordered,
-                "理論必要数": need_qty,
-                "発注数": qty,
-                "ロット": best_option["order_lot"],
-                "数量": round(qty / best_option["order_lot"], 2),
-                "単価": best_option["price"],
-                "総額": total_cost,
-                "仕入先": best_option.get("supplier", "不明"),
-                "ランク": rank
-            })
+                results.append({
+                    "jan": jan,
+                    "販売実績": sold,
+                    "在庫": stock,
+                    "発注済": ordered,
+                    "理論必要数": need_qty,
+                    "発注数": qty,
+                    "ロット": best_option["order_lot"],
+                    "数量": round(qty / best_option["order_lot"], 2),
+                    "単価": best_option["price"],
+                    "総額": total_cost,
+                    "仕入先": best_option.get("supplier", "不明"),
+                    "ランク": rank
+                })
 
-        if results:
-            result_df = pd.DataFrame(results)
+            if results:
+                result_df = pd.DataFrame(results)
 
-            df_master["商品コード"] = df_master["商品コード"].astype(str).str.strip()
-            result_df["jan"] = result_df["jan"].astype(str).str.strip()
+                df_master["商品コード"] = df_master["商品コード"].astype(str).str.strip()
+                result_df["jan"] = result_df["jan"].astype(str).str.strip()
 
-            df_temp = df_master[["商品コード", "商品名", "取扱区分"]].copy()
-            df_temp.rename(columns={"商品コード": "jan"}, inplace=True)
+                df_temp = df_master[["商品コード", "商品名", "取扱区分"]].copy()
+                df_temp.rename(columns={"商品コード": "jan"}, inplace=True)
 
-            result_df = pd.merge(result_df, df_temp, on="jan", how="left")
+                result_df = pd.merge(result_df, df_temp, on="jan", how="left")
 
-            if "商品名" in result_df.columns:
-                result_df = result_df[result_df["商品名"].notna()]
-            if "取扱区分" in result_df.columns:
-                result_df = result_df[result_df["取扱区分"] != "取扱中止"]
+                if "商品名" in result_df.columns:
+                    result_df = result_df[result_df["商品名"].notna()]
+                if "取扱区分" in result_df.columns:
+                    result_df = result_df[result_df["取扱区分"] != "取扱中止"]
+                else:
+                    st.warning("⚠️『取扱区分』列が存在しません。")
+
+                column_order = ["jan", "商品名", "ランク", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
+                result_df = result_df[[col for col in column_order if col in result_df.columns]]
+
+                st.success(f"✅ 発注対象: {len(result_df)} 件")
+                st.dataframe(result_df)
+
+                csv = result_df.to_csv(index=False).encode("utf-8-sig")
+                st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
+
+                st.markdown("---")
+                st.subheader("📦 仕入先別ダウンロード")
+                for supplier, group in result_df.groupby("仕入先"):
+                    supplier_csv = group.to_csv(index=False).encode("utf-8-sig")
+                    st.download_button(
+                        label=f"📥 {supplier} 用 発注CSVダウンロード",
+                        data=supplier_csv,
+                        file_name=f"orders_{supplier}.csv",
+                        mime="text/csv"
+                    )
             else:
-                st.warning("⚠️『取扱区分』列が存在しません。")
+                st.info("現在、発注が必要な商品はありません。")
 
-            column_order = ["jan", "商品名", "ランク", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
-            result_df = result_df[[col for col in column_order if col in result_df.columns]]
-
-            st.success(f"✅ 発注対象: {len(result_df)} 件")
-            st.dataframe(result_df)
-
-            csv = result_df.to_csv(index=False).encode("utf-8-sig")
-            st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
-
-            st.markdown("---")
-            st.subheader("📦 仕入先別ダウンロード")
-            for supplier, group in result_df.groupby("仕入先"):
-                supplier_csv = group.to_csv(index=False).encode("utf-8-sig")
-                st.download_button(
-                    label=f"📥 {supplier} 用 発注CSVダウンロード",
-                    data=supplier_csv,
-                    file_name=f"orders_{supplier}.csv",
-                    mime="text/csv"
-                )
-        else:
-            st.info("現在、発注が必要な商品はありません。")
 
 
 
