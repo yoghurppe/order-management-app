@@ -963,6 +963,41 @@ if mode == "csv_upload":
             except Exception as e:
                 st.error(f"❌ 処理エラー: {e}")
 
+    warehouse_file = st.file_uploader("🏢 倉庫在庫.xlsx アップロード", type=["xlsx"])
+    if warehouse_file:
+        def preprocess_warehouse_stock(file):
+            df = pd.read_excel(file, sheet_name="倉庫在庫")
+            df_upload = df.iloc[:, [13, 22]].copy()  # N列=14番目, W列=23番目
+            df_upload.columns = ["stock_available", "product_code"]
+            df_upload["product_code"] = df_upload["product_code"].astype(str).str.strip()
+            df_upload["stock_available"] = pd.to_numeric(df_upload["stock_available"], errors="coerce").fillna(0).round().astype(int)
+            return df_upload
+
+        def upload_warehouse_stock(df):
+            try:
+                requests.delete(f"{SUPABASE_URL}/rest/v1/warehouse_stock?product_code=neq.null", headers=HEADERS)
+                df = df.drop_duplicates(subset=["product_code"], keep="last")
+                df = df.replace({pd.NA: None, pd.NaT: None, float("nan"): None}).where(pd.notnull(df), None)
+                for i in range(0, len(df), 500):
+                    batch = df.iloc[i:i+500].to_dict(orient="records")
+                    res = requests.post(
+                        f"{SUPABASE_URL}/rest/v1/warehouse_stock",
+                        headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
+                        json=batch
+                    )
+                    if res.status_code not in [200, 201]:
+                        st.error(f"❌ warehouse_stock バッチPOST失敗: {res.status_code} {res.text}")
+                        return
+                st.success(f"✅ warehouse_stock に {len(df)} 件アップロード完了")
+            except Exception as e:
+                st.error(f"❌ warehouse_stock アップロード中にエラー: {e}")
+
+        with st.spinner("📤 倉庫在庫.xlsx を処理中..."):
+            try:
+                df_warehouse = preprocess_warehouse_stock(warehouse_file)
+                upload_warehouse_stock(df_warehouse)
+            except Exception as e:
+                st.error(f"❌ 処理エラー: {e}")
 
 
 # 🆕 販売実績（直近1ヶ月）モード -----------------------------
