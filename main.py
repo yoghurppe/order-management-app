@@ -255,18 +255,30 @@ elif mode == "order_ai":
         except:
             return ""
 
+    # 🔵 モード切り替え（通常 / JD）
+    ai_mode = st.radio("発注AIモードを選択", ["通常モード", "JDモード"], index=0)
+
     with st.spinner("📦 データを読み込み中..."):
         df_sales = fetch_table("sales")
         df_purchase = fetch_table("purchase_data")
         df_master = fetch_table("item_master")
 
+        if ai_mode == "JDモード":
+            df_warehouse = fetch_table("warehouse_stock")
+
     if df_sales.empty or df_purchase.empty or df_master.empty:
         st.warning("必要なデータが不足しています。")
+        st.stop()
+    if ai_mode == "JDモード" and df_warehouse.empty:
+        st.warning("JDモード用の warehouse_stock データが不足しています。")
         st.stop()
 
     df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
     df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
     df_master["jan"] = df_master["jan"].apply(normalize_jan)
+    if ai_mode == "JDモード":
+        df_warehouse["product_code"] = df_warehouse["product_code"].apply(normalize_jan)
+        df_warehouse["stock_available"] = pd.to_numeric(df_warehouse["stock_available"], errors="coerce").fillna(0).astype(int)
 
     df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
     df_sales["stock_available"] = pd.to_numeric(df_sales["stock_available"], errors="coerce").fillna(0).astype(int)
@@ -283,56 +295,57 @@ elif mode == "order_ai":
 
     with st.spinner("🤖 発注AIが計算をしています..."):
         from datetime import date, timedelta
-    
-        # 📌 昨日・今日に発注済みのJANを除外
+        import math
+
         df_history = fetch_table("purchase_history")
         df_history["order_date"] = pd.to_datetime(df_history["order_date"], errors="coerce").dt.date
         today = date.today()
         yesterday = today - timedelta(days=1)
         recent_jans = df_history[df_history["order_date"].isin([today, yesterday])]["jan"].dropna().astype(str).apply(normalize_jan).unique().tolist()
-    
+
         results = []
         for _, row in df_sales.iterrows():
             jan = row["jan"]
             sold = row["quantity_sold"]
-            stock = row.get("stock_available", 0)
+
+            # 🔄 在庫引用元切替
+            if ai_mode == "JDモード":
+                stock_row = df_warehouse[df_warehouse["product_code"] == jan]
+                stock = stock_row["stock_available"].values[0] if not stock_row.empty else 0
+            else:
+                stock = row.get("stock_available", 0)
+
             ordered = row.get("stock_ordered", 0)
-        
-            # ランク倍率
+
             rank_row = df_master[df_master["jan"] == jan]
             rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
             multiplier = rank_multiplier.get(rank, 1.0)
-        
-            # ✅ 先に raw を計算
+
             need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
-        
-            # ✅ raw を条件で使う
+
             if stock <= 1 and sold >= 1 and need_qty_raw <= 0:
                 need_qty = 1
             else:
                 need_qty = max(need_qty_raw, 0)
-        
-            # 除外JAN（昨日・今日発注済）
+
             if jan in recent_jans:
                 continue
-        
-            # 新条件：発注点を下回った場合のみ候補に
+
             reorder_point = max(math.floor(sold * 0.7), 1)
             current_total = stock + ordered
             if current_total > reorder_point:
                 continue
-        
+
             if need_qty <= 0:
                 continue
-        
+
             options = df_purchase[df_purchase["jan"] == jan].copy()
             if options.empty:
                 continue
 
-    
             options = options[options["order_lot"] > 0]
             options["diff"] = (options["order_lot"] - need_qty).abs()
-    
+
             smaller_lots = options[options["order_lot"] <= need_qty]
             if not smaller_lots.empty:
                 best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
@@ -346,11 +359,11 @@ elif mode == "order_ai":
                         best_option = one_lot.iloc[0]
                     else:
                         best_option = options.sort_values("order_lot").iloc[0]
-    
+
             sets = math.ceil(need_qty / best_option["order_lot"])
             qty = sets * best_option["order_lot"]
             total_cost = qty * best_option["price"]
-    
+
             results.append({
                 "jan": jan,
                 "販売実績": sold,
@@ -366,34 +379,33 @@ elif mode == "order_ai":
                 "ランク": rank
             })
 
-
         if results:
             result_df = pd.DataFrame(results)
-        
+
             df_master["商品コード"] = df_master["商品コード"].astype(str).str.strip()
             result_df["jan"] = result_df["jan"].astype(str).str.strip()
-        
+
             df_temp = df_master[["商品コード", "商品名", "取扱区分"]].copy()
             df_temp.rename(columns={"商品コード": "jan"}, inplace=True)
-        
+
             result_df = pd.merge(result_df, df_temp, on="jan", how="left")
-        
+
             if "商品名" in result_df.columns:
                 result_df = result_df[result_df["商品名"].notna()]
             if "取扱区分" in result_df.columns:
                 result_df = result_df[result_df["取扱区分"] != "取扱中止"]
             else:
                 st.warning("⚠️『取扱区分』列が存在しません。")
-        
+
             column_order = ["jan", "商品名", "ランク", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
             result_df = result_df[[col for col in column_order if col in result_df.columns]]
-        
+
             st.success(f"✅ 発注対象: {len(result_df)} 件")
             st.dataframe(result_df)
-        
+
             csv = result_df.to_csv(index=False).encode("utf-8-sig")
             st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
-        
+
             st.markdown("---")
             st.subheader("📦 仕入先別ダウンロード")
             for supplier, group in result_df.groupby("仕入先"):
@@ -406,6 +418,7 @@ elif mode == "order_ai":
                 )
         else:
             st.info("現在、発注が必要な商品はありません。")
+
 
 
 # 🔍 商品情報検索モード -----------------------------
