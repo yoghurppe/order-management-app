@@ -765,6 +765,13 @@ elif mode == "price_improve":
 
 if mode == "csv_upload":
     st.subheader("📄 CSVアップロードモード")
+    
+    # ✅ ここに追加！ normalize_jan を先に置く
+    def normalize_jan(x):
+        try:
+            return str(x).strip()
+        except:
+            return ""
 
     input_password = st.text_input("🔑 パスワードを入力してください", type="password")
     correct_password = st.secrets.get("UPLOAD_PASSWORD", "pass1234")
