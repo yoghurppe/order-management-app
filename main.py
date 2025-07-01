@@ -765,8 +765,7 @@ elif mode == "price_improve":
 
 if mode == "csv_upload":
     st.subheader("📄 CSVアップロードモード")
-    
-    # ✅ ここに追加！ normalize_jan を先に置く
+
     def normalize_jan(x):
         try:
             return str(x).strip()
@@ -779,6 +778,15 @@ if mode == "csv_upload":
     if input_password != correct_password:
         st.warning("正しいパスワードを入力してください。")
         st.stop()
+
+    # ✅ 必ず共通でここに置く！
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    HEADERS = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
 
     def preprocess_csv(df, table):
         df.columns = df.columns.str.replace("　", "").str.replace("\ufeff", "").str.strip()
