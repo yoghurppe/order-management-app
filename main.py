@@ -332,7 +332,11 @@ elif mode == "order_ai":
                 if jan in recent_jans:
                     continue
 
-                reorder_point = max(math.floor(sold * 0.7), 1)
+                if rank in ["A", "B"]:
+                    reorder_point = max(math.floor(sold * 0.9), 1)
+                else:
+                    reorder_point = max(math.floor(sold * 0.7), 1)
+                
                 current_total = stock + ordered
                 if current_total > reorder_point:
                     continue
