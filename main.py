@@ -288,9 +288,9 @@ elif mode == "order_ai":
         df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
         rank_multiplier = {
-            "A": 1.5,
-            "B": 1.2,
-            "C": 1.0,
+            "Aランク": 1.5,
+            "Bランク": 1.2,
+            "Cランク": 1.0,
             "TEST": 1.5
         }
 
@@ -332,7 +332,7 @@ elif mode == "order_ai":
                 if jan in recent_jans:
                     continue
 
-                if rank in ["A", "B"]:
+                if rank in ["Aランク", "Bランク"]:
                     reorder_point = max(math.floor(sold * 0.9), 1)
                 else:
                     reorder_point = max(math.floor(sold * 0.7), 1)
