@@ -1212,6 +1212,9 @@ elif mode == "rank_a_check":
     # Aランクのみ抽出
     df_a = df_item[df_item["ランク"] == "A"].copy()
 
+    # ✅ jan を商品コードとして扱う
+    df_sales["商品コード"] = df_sales["jan"]
+
     # 販売実績（30日）
     df_sales_30 = df_sales.groupby("商品コード", as_index=False)["quantity_sold"].sum().rename(
         columns={"quantity_sold": "販売実績（30日）"}
