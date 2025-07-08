@@ -1057,30 +1057,38 @@ elif mode == "monthly_sales":
         st.warning("必要なデータが存在しません。")
         st.stop()
 
-    # 型変換
+    # item_master 整形
     df_master["jan"] = df_master["jan"].astype(str)
     df_master["商品コード"] = df_master["商品コード"].astype(str)
     df_master = df_master.rename(columns={"jan": "JAN"})
 
+    # sales 整形
     df_sales["商品コード"] = df_sales["jan"].astype(str)
     df_sales.rename(columns={"quantity_sold": "販売数"}, inplace=True)
 
-    df_warehouse["jan"] = df_warehouse["jan"].astype(str)
-    df_warehouse.rename(columns={"stock_available": "利用可能"}, inplace=True)
+    # warehouse_stock 整形
+    df_warehouse["product_code"] = df_warehouse["product_code"].astype(str)
+    df_warehouse.rename(columns={
+        "product_code": "商品コード",
+        "stock_available": "利用可能"
+    }, inplace=True)
 
     # マージ
     df_joined = pd.merge(df_sales, df_master, on="商品コード", how="left")
-    df_joined = pd.merge(df_joined, df_warehouse[["jan", "利用可能"]], on="jan", how="left")
+    df_joined = pd.merge(df_joined, df_warehouse[["商品コード", "利用可能"]], on="商品コード", how="left")
 
+    # JAN 付与
     if "JAN" in df_joined.columns:
         df_joined["jan"] = df_joined["JAN"]
     else:
         st.warning("⚠️ item_master 側からJANが取得できませんでした。")
 
+    # 数値補正
     df_joined["販売数"] = pd.to_numeric(df_joined["販売数"], errors="coerce").fillna(0).astype(int)
     df_joined["発注済"] = pd.to_numeric(df_joined.get("stock_ordered", 0), errors="coerce").fillna(0).astype(int)
     df_joined["利用可能"] = df_joined["利用可能"].fillna(0).astype(int)
 
+    # 販売数 > 0 のみ
     df_joined = df_joined[df_joined["販売数"] > 0]
 
     # ---------- 🔍 検索 UI ----------
