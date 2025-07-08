@@ -155,6 +155,23 @@ def fetch_latest_item_update():
             return f"（{dt_jst.strftime('%-m.%d update')}）"
     return ""
 
+def fetch_table(table_name):
+    headers = {**HEADERS_PRE, "Prefer": "count=exact"}
+    dfs = []
+    offset = 0
+    limit = 1000
+    while True:
+        url = f"{SUPABASE_URL_PRE}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
+        res = requests.get(url, headers=headers)
+        if res.status_code == 416 or not res.json():
+            break
+        if res.status_code not in [200, 206]:
+            st.error(f"{table_name} の取得に失敗: {res.status_code} / {res.text}")
+            return pd.DataFrame()
+        dfs.append(pd.DataFrame(res.json()))
+        offset += limit
+    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
 item_master_update_text = fetch_latest_item_update()
 
 # タイトル表示
