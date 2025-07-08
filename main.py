@@ -1209,7 +1209,7 @@ elif mode == "rank_a_check":
         st.stop()
 
     # Aランクのみ
-    df_a = df_item[df_item["ランク"] == "A"].copy()
+    df_a = df_item[df_item["ランク"] == "Aランク"]
 
     # jan → 商品コード
     df_sales["商品コード"] = df_sales["jan"]
