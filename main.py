@@ -1208,7 +1208,7 @@ elif mode == "rank_a_check":
         st.warning("必要なテーブルが空です")
         st.stop()
 
-    # ✅ Aランクでフィルタ（"Aランク" に注意！）
+    # ✅ Aランクのみ
     df_a = df_item[df_item["ランク"] == "Aランク"].copy()
 
     # ✅ sales: jan → 商品コードに合わせる
@@ -1225,32 +1225,36 @@ elif mode == "rank_a_check":
         columns={"quantity_sold": "販売実績（30日）"}
     )
 
-    # ✅ 発注済（salesから）
+    # ✅ 発注済
     df_sales_ordered = df_sales.groupby("商品コード", as_index=False)["stock_ordered"].sum().rename(
         columns={"stock_ordered": "発注済"}
     )
 
-    # マージ
-    df_merged = df_a.merge(df_sales_30, on="商品コード", how="left") \
-                    .merge(df_sales_ordered, on="商品コード", how="left") \
-                    .merge(df_stock, on="商品コード", how="left")
-    
-    df_merged["販売実績（7日）"] = None
+    # ✅ マージ
+    df_merged = (
+        df_a
+        .merge(df_sales_30, on="商品コード", how="left")
+        .merge(df_sales_ordered, on="商品コード", how="left")
+        .merge(df_stock, on="商品コード", how="left")
+    )
+
+    # ✅ 必要な初期化
+    df_merged["販売実績（7日）"] = None  # ← 7日は仮
     df_merged["在庫数"] = df_merged["在庫数"].fillna(0)
     df_merged["販売実績（30日）"] = df_merged["販売実績（30日）"].fillna(0)
-    
-    # ✅ 発注済が無い場合は作る
-    if "発注済" not in df_merged.columns:
-        df_merged["発注済"] = 0
-    else:
+    if "発注済" in df_merged.columns:
         df_merged["発注済"] = df_merged["発注済"].fillna(0)
+    else:
+        df_merged["発注済"] = 0
 
+    # ✅ マージ後もランクを確実に絞る
+    df_merged = df_merged[df_merged["ランク"] == "Aランク"]
 
-    # ✅ 新しい条件
+    # ✅ 発注アラート条件（在庫＋発注済）
     df_merged["発注アラート1.0"] = df_merged["販売実績（30日）"] < (df_merged["在庫数"] + df_merged["発注済"])
     df_merged["発注アラート1.2"] = (df_merged["販売実績（30日）"] * 1.2) < (df_merged["在庫数"] + df_merged["発注済"])
 
-    # ✅ 絞り込み
+    # ✅ フィルタ
     check_1_0 = st.checkbox("✅ 発注アラート1.0のみ表示", value=False)
     check_1_2 = st.checkbox("✅ 発注アラート1.2のみ表示", value=False)
 
@@ -1264,6 +1268,7 @@ elif mode == "rank_a_check":
     st.dataframe(df_result[[
         "商品コード",
         "商品名",
+        "ランク",
         "販売実績（30日）",
         "販売実績（7日）",
         "在庫数",
@@ -1271,3 +1276,4 @@ elif mode == "rank_a_check":
         "発注アラート1.0",
         "発注アラート1.2"
     ]])
+
