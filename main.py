@@ -1048,43 +1048,40 @@ elif mode == "monthly_sales":
             offset += limit
         return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
+    # データ取得
     df_master = fetch_data("item_master")
     df_sales = fetch_data("sales")
-    
-    if df_master.empty or df_sales.empty:
-        st.warning("商品情報または販売実績データが存在しません。")
+    df_warehouse = fetch_data("warehouse_stock")
+
+    if df_master.empty or df_sales.empty or df_warehouse.empty:
+        st.warning("必要なデータが存在しません。")
         st.stop()
-    
-    # item_master 整形
+
+    # 型変換
     df_master["jan"] = df_master["jan"].astype(str)
     df_master["商品コード"] = df_master["商品コード"].astype(str)
-    df_master = df_master.rename(columns={"jan": "JAN"})  # ← これがないと後でJAN使えない
-    
-    # sales 側整形（商品コード＝sales.jan）
+    df_master = df_master.rename(columns={"jan": "JAN"})
+
     df_sales["商品コード"] = df_sales["jan"].astype(str)
     df_sales.rename(columns={"quantity_sold": "販売数"}, inplace=True)
-    
+
+    df_warehouse["jan"] = df_warehouse["jan"].astype(str)
+    df_warehouse.rename(columns={"stock_available": "利用可能"}, inplace=True)
+
     # マージ
     df_joined = pd.merge(df_sales, df_master, on="商品コード", how="left")
-    
-    # item_master 側の JAN を jan として再付与（存在確認つき）
+    df_joined = pd.merge(df_joined, df_warehouse[["jan", "利用可能"]], on="jan", how="left")
+
     if "JAN" in df_joined.columns:
         df_joined["jan"] = df_joined["JAN"]
     else:
         st.warning("⚠️ item_master 側からJANが取得できませんでした。")
-    
-    # === 欠損補完 ===
+
     df_joined["販売数"] = pd.to_numeric(df_joined["販売数"], errors="coerce").fillna(0).astype(int)
     df_joined["発注済"] = pd.to_numeric(df_joined.get("stock_ordered", 0), errors="coerce").fillna(0).astype(int)
-    
-    # 販売数を数値に変換して補完（これが超重要）
-    df_joined["販売数"] = pd.to_numeric(df_joined["販売数"], errors="coerce").fillna(0).astype(int)
-    
-    # ここでフィルターを適用（NaNや"0"も除外される）
+    df_joined["利用可能"] = df_joined["利用可能"].fillna(0).astype(int)
+
     df_joined = df_joined[df_joined["販売数"] > 0]
-
-
-
 
     # ---------- 🔍 検索 UI ----------
     col1, col2 = st.columns(2)
@@ -1140,13 +1137,14 @@ elif mode == "monthly_sales":
 
     # ---------- 📋 表示 ----------
     view_cols = [
-        "商品コード", "jan", "ランク", "メーカー名", "商品名", "取扱区分", "販売数", "在庫", "利用可能","発注済"
+        "商品コード", "jan", "ランク", "メーカー名",
+        "商品名", "取扱区分", "販売数", "利用可能", "発注済"
     ]
     available_cols = [c for c in view_cols if c in df_view.columns]
 
     display_df = (
         df_view[available_cols]
-        .sort_values(by="商品コード")  # ← ここが商品コードでのソート
+        .sort_values(by="商品コード")
         .rename(columns=COLUMN_NAMES[language])
     )
 
