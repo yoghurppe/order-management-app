@@ -1196,7 +1196,6 @@ elif mode == "monthly_sales":
     )
 
 
-# 📦 Aランク商品確認モード
 elif mode == "rank_a_check":
     st.subheader("🅰️ Aランク商品確認モード")
 
@@ -1209,29 +1208,31 @@ elif mode == "rank_a_check":
         st.warning("必要なテーブルが空です")
         st.stop()
 
-    # Aランクのみ抽出
+    # Aランクのみ
     df_a = df_item[df_item["ランク"] == "A"].copy()
 
-    # ✅ jan を商品コードとして扱う
+    # jan → 商品コード
     df_sales["商品コード"] = df_sales["jan"]
+
+    # 在庫テーブル product_code → 商品コード
+    df_stock = df_stock.rename(columns={
+        "stock_available": "在庫数",
+        "product_code": "商品コード"
+    })
 
     # 販売実績（30日）
     df_sales_30 = df_sales.groupby("商品コード", as_index=False)["quantity_sold"].sum().rename(
         columns={"quantity_sold": "販売実績（30日）"}
     )
 
-    # 在庫
-    df_stock = df_stock.rename(columns={"stock_available": "在庫数"})
-
     # マージ
     df_merged = df_a.merge(df_sales_30, on="商品コード", how="left").merge(df_stock, on="商品コード", how="left")
-    df_merged["販売実績（7日）"] = None  # 7日は仮
+    df_merged["販売実績（7日）"] = None
 
     # 発注アラート
     df_merged["発注アラート1.0"] = df_merged["在庫数"] < df_merged["販売実績（30日）"]
     df_merged["発注アラート1.2"] = df_merged["在庫数"] < (df_merged["販売実績（30日）"] * 1.2)
 
-    # チェックボックスでフィルタ
     check_1_0 = st.checkbox("✅ 発注アラート1.0のみ表示", value=False)
     check_1_2 = st.checkbox("✅ 発注アラート1.2のみ表示", value=False)
 
@@ -1241,7 +1242,6 @@ elif mode == "rank_a_check":
     if check_1_2:
         df_result = df_result[df_result["発注アラート1.2"]]
 
-    # 表示
     st.dataframe(df_result[[
         "商品コード",
         "販売実績（30日）",
