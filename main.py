@@ -1230,15 +1230,21 @@ elif mode == "rank_a_check":
         columns={"stock_ordered": "発注済"}
     )
 
-    # ✅ マージ
+    # マージ
     df_merged = df_a.merge(df_sales_30, on="商品コード", how="left") \
                     .merge(df_sales_ordered, on="商品コード", how="left") \
                     .merge(df_stock, on="商品コード", how="left")
-
-    df_merged["販売実績（7日）"] = None  # 7日は仮
+    
+    df_merged["販売実績（7日）"] = None
     df_merged["在庫数"] = df_merged["在庫数"].fillna(0)
     df_merged["販売実績（30日）"] = df_merged["販売実績（30日）"].fillna(0)
-    df_merged["発注済"] = df_merged["発注済"].fillna(0)
+    
+    # ✅ 発注済が無い場合は作る
+    if "発注済" not in df_merged.columns:
+        df_merged["発注済"] = 0
+    else:
+        df_merged["発注済"] = df_merged["発注済"].fillna(0)
+
 
     # ✅ 新しい条件
     df_merged["発注アラート1.0"] = df_merged["販売実績（30日）"] < (df_merged["在庫数"] + df_merged["発注済"])
