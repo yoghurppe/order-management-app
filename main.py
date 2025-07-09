@@ -1268,14 +1268,12 @@ elif mode == "difficult_items":
         "Content-Type": "application/json"
     }
 
-    # データ取得
     df = fetch_table("difficult_items")
     if not df.empty:
         df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
         df["updated_at"] = pd.to_datetime(df["updated_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
         df["選択"] = False
 
-        # 「選択」列を左端にして id は右端
         cols = ["選択", "item_key", "reason", "note", "created_at", "updated_at", "id"]
         df = df[cols]
 
@@ -1295,15 +1293,18 @@ elif mode == "difficult_items":
 
         selected_df = edited_df[edited_df["選択"]]
         selected_ids = selected_df["id"].tolist()
-        st.write("✅ 選択ID:", selected_ids)
 
-        if st.button("✅ 選択した行を削除"):
+        # ✅ ボタン無効化管理
+        delete_btn_disabled = False
+
+        if st.button("✅ 選択した行を削除", disabled=delete_btn_disabled):
             if selected_ids:
+                delete_btn_disabled = True  # 押されたら無効化
                 for _id in selected_ids:
                     record = df[df["id"] == _id].copy().to_dict(orient="records")[0]
                     record.pop("選択", None)
-                    record.pop("created_at", None)   # ← これ追加！
-                    record.pop("updated_at", None)   # ← これ追加！
+                    record.pop("created_at", None)
+                    record.pop("updated_at", None)
                     record["item_id"] = record["id"]
                     record.pop("id")
                     record["action"] = "delete"
@@ -1323,11 +1324,10 @@ elif mode == "difficult_items":
                     st.write("削除DELETE:", res2.status_code, res2.text)
 
                 st.success("✅ 削除完了！")
-                # st.rerun()
+                st.rerun()
             else:
                 st.warning("⚠️ 行が選択されていません")
 
-    # 新規登録フォーム
     with st.form("add_difficult_item"):
         item_key = st.text_input("ブランド / 商品名 / JAN など")
         reason = st.text_input("入荷困難理由")
@@ -1367,7 +1367,6 @@ elif mode == "difficult_items":
             else:
                 st.error(f"登録失敗: {res.text}")
 
-    # 履歴表示
     df_history = fetch_table("difficult_items_history")
     if not df_history.empty:
         one_week_ago = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).replace(tzinfo=None) - datetime.timedelta(days=7)
