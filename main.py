@@ -1285,14 +1285,15 @@ elif mode == "difficult_items":
             disabled=["id", "item_key", "reason", "note", "created_at", "updated_at", "選択"]
         )
 
-        selected_ids = edited_df[edited_df["選択"]]["id"].tolist()
-        st.write("選択ID:", selected_ids)  # デバッグ用
+        # ✅ ここで必ず edited_df で判断！
+        selected_df = edited_df[edited_df["選択"]]
+        selected_ids = selected_df["id"].tolist()
+        st.write("選択ID:", selected_ids)
 
-        # ✅ 常に表示する削除ボタン
         if st.button("✅ 選択した行を削除"):
             if selected_ids:
                 for _id in selected_ids:
-                    record = df[df["id"] == _id].to_dict(orient="records")[0]
+                    record = selected_df[selected_df["id"] == _id].to_dict(orient="records")[0]
 
                     record["item_id"] = record["id"]
                     record.pop("id")
