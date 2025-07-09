@@ -1292,16 +1292,14 @@ elif mode == "difficult_items":
                 st.rerun()
 
     with st.form("add_difficult_item"):
-        item_key = st.text_input("ブランド / 商品名 / JAN など")
-        item_name = st.text_input("商品名")
+        item_key = st.text_input("ブランド / 商品名 / JAN など")  # ← これだけでOK
         reason = st.text_input("入荷困難理由")
         note = st.text_area("備考")
-
+    
         submitted = st.form_submit_button("登録する")
         if submitted:
             payload = {
                 "item_key": item_key,
-                "item_name": item_name,
                 "reason": reason,
                 "note": note
             }
