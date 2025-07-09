@@ -1199,81 +1199,25 @@ elif mode == "monthly_sales":
 elif mode == "rank_a_check":
     st.subheader("🅰️ Aランク商品確認モード")
 
-    # データ取得
-    df_item = fetch_table("item_master")
-    df_sales = fetch_table("sales")
-    df_stock = fetch_table("warehouse_stock")
-
-    if df_item.empty or df_sales.empty or df_stock.empty:
-        st.warning("必要なテーブルが空です")
-        st.stop()
-
-    # --- 1️⃣ JAN ⇄ 商品コード を強制一致 ---
-    df_a = df_item[(df_item["ランク"] == "Aランク") & (df_item["jan"].notnull())].copy()
-    df_a["商品コード"] = df_a["jan"].astype(str).str.strip()
-
+     # 1) JAN -> 商品コード に揃える
+    df_item["商品コード"] = df_item["jan"].astype(str).str.strip()
     df_sales["商品コード"] = df_sales["jan"].astype(str).str.strip()
-    df_stock["商品コード"] = df_stock["product_code"].astype(str).str.strip()
-    df_stock = df_stock.rename(columns={"stock_available": "在庫数"})
-
-    st.write("item_master サンプル:", df_a.head())
-    st.write("sales サンプル:", df_sales.head())
-
-    # --- 2️⃣ 販売実績（30日） ---
-    df_sales_30 = df_sales.groupby("商品コード", as_index=False)["quantity_sold"].sum().rename(
-        columns={"quantity_sold": "販売実績（30日）"}
-    )
-
-    # --- 3️⃣ 最新の発注済 ---
+    
+    # 2) Aランクだけ
+    df_a = df_item[df_item["ランク"] == "Aランク"].copy()
+    
+    # 3) 最新 sales から発注済
     df_sales_latest = (
         df_sales.sort_values("id", ascending=False)
         .drop_duplicates(subset=["商品コード"])
         [["商品コード", "stock_ordered"]]
         .rename(columns={"stock_ordered": "発注済"})
     )
-
-    # --- 4️⃣ マージ ---
-    df_merged = (
-        df_a
-        .merge(df_sales_30, on="商品コード", how="left")
-        .merge(df_sales_latest, on="商品コード", how="left")
-        .merge(df_stock[["商品コード", "在庫数"]], on="商品コード", how="left")
-    )
-
-    # --- 5️⃣ 必ず存在させる ---
-    df_merged["販売実績（7日）"] = None
-
-    if "発注済" not in df_merged.columns:
-        df_merged["発注済"] = 0
-    else:
-        df_merged["発注済"] = df_merged["発注済"].fillna(0)
-
-    df_merged["販売実績（30日）"] = df_merged["販売実績（30日）"].fillna(0)
-    df_merged["在庫数"] = df_merged["在庫数"].fillna(0)
-
-    # --- 6️⃣ 発注アラート ---
-    df_merged["発注アラート1.0"] = df_merged["販売実績（30日）"] < (df_merged["在庫数"] + df_merged["発注済"])
-    df_merged["発注アラート1.2"] = (df_merged["販売実績（30日）"] * 1.2) < (df_merged["在庫数"] + df_merged["発注済"])
-
-    # --- 7️⃣ チェックボックスで絞り込み ---
-    check_1_0 = st.checkbox("✅ 発注アラート1.0のみ表示", value=False)
-    check_1_2 = st.checkbox("✅ 発注アラート1.2のみ表示", value=False)
-
-    df_result = df_merged.copy()
-    if check_1_0:
-        df_result = df_result[df_result["発注アラート1.0"]]
-    if check_1_2:
-        df_result = df_result[df_result["発注アラート1.2"]]
-
-    # --- 8️⃣ 出力 ---
-    st.dataframe(df_result[[
-        "商品コード",
-        "商品名",
-        "ランク",
-        "販売実績（30日）",
-        "販売実績（7日）",
-        "在庫数",
-        "発注済",
-        "発注アラート1.0",
-        "発注アラート1.2"
-    ]])
+    
+    # 4) マージ
+    df_merged = df_a.merge(df_sales_latest, on="商品コード", how="left")
+    
+    # 5) デバッグ表示
+    st.write("🔍 item_master サンプル:", df_item.head())
+    st.write("🔍 sales サンプル:", df_sales.head())
+    st.write("✅ マージ結果:", df_merged.head())
