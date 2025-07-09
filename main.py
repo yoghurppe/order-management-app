@@ -818,7 +818,6 @@ if mode == "csv_upload":
         st.warning("正しいパスワードを入力してください。")
         st.stop()
 
-    # ✅ 必ず共通でここに置く！
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
     HEADERS = {
@@ -1009,6 +1008,7 @@ if mode == "csv_upload":
             df_upload = df.iloc[:, [13, 22]].copy()  # N列=14番目, W列=23番目
             df_upload.columns = ["stock_available", "product_code"]
             df_upload["product_code"] = df_upload["product_code"].astype(str).str.strip()
+            df_upload["jan"] = df_upload["product_code"]  # ← JAN に product_code をコピー！
             df_upload["stock_available"] = pd.to_numeric(df_upload["stock_available"], errors="coerce").fillna(0).round().astype(int)
             return df_upload
 
