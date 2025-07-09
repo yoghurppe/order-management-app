@@ -1197,9 +1197,8 @@ elif mode == "monthly_sales":
 
 
 elif mode == "rank_a_check":
-    st.subheader("🅰️ Aランク商品確認モード（テスト版）")
+    st.subheader("🅰️ Aランク商品確認モード（テスト修正版）")
 
-    # 🔐 Supabase 接続
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
     HEADERS = {
@@ -1223,32 +1222,34 @@ elif mode == "rank_a_check":
             offset += limit
         return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
-    # ✅ データ取得
     df_item = fetch_table("item_master")
     df_sales = fetch_table("sales")
 
-    st.write("item_master サンプル:", df_item.head())
-    st.write("sales サンプル:", df_sales.head())
+    st.write("item_master:", df_item.head())
+    st.write("sales:", df_sales.head())
 
-    # ✅ 必要項目の整形
     df_item["商品コード"] = df_item["商品コード"].astype(str).str.strip()
     df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
-    df_sales = df_sales.rename(columns={"stock_ordered": "発注済"})
+
+    # sales側に「発注済」列を必ず作る
+    df_sales["発注済"] = df_sales["stock_ordered"]
+
     df_sales["商品コード"] = df_sales["jan"]
 
-    # ✅ マージに必要なカラムだけ残す
     df_sales_sub = df_sales[["商品コード", "発注済"]]
 
-    # ✅ LEFT JOIN
+    # LEFT JOIN
     df_merged = pd.merge(df_item, df_sales_sub, on="商品コード", how="left")
 
-    # ✅ 発注済が NULL の場合は 0
-    df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
+    st.write("マージ結果 before:", df_merged.head())
 
-    st.write("マージ結果:", df_merged.head())
+    # ✅ この時点で発注済が無ければエラー！ printして確認
+    if "発注済" not in df_merged.columns:
+        st.error("❌ マージ結果に『発注済』が含まれていません")
+    else:
+        df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
+        st.write("マージ結果 after:", df_merged.head())
 
-    # ✅ 絞り込み（例: Aランクのみ）
+    # Aランクのみ
     df_a = df_merged[df_merged["ランク"] == "Aランク"].copy()
-
-    # ✅ 必要に応じて表示
     st.dataframe(df_a[["商品コード", "商品名", "発注済"]])
