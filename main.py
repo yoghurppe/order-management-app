@@ -1228,19 +1228,20 @@ elif mode == "rank_a_check":
     df_item["商品コード"] = df_item["jan"].astype(str).str.strip()
     df_item_ordered = df_item[["商品コード", "発注済"]].copy()
 
-    # ✅ 5️⃣ マージ
+    # 5️⃣ マージ
     df_merged = (
         df_a
         .merge(df_sales_30, on="商品コード", how="left")
         .merge(df_item_ordered, on="商品コード", how="left")
         .merge(df_stock[["商品コード", "在庫数"]], on="商品コード", how="left")
     )
-
-    # ✅ 6️⃣ 欠損補完
+    
+    # 5️⃣.1 必ずカラムが無ければ作る！
+    if "発注済" not in df_merged.columns:
+        df_merged["発注済"] = 0
+    
+    # 6️⃣ 欠損補完
     df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
-    df_merged["実績（30日）"] = df_merged["実績（30日）"].fillna(0)
-    df_merged["在庫数"] = df_merged["在庫数"].fillna(0)
-    df_merged["実績（7日）"] = None
 
     # ✅ 7️⃣ アラート
     df_merged["発注アラート1.0"] = df_merged["実績（30日）"] > (df_merged["在庫数"] + df_merged["発注済"])
