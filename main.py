@@ -1303,7 +1303,7 @@ elif mode == "difficult_items":
             )
             if res.status_code in [200, 201]:
                 st.success("✅ 登録しました！")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error(f"登録失敗: {res.text}")
 
