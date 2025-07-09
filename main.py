@@ -1321,7 +1321,7 @@ elif mode == "difficult_items":
                     st.write("削除DELETE:", res2.status_code, res2.text)
 
                 st.success("✅ 削除完了！")
-                st.rerun()
+                # st.rerun()
             else:
                 st.warning("⚠️ 行が選択されていません")
 
