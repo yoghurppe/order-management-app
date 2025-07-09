@@ -206,6 +206,10 @@ MODE_KEYS = {
         "日本語": "📜 発注履歴",
         "中文": "📜 订货记录"
     },
+    "difficult_items": {
+        "日本語": "入荷困難商品",
+        "中文": "进货困难商品"
+    },
     "csv_upload": {
         "日本語": "CSVアップロード",
         "中文": "上传CSV"
@@ -1250,3 +1254,67 @@ elif mode == "rank_a_check":
         "発注アラート1.0",
         "発注アラート1.2"
     ]])
+
+elif mode == "difficult_items":
+    st.subheader("🚫 入荷困難商品モード")
+
+    # Supabase情報
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    HEADERS = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    # データ取得関数
+    def fetch_table(table_name):
+        url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*"
+        res = requests.get(url, headers=HEADERS)
+        if res.status_code == 200:
+            return pd.DataFrame(res.json())
+        else:
+            st.error(f"データ取得失敗: {res.text}")
+            return pd.DataFrame()
+
+    # データ取得
+    df = fetch_table("difficult_items")
+    st.write("📋 現在の入荷困難リスト", df)
+
+    # 新規登録フォーム
+    with st.form("add_difficult_item"):
+        jan = st.text_input("JANコード")
+        item_name = st.text_input("商品名")
+        reason = st.text_input("入荷困難理由")
+        note = st.text_area("備考")
+
+        submitted = st.form_submit_button("登録する")
+        if submitted:
+            payload = {
+                "jan": jan,
+                "item_name": item_name,
+                "reason": reason,
+                "note": note
+            }
+            res = requests.post(
+                f"{SUPABASE_URL}/rest/v1/difficult_items",
+                headers={**HEADERS, "Prefer": "return=representation"},
+                json=payload
+            )
+            if res.status_code in [200, 201]:
+                st.success("✅ 登録しました！")
+                st.experimental_rerun()
+            else:
+                st.error(f"登録失敗: {res.text}")
+
+    # 削除
+    if not df.empty:
+        selected = st.multiselect("🗑️ 削除するIDを選択", df["id"].tolist())
+        if st.button("選択した行を削除"):
+            for _id in selected:
+                res = requests.delete(
+                    f"{SUPABASE_URL}/rest/v1/difficult_items?id=eq.{_id}",
+                    headers=HEADERS
+                )
+            st.success("✅ 削除しました！")
+            st.experimental_rerun()
