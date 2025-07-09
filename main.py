@@ -1256,6 +1256,8 @@ elif mode == "rank_a_check":
         "発注アラート1.2"
     ]])
 
+import datetime
+
 elif mode == "difficult_items":
     st.subheader("🚫 入荷困難商品モード")
 
@@ -1292,6 +1294,7 @@ elif mode == "difficult_items":
                     record["item_id"] = record["id"]
                     record.pop("id")
                     record["action"] = "delete"
+                    record["action_at"] = datetime.datetime.now().isoformat()
 
                     res1 = requests.post(
                         f"{SUPABASE_URL}/rest/v1/difficult_items_history",
@@ -1328,11 +1331,11 @@ elif mode == "difficult_items":
                 json=payload
             )
             if res.status_code in [200, 201]:
-                # 元テーブルの登録結果を履歴に
                 record = res.json()[0]
                 record["item_id"] = record["id"]
                 record.pop("id")
                 record["action"] = "insert"
+                record["action_at"] = datetime.datetime.now().isoformat()
 
                 res2 = requests.post(
                     f"{SUPABASE_URL}/rest/v1/difficult_items_history",
