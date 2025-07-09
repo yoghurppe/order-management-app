@@ -1258,14 +1258,10 @@ elif mode == "rank_a_check":
 elif mode == "difficult_items":
     st.subheader("🚫 入荷困難商品モード")
 
-    # データ取得
     df = fetch_table("difficult_items")
     if not df.empty:
-        # フォーマット
         df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
         df["updated_at"] = pd.to_datetime(df["updated_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
-
-        # 選択列を追加
         df["選択"] = False
 
         edited_df = st.data_editor(
@@ -1277,20 +1273,17 @@ elif mode == "difficult_items":
             }
         )
 
-        # チェックされたIDを取得
         selected_ids = edited_df[edited_df["選択"]]["id"].tolist()
-
         if selected_ids:
             if st.button("✅ 選択した行を削除"):
                 for _id in selected_ids:
-                    # 削除前に履歴テーブルに追加
                     record = df[df["id"] == _id].to_dict(orient="records")[0]
+                    record["action"] = "delete"
                     requests.post(
                         f"{SUPABASE_URL}/rest/v1/difficult_items_history",
                         headers={**HEADERS, "Prefer": "return=representation"},
                         json=record
                     )
-                    # 本体から削除
                     requests.delete(
                         f"{SUPABASE_URL}/rest/v1/difficult_items?id=eq.{_id}",
                         headers=HEADERS
@@ -1298,9 +1291,8 @@ elif mode == "difficult_items":
                 st.success("削除完了！")
                 st.rerun()
 
-    # 新規登録フォーム
     with st.form("add_difficult_item"):
-        jan = st.text_input("JANコード")
+        item_key = st.text_input("ブランド / 商品名 / JAN など")
         item_name = st.text_input("商品名")
         reason = st.text_input("入荷困難理由")
         note = st.text_area("備考")
@@ -1308,7 +1300,7 @@ elif mode == "difficult_items":
         submitted = st.form_submit_button("登録する")
         if submitted:
             payload = {
-                "jan": jan,
+                "item_key": item_key,
                 "item_name": item_name,
                 "reason": reason,
                 "note": note
