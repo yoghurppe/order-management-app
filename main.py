@@ -1227,8 +1227,8 @@ elif mode == "rank_a_check":
         .drop_duplicates(subset=["商品コード"])
         [["商品コード", "stock_ordered"]]
         .rename(columns={"stock_ordered": "発注済"})
+        .copy()  # ✅ ここを追加！
     )
-
     # --- 4️⃣ マージ ---
     df_merged = (
         df_a
