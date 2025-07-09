@@ -1301,7 +1301,9 @@ elif mode == "difficult_items":
             if selected_ids:
                 for _id in selected_ids:
                     record = df[df["id"] == _id].copy().to_dict(orient="records")[0]
-                    record.pop("選択", None)  # ← 余計な列を除去！
+                    record.pop("選択", None)
+                    record.pop("created_at", None)   # ← これ追加！
+                    record.pop("updated_at", None)   # ← これ追加！
                     record["item_id"] = record["id"]
                     record.pop("id")
                     record["action"] = "delete"
