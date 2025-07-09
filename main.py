@@ -1196,60 +1196,57 @@ elif mode == "monthly_sales":
     )
 
 
-elif mode == "rank_a_check":
-    st.subheader("🅰️ Aランク商品確認モード（テスト修正版）")
+import streamlit as st
+import pandas as pd
 
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-    HEADERS = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json"
-    }
+# ------------------------------
+# ✅ ダミーデータ：Supabaseから来る想定で読み込み
+# （ここは実際は requests で取る部分です）
+df_item = pd.DataFrame({
+    "商品コード": ["111", "222", "333"],
+    "jan": ["111", "222", "333"],
+    "商品名": ["AAA", "BBB", "CCC"],
+    "ランク": ["Aランク", "Aランク", "Bランク"]
+})
 
-    def fetch_table(table_name):
-        dfs = []
-        offset, limit = 0, 1000
-        while True:
-            url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
-            res = requests.get(url, headers=HEADERS)
-            if res.status_code == 416 or not res.json():
-                break
-            if res.status_code not in [200, 206]:
-                st.error(f"❌ {table_name} の取得に失敗: {res.status_code} / {res.text}")
-                return pd.DataFrame()
-            dfs.append(pd.DataFrame(res.json()))
-            offset += limit
-        return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+df_sales = pd.DataFrame({
+    "jan": ["111", "222", "333"],
+    "stock_ordered": [10, 0, 99]
+})
 
-    df_item = fetch_table("item_master")
-    df_sales = fetch_table("sales")
+# ------------------------------
+# ✅ 表示して列名確認
+st.write("item_master:", df_item)
+st.write("sales:", df_sales)
+st.write("sales columns:", df_sales.columns.tolist())
 
-    st.write("item_master:", df_item.head())
-    st.write("sales:", df_sales.head())
+# ------------------------------
+# ✅ sales に「発注済」列を作成
+if "stock_ordered" not in df_sales.columns:
+    st.error("❌ salesテーブルに『stock_ordered』列が存在しません！")
+else:
+    df_sales["発注済"] = df_sales["stock_ordered"].fillna(0).astype(int)
+    df_sales["商品コード"] = df_sales["jan"].astype(str).str.strip()
 
-    df_item["商品コード"] = df_item["商品コード"].astype(str).str.strip()
-    df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
+    df_sales_sub = df_sales[["商品コード", "発注済"]].copy()
+    st.write("df_sales_sub:", df_sales_sub)
 
-    # sales側に「発注済」列を必ず作る
-    df_sales["発注済"] = df_sales["stock_ordered"]
+    # ------------------------------
+    # ✅ item_master に商品コードでLEFT JOIN
+    df_item["商品コード"] = df_item["jan"].astype(str).str.strip()
 
-    df_sales["商品コード"] = df_sales["jan"]
-
-    df_sales_sub = df_sales[["商品コード", "発注済"]]
-
-    # LEFT JOIN
     df_merged = pd.merge(df_item, df_sales_sub, on="商品コード", how="left")
+    st.write("マージ結果:", df_merged)
 
-    st.write("マージ結果 before:", df_merged.head())
-
-    # ✅ この時点で発注済が無ければエラー！ printして確認
+    # ------------------------------
+    # ✅ マージ後の列が本当にあるか確認
     if "発注済" not in df_merged.columns:
-        st.error("❌ マージ結果に『発注済』が含まれていません")
+        st.error("❌ マージ後に『発注済』が含まれていません！")
     else:
         df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
-        st.write("マージ結果 after:", df_merged.head())
 
-    # Aランクのみ
-    df_a = df_merged[df_merged["ランク"] == "Aランク"].copy()
-    st.dataframe(df_a[["商品コード", "商品名", "発注済"]])
+        # ✅ Aランクだけ
+        df_a = df_merged[df_merged["ランク"] == "Aランク"].copy()
+
+        st.success("✅ Aランクのみ:")
+        st.dataframe(df_a[["商品コード", "商品名", "発注済"]])
