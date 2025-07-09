@@ -1257,6 +1257,8 @@ elif mode == "rank_a_check":
     ]])
 
 
+import datetime
+
 elif mode == "difficult_items":
     st.subheader("🚫 入荷困難商品モード")
 
@@ -1288,8 +1290,6 @@ elif mode == "difficult_items":
             if st.button("✅ 選択した行を削除"):
                 for _id in selected_ids:
                     record = df[df["id"] == _id].to_dict(orient="records")[0]
-
-                    # 元のIDを履歴に残す
                     record["item_id"] = record["id"]
                     record.pop("id")
                     record["action"] = "delete"
@@ -1329,6 +1329,8 @@ elif mode == "difficult_items":
                 headers={**HEADERS, "Prefer": "return=representation"},
                 json=payload
             )
+            st.write("登録POST:", res.status_code, res.text)
+
             if res.status_code in [200, 201]:
                 record = res.json()[0]
                 record["item_id"] = record["id"]
