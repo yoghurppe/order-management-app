@@ -1314,13 +1314,11 @@ elif mode == "difficult_items":
                         headers={**HEADERS, "Prefer": "return=representation"},
                         json=record
                     )
-                    st.write("履歴POST:", res1.status_code, res1.text)
         
                     res2 = requests.delete(
                         f"{SUPABASE_URL}/rest/v1/difficult_items?id=eq.{_id}",
                         headers=HEADERS
                     )
-                    st.write("削除DELETE:", res2.status_code, res2.text)
         
                 st.success("✅ 削除完了！")
                 st.rerun()
@@ -1361,7 +1359,6 @@ elif mode == "difficult_items":
                     headers={**HEADERS, "Prefer": "return=representation"},
                     json=record
                 )
-                st.write("履歴POST:", res2.status_code, res2.text)
 
                 st.success("✅ 登録しました！")
                 st.rerun()
