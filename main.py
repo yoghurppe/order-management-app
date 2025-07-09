@@ -1290,13 +1290,12 @@ elif mode == "difficult_items":
                 for _id in selected_ids:
                     record = df[df["id"] == _id].to_dict(orient="records")[0]
 
-                    # 元のIDを履歴に残す
                     record["item_id"] = record["id"]
                     record.pop("id")
                     record.pop("created_at", None)
                     record.pop("updated_at", None)
                     record["action"] = "delete"
-                    record["action_at"] = datetime.datetime.now().isoformat()
+                    record["action_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
 
                     res1 = requests.post(
                         f"{SUPABASE_URL}/rest/v1/difficult_items_history",
@@ -1305,6 +1304,7 @@ elif mode == "difficult_items":
                     )
                     st.write("履歴POST:", res1.status_code, res1.text)
 
+                    _id = int(_id)
                     res2 = requests.delete(
                         f"{SUPABASE_URL}/rest/v1/difficult_items?id=eq.{_id}",
                         headers=HEADERS
@@ -1312,7 +1312,7 @@ elif mode == "difficult_items":
                     st.write("削除DELETE:", res2.status_code, res2.text)
 
                 st.success("削除完了！")
-                # st.rerun()  ← ログ見たいなら一旦コメントアウト
+                # st.rerun() はログ確認後で
 
     with st.form("add_difficult_item"):
         item_key = st.text_input("ブランド / 商品名 / JAN など")
@@ -1341,7 +1341,7 @@ elif mode == "difficult_items":
                 record.pop("created_at", None)
                 record.pop("updated_at", None)
                 record["action"] = "insert"
-                record["action_at"] = datetime.datetime.now().isoformat()
+                record["action_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
 
                 res2 = requests.post(
                     f"{SUPABASE_URL}/rest/v1/difficult_items_history",
@@ -1351,26 +1351,19 @@ elif mode == "difficult_items":
                 st.write("履歴POST:", res2.status_code, res2.text)
 
                 st.success("✅ 登録しました！")
-                # st.rerun()  ← ログ見たいなら一旦コメントアウト
+                # st.rerun()
             else:
                 st.error(f"登録失敗: {res.text}")
 
     df_history = fetch_table("difficult_items_history")
 
     if not df_history.empty:
-        # 直近7日
-        one_week_ago = datetime.datetime.now() - datetime.timedelta(days=7)
-    
-        # 文字列 → datetime, UTC → tzなし
+        one_week_ago = datetime.datetime.now(ZoneInfo("Asia/Tokyo")) - datetime.timedelta(days=7)
         df_history["action_at"] = pd.to_datetime(df_history["action_at"], utc=True).dt.tz_localize(None)
-    
-        # 比較
         df_history = df_history[df_history["action_at"] >= one_week_ago]
-    
         df_history["action_at"] = df_history["action_at"].dt.strftime("%Y-%m-%d %H:%M:%S")
-    
+
         st.write("📜 **履歴（直近7日分）**")
         st.dataframe(df_history, use_container_width=True)
     else:
         st.write("📜 **履歴はまだありません**")
-
