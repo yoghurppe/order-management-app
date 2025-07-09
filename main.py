@@ -1226,9 +1226,9 @@ elif mode == "rank_a_check":
         df_sales.sort_values("id", ascending=False)
         .drop_duplicates(subset=["商品コード"])
         [["商品コード", "stock_ordered"]]
-        .rename(columns={"stock_ordered": "発注済"})
-        .copy()  # ✅ ここを追加！
+        .copy()
     )
+    
     # --- 4️⃣ マージ ---
     df_merged = (
         df_a
@@ -1236,6 +1236,10 @@ elif mode == "rank_a_check":
         .merge(df_sales_latest, on="商品コード", how="left")
         .merge(df_stock[["商品コード", "在庫数"]], on="商品コード", how="left")
     )
+    
+    # ✅ マージ後に改名する！
+    if "stock_ordered" in df_merged.columns:
+        df_merged = df_merged.rename(columns={"stock_ordered": "発注済"})
 
     # --- 5️⃣ 必ず存在させる ---
     df_merged["販売実績（7日）"] = None
