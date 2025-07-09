@@ -1258,6 +1258,14 @@ elif mode == "rank_a_check":
 elif mode == "difficult_items":
     st.subheader("🚫 入荷困難商品モード")
 
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    HEADERS = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+    
     df = fetch_table("difficult_items")
     if not df.empty:
         df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
