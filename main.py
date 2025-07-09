@@ -1207,7 +1207,6 @@ elif mode == "rank_a_check":
         st.warning("必要なテーブルが空です")
         st.stop()
 
-    # ✅ Aランク & JAN 有りだけ
     df_a = df_item[(df_item["ランク"] == "Aランク") & (df_item["jan"].notnull())].copy()
     df_a["商品コード"] = df_a["jan"]
 
@@ -1239,7 +1238,12 @@ elif mode == "rank_a_check":
     df_merged["販売実績（7日）"] = None
     df_merged["在庫数"] = df_merged["在庫数"].fillna(0)
     df_merged["販売実績（30日）"] = df_merged["販売実績（30日）"].fillna(0)
-    df_merged["発注済"] = df_merged["発注済"].fillna(0)
+
+    # ✅ ここで絶対 KeyError 対策
+    if "発注済" not in df_merged.columns:
+        df_merged["発注済"] = 0
+    else:
+        df_merged["発注済"] = df_merged["発注済"].fillna(0)
 
     df_merged = df_merged[df_merged["ランク"] == "Aランク"]
 
