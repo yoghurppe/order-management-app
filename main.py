@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
+import datetime
 import os
 import math
 import re
@@ -1321,3 +1322,20 @@ elif mode == "difficult_items":
                 st.rerun()
             else:
                 st.error(f"登録失敗: {res.text}")
+
+    # 履歴テーブルを取得
+    df_history = fetch_table("difficult_items_history")
+    
+    if not df_history.empty:
+        # 直近7日分だけ
+        one_week_ago = datetime.datetime.now() - datetime.timedelta(days=7)
+        df_history["action_at"] = pd.to_datetime(df_history["action_at"])
+        df_history = df_history[df_history["action_at"] >= one_week_ago]
+    
+        # フォーマット
+        df_history["action_at"] = df_history["action_at"].dt.strftime("%Y-%m-%d %H:%M:%S")
+    
+        st.write("📜 **履歴（直近7日分）**")
+        st.dataframe(df_history, use_container_width=True)
+    else:
+        st.write("📜 **履歴はまだありません**")
