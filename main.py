@@ -1256,7 +1256,6 @@ elif mode == "rank_a_check":
         "発注アラート1.2"
     ]])
 
-import datetime
 
 elif mode == "difficult_items":
     st.subheader("🚫 入荷困難商品モード")
