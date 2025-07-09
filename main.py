@@ -1197,27 +1197,58 @@ elif mode == "monthly_sales":
 
 
 elif mode == "rank_a_check":
-    st.subheader("🅰️ Aランク商品確認モード")
+    st.subheader("🅰️ Aランク商品確認モード（テスト版）")
 
+    # 🔐 Supabase 接続
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    HEADERS = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    def fetch_table(table_name):
+        dfs = []
+        offset, limit = 0, 1000
+        while True:
+            url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*&offset={offset}&limit={limit}"
+            res = requests.get(url, headers=HEADERS)
+            if res.status_code == 416 or not res.json():
+                break
+            if res.status_code not in [200, 206]:
+                st.error(f"❌ {table_name} の取得に失敗: {res.status_code} / {res.text}")
+                return pd.DataFrame()
+            dfs.append(pd.DataFrame(res.json()))
+            offset += limit
+        return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+    # ✅ データ取得
     df_item = fetch_table("item_master")
     df_sales = fetch_table("sales")
 
-    df_item["JANコード"] = df_item["jan"].astype(str).str.strip()
-    df_sales["JANコード"] = df_sales["jan"].astype(str).str.strip()
+    st.write("item_master サンプル:", df_item.head())
+    st.write("sales サンプル:", df_sales.head())
 
-    df_a = df_item[df_item["ランク"] == "Aランク"].copy()
+    # ✅ 必要項目の整形
+    df_item["商品コード"] = df_item["商品コード"].astype(str).str.strip()
+    df_sales["jan"] = df_sales["jan"].astype(str).str.strip()
+    df_sales = df_sales.rename(columns={"stock_ordered": "発注済"})
+    df_sales["商品コード"] = df_sales["jan"]
 
-    # --- 仮で発注済を sales から1件だけ持ってくる ---
-    fake_stock = df_sales[["JANコード", "stock_ordered"]].copy()
-    fake_stock = fake_stock.rename(columns={"stock_ordered": "発注済"})
+    # ✅ マージに必要なカラムだけ残す
+    df_sales_sub = df_sales[["商品コード", "発注済"]]
 
-    st.write("item_master:", df_a.head())
-    st.write("sales:", df_sales.head())
-    st.write("仮 発注済:", fake_stock.head())
+    # ✅ LEFT JOIN
+    df_merged = pd.merge(df_item, df_sales_sub, on="商品コード", how="left")
 
-    df_merged = df_a.merge(fake_stock, on="JANコード", how="left")
-
-    # fillna で 0 にする
+    # ✅ 発注済が NULL の場合は 0
     df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
 
-    st.write("✅ マージ結果:", df_merged.head())
+    st.write("マージ結果:", df_merged.head())
+
+    # ✅ 絞り込み（例: Aランクのみ）
+    df_a = df_merged[df_merged["ランク"] == "Aランク"].copy()
+
+    # ✅ 必要に応じて表示
+    st.dataframe(df_a[["商品コード", "商品名", "発注済"]])
