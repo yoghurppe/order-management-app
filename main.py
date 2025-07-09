@@ -1199,7 +1199,6 @@ elif mode == "monthly_sales":
 elif mode == "rank_a_check":
     st.subheader("🅰️ Aランク商品確認モード")
 
-    # データ取得
     df_item = fetch_table("item_master")
     df_sales = fetch_table("sales")
     df_stock = fetch_table("warehouse_stock")
@@ -1208,7 +1207,7 @@ elif mode == "rank_a_check":
         st.warning("必要なテーブルが空です")
         st.stop()
 
-    # --- 1️⃣ JAN ⇄ 商品コード を一致 ---
+    # 1️⃣ Aランクのみ
     df_a = df_item[(df_item["ランク"] == "Aランク") & (df_item["jan"].notnull())].copy()
     df_a["商品コード"] = df_a["jan"].astype(str).str.strip()
 
@@ -1216,14 +1215,14 @@ elif mode == "rank_a_check":
     df_stock["商品コード"] = df_stock["product_code"].astype(str).str.strip()
     df_stock = df_stock.rename(columns={"stock_available": "在庫数"})
 
-    # --- 2️⃣ 販売実績（30日） ---
+    # 2️⃣ 実績30日
     df_sales_30 = (
         df_sales.groupby("商品コード", as_index=False)["quantity_sold"]
         .sum()
         .rename(columns={"quantity_sold": "販売実績（30日）"})
     )
 
-    # --- 3️⃣ 最新の発注済 ---
+    # 3️⃣ 発注済
     df_sales_latest = (
         df_sales.sort_values("id", ascending=False)
         .drop_duplicates(subset=["商品コード"])
@@ -1232,7 +1231,7 @@ elif mode == "rank_a_check":
         .copy()
     )
 
-    # --- 4️⃣ マージ ---
+    # 4️⃣ マージ
     df_merged = (
         df_a
         .merge(df_sales_30, on="商品コード", how="left")
@@ -1240,26 +1239,23 @@ elif mode == "rank_a_check":
         .merge(df_stock[["商品コード", "在庫数"]], on="商品コード", how="left")
     )
 
-    # --- 5️⃣ 重複カラムに備えて再確認 ---
-    # 例: '発注済_x', '発注済_y' が紛れ込んでないか
-    for col in df_merged.columns:
-        if col.startswith("発注済_"):
-            df_merged.rename(columns={col: "発注済"}, inplace=True)
-        if col.startswith("stock_ordered"):
-            df_merged.rename(columns={col: "発注済"}, inplace=True)
+    # 🔑 カラム確認 → 重複があれば必ず1つにまとめる
+    if "発注済_x" in df_merged.columns:
+        df_merged["発注済"] = df_merged["発注済_x"]
+    if "発注済_y" in df_merged.columns:
+        df_merged["発注済"] = df_merged["発注済_y"]
 
-    # --- 6️⃣ 欠損補完 ---
-    df_merged["販売実績（7日）"] = None
-    df_merged["発注済"] = df_merged.get("発注済", 0)
+    # 5️⃣ 欠損補完
     df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
     df_merged["販売実績（30日）"] = df_merged["販売実績（30日）"].fillna(0)
     df_merged["在庫数"] = df_merged["在庫数"].fillna(0)
+    df_merged["販売実績（7日）"] = None
 
-    # --- 7️⃣ アラート計算 ---
+    # 6️⃣ アラート
     df_merged["発注アラート1.0"] = df_merged["販売実績（30日）"] < (df_merged["在庫数"] + df_merged["発注済"])
     df_merged["発注アラート1.2"] = (df_merged["販売実績（30日）"] * 1.2) < (df_merged["在庫数"] + df_merged["発注済"])
 
-    # --- 8️⃣ フィルター ---
+    # 7️⃣ フィルター
     check_1_0 = st.checkbox("✅ 発注アラート1.0のみ表示", value=False)
     check_1_2 = st.checkbox("✅ 発注アラート1.2のみ表示", value=False)
 
@@ -1269,7 +1265,7 @@ elif mode == "rank_a_check":
     if check_1_2:
         df_result = df_result[df_result["発注アラート1.2"]]
 
-    # --- 9️⃣ 出力 ---
+    # 8️⃣ 出力
     st.dataframe(df_result[[
         "商品コード",
         "商品名",
