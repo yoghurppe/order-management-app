@@ -1257,6 +1257,8 @@ elif mode == "rank_a_check":
     ]])
 
 
+import datetime
+
 elif mode == "difficult_items":
     st.subheader("🚫 入荷困難商品モード")
 
@@ -1288,8 +1290,12 @@ elif mode == "difficult_items":
             if st.button("✅ 選択した行を削除"):
                 for _id in selected_ids:
                     record = df[df["id"] == _id].to_dict(orient="records")[0]
+
+                    # 元のIDを履歴に残す
                     record["item_id"] = record["id"]
                     record.pop("id")
+                    record.pop("created_at", None)
+                    record.pop("updated_at", None)
                     record["action"] = "delete"
                     record["action_at"] = datetime.datetime.now().isoformat()
 
@@ -1307,7 +1313,7 @@ elif mode == "difficult_items":
                     st.write("削除DELETE:", res2.status_code, res2.text)
 
                 st.success("削除完了！")
-                # st.rerun()
+                # st.rerun()  ← ログ見たいなら一旦コメントアウト
 
     with st.form("add_difficult_item"):
         item_key = st.text_input("ブランド / 商品名 / JAN など")
@@ -1333,6 +1339,8 @@ elif mode == "difficult_items":
                 record = res.json()[0]
                 record["item_id"] = record["id"]
                 record.pop("id")
+                record.pop("created_at", None)
+                record.pop("updated_at", None)
                 record["action"] = "insert"
                 record["action_at"] = datetime.datetime.now().isoformat()
 
@@ -1344,7 +1352,7 @@ elif mode == "difficult_items":
                 st.write("履歴POST:", res2.status_code, res2.text)
 
                 st.success("✅ 登録しました！")
-                # st.rerun()
+                # st.rerun()  ← ログ見たいなら一旦コメントアウト
             else:
                 st.error(f"登録失敗: {res.text}")
 
