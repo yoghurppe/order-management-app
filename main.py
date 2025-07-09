@@ -1282,7 +1282,7 @@ elif mode == "difficult_items":
             column_config={
                 "選択": st.column_config.CheckboxColumn("選択")
             },
-            disabled=["id", "item_key", "reason", "note", "created_at", "updated_at", "選択"]
+            disabled=["id", "item_key", "reason", "note", "created_at", "updated_at"]  # ← 「選択」は外す！
         )
 
         # ✅ ここで必ず edited_df で判断！
