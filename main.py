@@ -1233,23 +1233,26 @@ elif mode == "rank_a_check":
         .rename(columns={"quantity_sold": "実績（30日）"})
     )
 
-    # --- 5️⃣ 発注済 は item_master のを使う
-    df_ordered = df_item[["商品コード", "発注済"]].copy()
-    df_ordered["商品コード"] = df_ordered["商品コード"].astype(str).str.strip()
-
-    # --- 6️⃣ マージ
+    # 5️⃣ item_master の発注済を保証して抽出
+    if "発注済" not in df_item.columns:
+        df_item["発注済"] = 0
+    
+    df_item_master_ordered = df_item[["商品コード", "発注済"]].copy()
+    
+    # 6️⃣ マージ
     df_merged = (
         df_a
         .merge(df_sales_30, on="商品コード", how="left")
-        .merge(df_ordered, on="商品コード", how="left")
+        .merge(df_item_master_ordered, on="商品コード", how="left")
         .merge(df_stock[["商品コード", "在庫数"]], on="商品コード", how="left")
     )
-
-    # --- 7️⃣ 欠損補完
+    
+    # 7️⃣ 欠損補完
     df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
     df_merged["実績（30日）"] = df_merged["実績（30日）"].fillna(0)
     df_merged["在庫数"] = df_merged["在庫数"].fillna(0)
     df_merged["実績（7日）"] = None
+
 
     # --- 8️⃣ アラート条件
     df_merged["発注アラート1.0"] = df_merged["実績（30日）"] > (df_merged["在庫数"] + df_merged["発注済"])
