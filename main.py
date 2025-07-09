@@ -1266,7 +1266,7 @@ elif mode == "difficult_items":
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json"
     }
-    
+
     df = fetch_table("difficult_items")
     if not df.empty:
         df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
@@ -1288,23 +1288,30 @@ elif mode == "difficult_items":
                 for _id in selected_ids:
                     record = df[df["id"] == _id].to_dict(orient="records")[0]
                     record["action"] = "delete"
-                    requests.post(
+
+                    # 履歴テーブルに追加
+                    res1 = requests.post(
                         f"{SUPABASE_URL}/rest/v1/difficult_items_history",
                         headers={**HEADERS, "Prefer": "return=representation"},
                         json=record
                     )
-                    requests.delete(
+                    st.write("履歴POST:", res1.status_code, res1.text)
+
+                    # 本体から削除
+                    res2 = requests.delete(
                         f"{SUPABASE_URL}/rest/v1/difficult_items?id=eq.{_id}",
                         headers=HEADERS
                     )
+                    st.write("削除DELETE:", res2.status_code, res2.text)
+
                 st.success("削除完了！")
                 st.rerun()
 
     with st.form("add_difficult_item"):
-        item_key = st.text_input("ブランド / 商品名 / JAN など")  # ← これだけでOK
+        item_key = st.text_input("ブランド / 商品名 / JAN など")
         reason = st.text_input("入荷困難理由")
         note = st.text_area("備考")
-    
+
         submitted = st.form_submit_button("登録する")
         if submitted:
             payload = {
@@ -1318,6 +1325,17 @@ elif mode == "difficult_items":
                 json=payload
             )
             if res.status_code in [200, 201]:
+                # 追加後に履歴も残す
+                record = res.json()[0]
+                record["action"] = "insert"
+
+                res2 = requests.post(
+                    f"{SUPABASE_URL}/rest/v1/difficult_items_history",
+                    headers={**HEADERS, "Prefer": "return=representation"},
+                    json=record
+                )
+                st.write("履歴POST:", res2.status_code, res2.text)
+
                 st.success("✅ 登録しました！")
                 st.rerun()
             else:
@@ -1325,16 +1343,16 @@ elif mode == "difficult_items":
 
     # 履歴テーブルを取得
     df_history = fetch_table("difficult_items_history")
-    
+
     if not df_history.empty:
         # 直近7日分だけ
         one_week_ago = datetime.datetime.now() - datetime.timedelta(days=7)
         df_history["action_at"] = pd.to_datetime(df_history["action_at"])
         df_history = df_history[df_history["action_at"] >= one_week_ago]
-    
+
         # フォーマット
         df_history["action_at"] = df_history["action_at"].dt.strftime("%Y-%m-%d %H:%M:%S")
-    
+
         st.write("📜 **履歴（直近7日分）**")
         st.dataframe(df_history, use_container_width=True)
     else:
