@@ -1219,7 +1219,7 @@ elif mode == "rank_a_check":
     df_sales_30 = (
         df_sales.groupby("商品コード", as_index=False)["quantity_sold"]
         .sum()
-        .rename(columns={"quantity_sold": "販売実績（30日）"})
+        .rename(columns={"quantity_sold": "実績（30日）"})
     )
 
     # 3️⃣ 発注済
@@ -1247,13 +1247,13 @@ elif mode == "rank_a_check":
 
     # 5️⃣ 欠損補完
     df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
-    df_merged["販売実績（30日）"] = df_merged["販売実績（30日）"].fillna(0)
+    df_merged["実績（30日）"] = df_merged["実績（30日）"].fillna(0)
     df_merged["在庫数"] = df_merged["在庫数"].fillna(0)
-    df_merged["販売実績（7日）"] = None
+    df_merged["実績（7日）"] = None
 
     # 6️⃣ アラート
-    df_merged["発注アラート1.0"] = df_merged["販売実績（30日）"] < (df_merged["在庫数"] + df_merged["発注済"])
-    df_merged["発注アラート1.2"] = (df_merged["販売実績（30日）"] * 1.2) < (df_merged["在庫数"] + df_merged["発注済"])
+    df_merged["発注アラート1.0"] = df_merged["実績（30日）"] > (df_merged["在庫数"] + df_merged["発注済"])
+    df_merged["発注アラート1.2"] = (df_merged["実績（30日）"] * 1.2) > (df_merged["在庫数"] + df_merged["発注済"])
 
     # 7️⃣ フィルター
     check_1_0 = st.checkbox("✅ 発注アラート1.0のみ表示", value=False)
@@ -1270,8 +1270,8 @@ elif mode == "rank_a_check":
         "商品コード",
         "商品名",
         "ランク",
-        "販売実績（30日）",
-        "販売実績（7日）",
+        "実績（30日）",
+        "実績（7日）",
         "在庫数",
         "発注済",
         "発注アラート1.0",
