@@ -1351,6 +1351,8 @@ elif mode == "difficult_items":
                 record = res.json()[0]
                 record["item_id"] = record["id"]
                 record.pop("id")
+                record.pop("created_at", None)  # ← 忘れず追加！
+                record.pop("updated_at", None)  # ← 忘れず追加！
                 record["action"] = "insert"
                 record["action_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
 
