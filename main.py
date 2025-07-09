@@ -247,7 +247,6 @@ elif mode == "order_ai":
     # 🔵 モード切替
     ai_mode = st.radio("発注AIモードを選択", ["通常モード", "JDモード"], index=0)
 
-    # ✅ 計算開始ボタン
     if st.button("🤖 計算を開始する"):
         SUPABASE_URL = st.secrets["SUPABASE_URL"]
         SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -341,11 +340,8 @@ elif mode == "order_ai":
                 rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
                 multiplier = rank_multiplier.get(rank, 1.0)
 
-                # --- Aランクだけ 1.2 補正 ---
-                if rank == "Aランク":
-                    need_qty_raw = math.ceil(sold * multiplier * 1.2) - stock - ordered
-                else:
-                    need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
+                # ✅ ランク倍率のみ適用
+                need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
 
                 if stock <= 1 and sold >= 1 and need_qty_raw <= 0:
                     need_qty = 1
@@ -380,11 +376,8 @@ elif mode == "order_ai":
                     if not bigger_lots.empty:
                         best_option = bigger_lots.sort_values("order_lot", ascending=False).iloc[0]
                     else:
-                        one_lot = options[options["order_lot"] == 1]
-                        if not one_lot.empty:
-                            best_option = one_lot.iloc[0]
-                        else:
-                            best_option = options.sort_values("order_lot").iloc[0]
+                        # 理論必要数未満でも最大ロットを必ず適用
+                        best_option = options.sort_values("order_lot", ascending=False).iloc[0]
                 else:
                     options["diff"] = (options["order_lot"] - need_qty).abs()
                     smaller_lots = options[options["order_lot"] <= need_qty]
@@ -459,6 +452,7 @@ elif mode == "order_ai":
                     )
             else:
                 st.info("現在、発注が必要な商品はありません。")
+
 
 
 
