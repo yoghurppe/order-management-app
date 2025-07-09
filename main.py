@@ -1287,9 +1287,12 @@ elif mode == "difficult_items":
             if st.button("✅ 選択した行を削除"):
                 for _id in selected_ids:
                     record = df[df["id"] == _id].to_dict(orient="records")[0]
+
+                    # 元のIDを履歴に残す
+                    record["item_id"] = record["id"]
+                    record.pop("id")
                     record["action"] = "delete"
 
-                    # 履歴テーブルに追加
                     res1 = requests.post(
                         f"{SUPABASE_URL}/rest/v1/difficult_items_history",
                         headers={**HEADERS, "Prefer": "return=representation"},
@@ -1297,7 +1300,6 @@ elif mode == "difficult_items":
                     )
                     st.write("履歴POST:", res1.status_code, res1.text)
 
-                    # 本体から削除
                     res2 = requests.delete(
                         f"{SUPABASE_URL}/rest/v1/difficult_items?id=eq.{_id}",
                         headers=HEADERS
@@ -1319,14 +1321,17 @@ elif mode == "difficult_items":
                 "reason": reason,
                 "note": note
             }
+
             res = requests.post(
                 f"{SUPABASE_URL}/rest/v1/difficult_items",
                 headers={**HEADERS, "Prefer": "return=representation"},
                 json=payload
             )
             if res.status_code in [200, 201]:
-                # 追加後に履歴も残す
+                # 元テーブルの登録結果を履歴に
                 record = res.json()[0]
+                record["item_id"] = record["id"]
+                record.pop("id")
                 record["action"] = "insert"
 
                 res2 = requests.post(
@@ -1341,16 +1346,12 @@ elif mode == "difficult_items":
             else:
                 st.error(f"登録失敗: {res.text}")
 
-    # 履歴テーブルを取得
     df_history = fetch_table("difficult_items_history")
 
     if not df_history.empty:
-        # 直近7日分だけ
         one_week_ago = datetime.datetime.now() - datetime.timedelta(days=7)
         df_history["action_at"] = pd.to_datetime(df_history["action_at"])
         df_history = df_history[df_history["action_at"] >= one_week_ago]
-
-        # フォーマット
         df_history["action_at"] = df_history["action_at"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
         st.write("📜 **履歴（直近7日分）**")
