@@ -1199,25 +1199,35 @@ elif mode == "monthly_sales":
 elif mode == "rank_a_check":
     st.subheader("🅰️ Aランク商品確認モード")
 
-     # 1) JAN -> 商品コード に揃える
+    # ✅ 1) 必ず先にテーブル読み込む
+    df_item = fetch_table("item_master")
+    df_sales = fetch_table("sales")
+    df_stock = fetch_table("warehouse_stock")
+
+    if df_item.empty or df_sales.empty:
+        st.warning("テーブルが空です")
+        st.stop()
+
+    # ✅ 2) 読んだ後に文字列化する
     df_item["商品コード"] = df_item["jan"].astype(str).str.strip()
     df_sales["商品コード"] = df_sales["jan"].astype(str).str.strip()
-    
-    # 2) Aランクだけ
+    df_stock["商品コード"] = df_stock["product_code"].astype(str).str.strip()
+
+    # 3) Aランクだけ
     df_a = df_item[df_item["ランク"] == "Aランク"].copy()
-    
-    # 3) 最新 sales から発注済
+
+    # 4) 最新の sales から発注済を取る
     df_sales_latest = (
         df_sales.sort_values("id", ascending=False)
         .drop_duplicates(subset=["商品コード"])
         [["商品コード", "stock_ordered"]]
         .rename(columns={"stock_ordered": "発注済"})
     )
-    
-    # 4) マージ
+
+    # 5) マージ
     df_merged = df_a.merge(df_sales_latest, on="商品コード", how="left")
-    
-    # 5) デバッグ表示
-    st.write("🔍 item_master サンプル:", df_item.head())
-    st.write("🔍 sales サンプル:", df_sales.head())
+
+    # 6) デバッグ
+    st.write("🔍 item_master:", df_item.head())
+    st.write("🔍 sales:", df_sales.head())
     st.write("✅ マージ結果:", df_merged.head())
