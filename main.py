@@ -307,7 +307,7 @@ elif mode == "order_ai":
         df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
         rank_multiplier = {
-            "Aランク": 1.5,
+            "Aランク": 1.0,  # 実際は使わない
             "Bランク": 1.2,
             "Cランク": 1.0,
             "TEST": 1.5
@@ -340,8 +340,14 @@ elif mode == "order_ai":
                 rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
                 multiplier = rank_multiplier.get(rank, 1.0)
 
-                # ✅ ランク倍率のみ適用
-                need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
+                # ✅ Aランクは倍率なし & 実績条件付き
+                if rank == "Aランク":
+                    if (stock + ordered) < sold:
+                        need_qty_raw = math.ceil(sold * 1.2) - stock - ordered
+                    else:
+                        need_qty_raw = 0
+                else:
+                    need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
 
                 if stock <= 1 and sold >= 1 and need_qty_raw <= 0:
                     need_qty = 1
@@ -376,7 +382,6 @@ elif mode == "order_ai":
                     if not bigger_lots.empty:
                         best_option = bigger_lots.sort_values("order_lot", ascending=False).iloc[0]
                     else:
-                        # 理論必要数未満でも最大ロットを必ず適用
                         best_option = options.sort_values("order_lot", ascending=False).iloc[0]
                 else:
                     options["diff"] = (options["order_lot"] - need_qty).abs()
@@ -452,8 +457,6 @@ elif mode == "order_ai":
                     )
             else:
                 st.info("現在、発注が必要な商品はありません。")
-
-
 
 
 
