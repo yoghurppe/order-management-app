@@ -1281,12 +1281,16 @@ elif mode == "difficult_items":
             num_rows="dynamic",
             column_config={
                 "選択": st.column_config.CheckboxColumn("選択")
-            }
+            },
+            disabled=["id", "item_key", "reason", "note", "created_at", "updated_at", "選択"]
         )
 
         selected_ids = edited_df[edited_df["選択"]]["id"].tolist()
-        if selected_ids:
-            if st.button("✅ 選択した行を削除"):
+        st.write("選択ID:", selected_ids)  # デバッグ用
+
+        # ✅ 常に表示する削除ボタン
+        if st.button("✅ 選択した行を削除"):
+            if selected_ids:
                 for _id in selected_ids:
                     record = df[df["id"] == _id].to_dict(orient="records")[0]
 
@@ -1312,7 +1316,9 @@ elif mode == "difficult_items":
                     st.write("削除DELETE:", res2.status_code, res2.text)
 
                 st.success("削除完了！")
-                # st.rerun() はログ確認後で
+                st.rerun()
+            else:
+                st.warning("⚠️ 行が選択されていません")
 
     with st.form("add_difficult_item"):
         item_key = st.text_input("ブランド / 商品名 / JAN など")
@@ -1351,7 +1357,7 @@ elif mode == "difficult_items":
                 st.write("履歴POST:", res2.status_code, res2.text)
 
                 st.success("✅ 登録しました！")
-                # st.rerun()
+                st.rerun()
             else:
                 st.error(f"登録失敗: {res.text}")
 
@@ -1359,13 +1365,10 @@ elif mode == "difficult_items":
 
     if not df_history.empty:
         one_week_ago = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).replace(tzinfo=None) - datetime.timedelta(days=7)
-    
         df_history["action_at"] = pd.to_datetime(df_history["action_at"], utc=True).dt.tz_localize(None)
-    
         df_history = df_history[df_history["action_at"] >= one_week_ago]
-    
         df_history["action_at"] = df_history["action_at"].dt.strftime("%Y-%m-%d %H:%M:%S")
-    
+
         st.write("📜 **履歴（直近7日分）**")
         st.dataframe(df_history, use_container_width=True)
     else:
