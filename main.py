@@ -340,15 +340,16 @@ elif mode == "order_ai":
                 rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
                 multiplier = rank_multiplier.get(rank, 1.0)
 
-                # ✅ Aランクは倍率なし & 実績条件付き
+                # ✅ Aランクは在庫・発注済を引かず実績×1.2
                 if rank == "Aランク":
                     if (stock + ordered) < sold:
-                        need_qty_raw = math.ceil(sold * 1.2) - stock - ordered
+                        need_qty_raw = math.ceil(sold * 1.2)
                     else:
                         need_qty_raw = 0
                 else:
                     need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
 
+                # 在庫が少なくて実績ある場合の救済
                 if stock <= 1 and sold >= 1 and need_qty_raw <= 0:
                     need_qty = 1
                 else:
@@ -399,7 +400,11 @@ elif mode == "order_ai":
                             else:
                                 best_option = options.sort_values("order_lot").iloc[0]
 
-                sets = math.ceil(need_qty / best_option["order_lot"])
+                # ✅ Aランクはフル数量をロットで丸める
+                if rank == "Aランク":
+                    sets = math.ceil(need_qty_raw / best_option["order_lot"])
+                else:
+                    sets = math.ceil(need_qty / best_option["order_lot"])
                 qty = sets * best_option["order_lot"]
                 total_cost = qty * best_option["price"]
 
@@ -408,7 +413,7 @@ elif mode == "order_ai":
                     "販売実績": sold,
                     "在庫": stock,
                     "発注済": ordered,
-                    "理論必要数": need_qty,
+                    "理論必要数": need_qty_raw if rank == "Aランク" else need_qty,
                     "発注数": qty,
                     "ロット": best_option["order_lot"],
                     "数量": round(qty / best_option["order_lot"], 2),
@@ -457,6 +462,7 @@ elif mode == "order_ai":
                     )
             else:
                 st.info("現在、発注が必要な商品はありません。")
+
 
 
 
