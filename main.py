@@ -1275,6 +1275,10 @@ elif mode == "difficult_items":
         df["updated_at"] = pd.to_datetime(df["updated_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
         df["選択"] = False
 
+        # 並び順を「選択列が一番左」に
+        cols = ["選択", "item_key", "reason", "note", "created_at", "updated_at", "id"]
+        df = df[cols]
+
         st.write("### 📋 現在の入荷困難リスト")
 
         edited_df = st.data_editor(
@@ -1285,8 +1289,8 @@ elif mode == "difficult_items":
                 "選択": st.column_config.CheckboxColumn("選択")
             },
             disabled=[
-                "id", "item_key", "reason", "note", "created_at", "updated_at"
-                # ← 選択だけは disabled にしない！
+                "item_key", "reason", "note", "created_at", "updated_at"
+                # ← 「選択」と「id」は外す
             ]
         )
 
@@ -1297,12 +1301,9 @@ elif mode == "difficult_items":
         if st.button("✅ 選択した行を削除"):
             if selected_ids:
                 for _id in selected_ids:
-                    record = selected_df[selected_df["id"] == _id].to_dict(orient="records")[0]
-
+                    record = df[df["id"] == _id].to_dict(orient="records")[0]
                     record["item_id"] = record["id"]
                     record.pop("id")
-                    record.pop("created_at", None)
-                    record.pop("updated_at", None)
                     record["action"] = "delete"
                     record["action_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
 
@@ -1349,8 +1350,6 @@ elif mode == "difficult_items":
                 record = res.json()[0]
                 record["item_id"] = record["id"]
                 record.pop("id")
-                record.pop("created_at", None)
-                record.pop("updated_at", None)
                 record["action"] = "insert"
                 record["action_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
 
