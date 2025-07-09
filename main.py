@@ -1307,7 +1307,7 @@ elif mode == "difficult_items":
                     st.write("削除DELETE:", res2.status_code, res2.text)
 
                 st.success("削除完了！")
-                st.rerun()
+                # st.rerun()
 
     with st.form("add_difficult_item"):
         item_key = st.text_input("ブランド / 商品名 / JAN など")
@@ -1344,7 +1344,7 @@ elif mode == "difficult_items":
                 st.write("履歴POST:", res2.status_code, res2.text)
 
                 st.success("✅ 登録しました！")
-                st.rerun()
+                # st.rerun()
             else:
                 st.error(f"登録失敗: {res.text}")
 
