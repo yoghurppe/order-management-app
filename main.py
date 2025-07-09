@@ -1275,7 +1275,7 @@ elif mode == "difficult_items":
         df["updated_at"] = pd.to_datetime(df["updated_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
         df["選択"] = False
 
-        # 並び順を「選択列が一番左」に
+        # 「選択」列を左端にして id は右端
         cols = ["選択", "item_key", "reason", "note", "created_at", "updated_at", "id"]
         df = df[cols]
 
@@ -1290,7 +1290,6 @@ elif mode == "difficult_items":
             },
             disabled=[
                 "item_key", "reason", "note", "created_at", "updated_at"
-                # ← 「選択」と「id」は外す
             ]
         )
 
@@ -1301,7 +1300,8 @@ elif mode == "difficult_items":
         if st.button("✅ 選択した行を削除"):
             if selected_ids:
                 for _id in selected_ids:
-                    record = df[df["id"] == _id].to_dict(orient="records")[0]
+                    record = df[df["id"] == _id].copy().to_dict(orient="records")[0]
+                    record.pop("選択", None)  # ← 余計な列を除去！
                     record["item_id"] = record["id"]
                     record.pop("id")
                     record["action"] = "delete"
