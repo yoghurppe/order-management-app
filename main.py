@@ -1257,9 +1257,6 @@ elif mode == "rank_a_check":
     ]])
 
 
-
-from zoneinfo import ZoneInfo
-
 elif mode == "difficult_items":
     st.subheader("🚫 入荷困難商品モード")
 
