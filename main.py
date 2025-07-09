@@ -1359,10 +1359,16 @@ elif mode == "difficult_items":
 
     if not df_history.empty:
         one_week_ago = datetime.datetime.now() - datetime.timedelta(days=7)
-        df_history["action_at"] = pd.to_datetime(df_history["action_at"])
+    
+        # 文字列を datetime に変換
+        df_history["action_at"] = pd.to_datetime(df_history["action_at"], errors="coerce")
+    
+        # 比較
         df_history = df_history[df_history["action_at"] >= one_week_ago]
+    
+        # 表示用フォーマット
         df_history["action_at"] = df_history["action_at"].dt.strftime("%Y-%m-%d %H:%M:%S")
-
+    
         st.write("📜 **履歴（直近7日分）**")
         st.dataframe(df_history, use_container_width=True)
     else:
