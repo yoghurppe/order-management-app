@@ -314,10 +314,10 @@ elif mode == "order_ai":
             "TEST": 1.5
         }
 
-        with st.spinner("🤖 発注AIが計算をしています..."):
-            from datetime import date, timedelta
-            import math
+        from datetime import date, timedelta
+        import math
 
+        with st.spinner("🤖 発注AIが計算をしています..."):
             df_history = fetch_table("purchase_history")
             df_history["order_date"] = pd.to_datetime(df_history["order_date"], errors="coerce").dt.date
             today = date.today()
@@ -329,7 +329,6 @@ elif mode == "order_ai":
                 jan = row["jan"]
                 sold = row["quantity_sold"]
 
-                # 🔄 在庫引用元切替
                 if ai_mode == "JDモード":
                     stock_row = df_warehouse[df_warehouse["product_code"] == jan]
                     stock = stock_row["stock_available"].values[0] if not stock_row.empty else 0
@@ -342,7 +341,11 @@ elif mode == "order_ai":
                 rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
                 multiplier = rank_multiplier.get(rank, 1.0)
 
-                need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
+                # --- Aランクだけ 1.2 補正 ---
+                if rank == "Aランク":
+                    need_qty_raw = math.ceil(sold * multiplier * 1.2) - stock - ordered
+                else:
+                    need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
 
                 if stock <= 1 and sold >= 1 and need_qty_raw <= 0:
                     need_qty = 1
@@ -352,11 +355,13 @@ elif mode == "order_ai":
                 if jan in recent_jans:
                     continue
 
-                if rank in ["Aランク", "Bランク"]:
+                if rank == "Aランク":
+                    reorder_point = max(math.floor(sold * 1.0), 1)
+                elif rank == "Bランク":
                     reorder_point = max(math.floor(sold * 0.9), 1)
                 else:
                     reorder_point = max(math.floor(sold * 0.7), 1)
-                
+
                 current_total = stock + ordered
                 if current_total > reorder_point:
                     continue
@@ -369,21 +374,32 @@ elif mode == "order_ai":
                     continue
 
                 options = options[options["order_lot"] > 0]
-                options["diff"] = (options["order_lot"] - need_qty).abs()
 
-                smaller_lots = options[options["order_lot"] <= need_qty]
-                if not smaller_lots.empty:
-                    best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
-                else:
-                    near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.5) & (options["order_lot"] != 1)]
-                    if not near_lots.empty:
-                        best_option = near_lots.loc[near_lots["diff"].idxmin()]
+                if rank == "Aランク":
+                    bigger_lots = options[options["order_lot"] >= need_qty]
+                    if not bigger_lots.empty:
+                        best_option = bigger_lots.sort_values("order_lot", ascending=False).iloc[0]
                     else:
                         one_lot = options[options["order_lot"] == 1]
                         if not one_lot.empty:
                             best_option = one_lot.iloc[0]
                         else:
                             best_option = options.sort_values("order_lot").iloc[0]
+                else:
+                    options["diff"] = (options["order_lot"] - need_qty).abs()
+                    smaller_lots = options[options["order_lot"] <= need_qty]
+                    if not smaller_lots.empty:
+                        best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
+                    else:
+                        near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.5) & (options["order_lot"] != 1)]
+                        if not near_lots.empty:
+                            best_option = near_lots.loc[near_lots["diff"].idxmin()]
+                        else:
+                            one_lot = options[options["order_lot"] == 1]
+                            if not one_lot.empty:
+                                best_option = one_lot.iloc[0]
+                            else:
+                                best_option = options.sort_values("order_lot").iloc[0]
 
                 sets = math.ceil(need_qty / best_option["order_lot"])
                 qty = sets * best_option["order_lot"]
