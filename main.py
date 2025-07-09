@@ -1216,6 +1216,9 @@ elif mode == "rank_a_check":
     df_stock["商品コード"] = df_stock["product_code"].astype(str).str.strip()
     df_stock = df_stock.rename(columns={"stock_available": "在庫数"})
 
+    st.write("item_master サンプル:", df_a.head())
+    st.write("sales サンプル:", df_sales.head())
+
     # --- 2️⃣ 販売実績（30日） ---
     df_sales_30 = df_sales.groupby("商品コード", as_index=False)["quantity_sold"].sum().rename(
         columns={"quantity_sold": "販売実績（30日）"}
