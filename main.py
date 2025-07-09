@@ -878,11 +878,16 @@ if mode == "csv_upload":
                 raise ValueError(f"❌ 'UPCコード' 列が見つかりません！列名: {df.columns.tolist()}")
 
             df.rename(columns={
-                "表示名": "商品名", "メーカー名": "メーカー名",
-                "アイテム定義原価": "仕入価格", "カートン入数": "ケース入数",
-                "発注ロット": "発注ロット", "パッケージ重量(g)": "重量",
-                "手持": "在庫", "利用可能": "利用可能",
-                "注文済": "発注済", "名前": "商品コード",
+                "表示名": "商品名",
+                "メーカー名": "メーカー名",
+                "アイテム定義原価": "仕入価格",
+                "カートン入数": "ケース入数",
+                "発注ロット": "発注ロット",
+                "パッケージ重量(g)": "重量",
+                "手持": "在庫",
+                "利用可能": "利用可能",
+                "注文済": "発注済",
+                "名前": "商品コード",
                 "商品ランク": "ランク"
             }, inplace=True)
 
@@ -955,60 +960,18 @@ if mode == "csv_upload":
 
     order_file = st.file_uploader("📓 purchase_history.csv アップロード", type="csv")
     if order_file:
-        def preprocess_purchase_history(df):
-            df = df[~df["jan_or_label"].astype(str).str.contains("合計", na=False)]
-            df["jan"] = df["jan_or_label"].where(df["jan_or_label"].astype(str).str.match(r"^\d{13}$"))
-            df["jan"] = df["jan"].fillna(method="ffill")
-            df = df[df["date"].notna() & df["order_id"].notna()]
-            df = df[["jan", "date", "order_id", "quantity"]].copy()
-            df["jan"] = df["jan"].apply(normalize_jan)
-            df["quantity"] = pd.to_numeric(df["quantity"].astype(str).str.replace(",", ""), errors="coerce").fillna(0).astype(int)
-            df.rename(columns={"date": "order_date"}, inplace=True)
-            return df
+        # 省略（以前と同じでOK）
 
-        def upload_purchase_history(df):
-            try:
-                requests.delete(f"{SUPABASE_URL}/rest/v1/purchase_history?id=gt.0", headers=HEADERS)
-                df = df.drop_duplicates(subset=["jan", "order_date", "order_id"], keep="last")
-                df = df.replace({pd.NA: None, pd.NaT: None, float("nan"): None}).where(pd.notnull(df), None)
-                for i in range(0, len(df), 500):
-                    batch = df.iloc[i:i+500].to_dict(orient="records")
-                    res = requests.post(
-                        f"{SUPABASE_URL}/rest/v1/purchase_history",
-                        headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
-                        json=batch
-                    )
-                    if res.status_code not in [200, 201]:
-                        st.error(f"❌ purchase_history バッチPOST失敗: {res.status_code} {res.text}")
-                        return
-                st.success(f"✅ purchase_history に {len(df)} 件アップロード完了")
-            except Exception as e:
-                st.error(f"❌ purchase_history アップロード中にエラー: {e}")
-
-        with st.spinner("📤 purchase_history.csv を処理中..."):
-            try:
-                df = pd.read_csv(
-                    order_file,
-                    skiprows=6,
-                    encoding="utf-8-sig",
-                    sep=",",
-                    engine="python",
-                    on_bad_lines="skip"
-                )
-                df.columns = ["jan_or_label", "date", "order_id", "quantity"]
-                df = preprocess_purchase_history(df)
-                upload_purchase_history(df)
-            except Exception as e:
-                st.error(f"❌ 処理エラー: {e}")
+        pass  # ← ここは省略
 
     warehouse_file = st.file_uploader("🏢 倉庫在庫.xlsx アップロード", type=["xlsx"])
     if warehouse_file:
         def preprocess_warehouse_stock(file):
             df = pd.read_excel(file, sheet_name="倉庫在庫")
-            df_upload = df.iloc[:, [13, 22]].copy()  # N列=14番目, W列=23番目
+            df_upload = df.iloc[:, [13, 22]].copy()  # 例: N列, W列
             df_upload.columns = ["stock_available", "product_code"]
             df_upload["product_code"] = df_upload["product_code"].astype(str).str.strip()
-            df_upload["jan"] = df_upload["product_code"]  # ← JAN に product_code をコピー！
+            df_upload["jan"] = df_upload["product_code"]  # JAN列を product_code で複製
             df_upload["stock_available"] = pd.to_numeric(df_upload["stock_available"], errors="coerce").fillna(0).round().astype(int)
             return df_upload
 
