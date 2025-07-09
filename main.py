@@ -1369,12 +1369,16 @@ elif mode == "difficult_items":
                 st.error(f"登録失敗: {res.text}")
 
     df_history = fetch_table("difficult_items_history")
+    
     if not df_history.empty:
-        one_week_ago = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).replace(tzinfo=None) - datetime.timedelta(days=7)
-        df_history["action_at"] = pd.to_datetime(df_history["action_at"], utc=True).dt.tz_localize(None)
+        one_week_ago = datetime.datetime.now(ZoneInfo("Asia/Tokyo")) - datetime.timedelta(days=7)
+        df_history["action_at"] = pd.to_datetime(df_history["action_at"], utc=True)
         df_history = df_history[df_history["action_at"] >= one_week_ago]
+    
+        # 🔥 JSTに変換
+        df_history["action_at"] = df_history["action_at"].dt.tz_convert("Asia/Tokyo")
         df_history["action_at"] = df_history["action_at"].dt.strftime("%Y-%m-%d %H:%M:%S")
-
+    
         st.write("📜 **履歴（直近7日分）**")
         st.dataframe(df_history, use_container_width=True)
     else:
