@@ -1273,27 +1273,36 @@ elif mode == "difficult_items":
     if not df.empty:
         df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
         df["updated_at"] = pd.to_datetime(df["updated_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
+        df["選択"] = False
 
         st.write("### 📋 現在の入荷困難リスト")
 
-        selected_ids = []
-        for i, row in df.iterrows():
-            checked = st.checkbox(
-                f"[ID:{row['id']}] {row['item_key']} | {row['reason']} | {row['note']}",
-                key=f"cb_{row['id']}"
-            )
-            if checked:
-                selected_ids.append(row['id'])
+        edited_df = st.data_editor(
+            df,
+            use_container_width=True,
+            num_rows="dynamic",
+            column_config={
+                "選択": st.column_config.CheckboxColumn("選択")
+            },
+            disabled=[
+                "id", "item_key", "reason", "note", "created_at", "updated_at"
+                # ← 選択だけは disabled にしない！
+            ]
+        )
 
+        selected_df = edited_df[edited_df["選択"]]
+        selected_ids = selected_df["id"].tolist()
         st.write("✅ 選択ID:", selected_ids)
 
         if st.button("✅ 選択した行を削除"):
             if selected_ids:
                 for _id in selected_ids:
-                    record = df[df["id"] == _id].to_dict(orient="records")[0]
+                    record = selected_df[selected_df["id"] == _id].to_dict(orient="records")[0]
 
                     record["item_id"] = record["id"]
                     record.pop("id")
+                    record.pop("created_at", None)
+                    record.pop("updated_at", None)
                     record["action"] = "delete"
                     record["action_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
 
@@ -1340,6 +1349,8 @@ elif mode == "difficult_items":
                 record = res.json()[0]
                 record["item_id"] = record["id"]
                 record.pop("id")
+                record.pop("created_at", None)
+                record.pop("updated_at", None)
                 record["action"] = "insert"
                 record["action_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
 
