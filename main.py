@@ -1236,17 +1236,28 @@ elif mode == "rank_a_check":
         .merge(df_stock, on="商品コード", how="left")
     )
 
-    df_merged["販売実績（7日）"] = None
-    df_merged["在庫数"] = df_merged["在庫数"].fillna(0)
-    df_merged["販売実績（30日）"] = df_merged["販売実績（30日）"].fillna(0)
-
+    df_merged = (
+        df_a
+        .merge(df_sales_30, on="商品コード", how="left")
+        .merge(df_sales_latest, on="商品コード", how="left")
+        .merge(df_stock, on="商品コード", how="left")
+    )
+    
+    # 🔑 ← ここにすぐ置く
     if "発注済" not in df_merged.columns:
         df_merged["発注済"] = 0
     else:
         df_merged["発注済"] = df_merged["発注済"].fillna(0)
-
+    
+    # 他の fillna はこれの後でOK
+    df_merged["在庫数"] = df_merged["在庫数"].fillna(0)
+    df_merged["販売実績（30日）"] = df_merged["販売実績（30日）"].fillna(0)
+    df_merged["販売実績（7日）"] = None  # ←仮
+    
+    # 以下、アラート計算など続き
     df_merged["発注アラート1.0"] = df_merged["販売実績（30日）"] < (df_merged["在庫数"] + df_merged["発注済"])
     df_merged["発注アラート1.2"] = (df_merged["販売実績（30日）"] * 1.2) < (df_merged["在庫数"] + df_merged["発注済"])
+
 
     check_1_0 = st.checkbox("✅ 発注アラート1.0のみ表示", value=False)
     check_1_2 = st.checkbox("✅ 発注アラート1.2のみ表示", value=False)
