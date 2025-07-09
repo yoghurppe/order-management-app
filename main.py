@@ -1297,9 +1297,8 @@ elif mode == "difficult_items":
         # ✅ ボタン無効化管理
         delete_btn_disabled = False
 
-        if st.button("✅ 選択した行を削除", disabled=delete_btn_disabled):
+        if st.button("✅ 選択した行を削除"):
             if selected_ids:
-                delete_btn_disabled = True  # 押されたら無効化
                 for _id in selected_ids:
                     record = df[df["id"] == _id].copy().to_dict(orient="records")[0]
                     record.pop("選択", None)
@@ -1309,20 +1308,20 @@ elif mode == "difficult_items":
                     record.pop("id")
                     record["action"] = "delete"
                     record["action_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
-
+        
                     res1 = requests.post(
                         f"{SUPABASE_URL}/rest/v1/difficult_items_history",
                         headers={**HEADERS, "Prefer": "return=representation"},
                         json=record
                     )
                     st.write("履歴POST:", res1.status_code, res1.text)
-
+        
                     res2 = requests.delete(
                         f"{SUPABASE_URL}/rest/v1/difficult_items?id=eq.{_id}",
                         headers=HEADERS
                     )
                     st.write("削除DELETE:", res2.status_code, res2.text)
-
+        
                 st.success("✅ 削除完了！")
                 st.rerun()
             else:
