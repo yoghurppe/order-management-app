@@ -1258,28 +1258,45 @@ elif mode == "rank_a_check":
 elif mode == "difficult_items":
     st.subheader("🚫 入荷困難商品モード")
 
-    # Supabase情報
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-    HEADERS = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    # データ取得関数
-    def fetch_table(table_name):
-        url = f"{SUPABASE_URL}/rest/v1/{table_name}?select=*"
-        res = requests.get(url, headers=HEADERS)
-        if res.status_code == 200:
-            return pd.DataFrame(res.json())
-        else:
-            st.error(f"データ取得失敗: {res.text}")
-            return pd.DataFrame()
-
     # データ取得
     df = fetch_table("difficult_items")
-    st.write("📋 現在の入荷困難リスト", df)
+    if not df.empty:
+        # フォーマット
+        df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
+        df["updated_at"] = pd.to_datetime(df["updated_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
+
+        # 選択列を追加
+        df["選択"] = False
+
+        edited_df = st.data_editor(
+            df,
+            use_container_width=True,
+            num_rows="dynamic",
+            column_config={
+                "選択": st.column_config.CheckboxColumn("選択")
+            }
+        )
+
+        # チェックされたIDを取得
+        selected_ids = edited_df[edited_df["選択"]]["id"].tolist()
+
+        if selected_ids:
+            if st.button("✅ 選択した行を削除"):
+                for _id in selected_ids:
+                    # 削除前に履歴テーブルに追加
+                    record = df[df["id"] == _id].to_dict(orient="records")[0]
+                    requests.post(
+                        f"{SUPABASE_URL}/rest/v1/difficult_items_history",
+                        headers={**HEADERS, "Prefer": "return=representation"},
+                        json=record
+                    )
+                    # 本体から削除
+                    requests.delete(
+                        f"{SUPABASE_URL}/rest/v1/difficult_items?id=eq.{_id}",
+                        headers=HEADERS
+                    )
+                st.success("削除完了！")
+                st.rerun()
 
     # 新規登録フォーム
     with st.form("add_difficult_item"):
@@ -1306,15 +1323,3 @@ elif mode == "difficult_items":
                 st.rerun()
             else:
                 st.error(f"登録失敗: {res.text}")
-
-    # 削除
-    if not df.empty:
-        selected = st.multiselect("🗑️ 削除するIDを選択", df["id"].tolist())
-        if st.button("選択した行を削除"):
-            for _id in selected:
-                res = requests.delete(
-                    f"{SUPABASE_URL}/rest/v1/difficult_items?id=eq.{_id}",
-                    headers=HEADERS
-                )
-            st.success("✅ 削除しました！")
-            st.experimental_rerun()
