@@ -1358,11 +1358,13 @@ elif mode == "difficult_items":
     df_history = fetch_table("difficult_items_history")
 
     if not df_history.empty:
+        # 直近7日
         one_week_ago = datetime.datetime.now() - datetime.timedelta(days=7)
     
-        # ← ここ！df_history に再代入が重要！
-        df_history["action_at"] = pd.to_datetime(df_history["action_at"], errors="coerce")
+        # 文字列 → datetime, UTC → tzなし
+        df_history["action_at"] = pd.to_datetime(df_history["action_at"], utc=True).dt.tz_localize(None)
     
+        # 比較
         df_history = df_history[df_history["action_at"] >= one_week_ago]
     
         df_history["action_at"] = df_history["action_at"].dt.strftime("%Y-%m-%d %H:%M:%S")
