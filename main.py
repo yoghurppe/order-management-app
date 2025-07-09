@@ -1247,12 +1247,15 @@ elif mode == "rank_a_check":
         .merge(df_stock[["商品コード", "在庫数"]], on="商品コード", how="left")
     )
     
+    # 🚨 必ず発注済カラムを作る
+    if "発注済" not in df_merged.columns:
+        df_merged["発注済"] = 0
+    
     # 7️⃣ 欠損補完
     df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
     df_merged["実績（30日）"] = df_merged["実績（30日）"].fillna(0)
     df_merged["在庫数"] = df_merged["在庫数"].fillna(0)
     df_merged["実績（7日）"] = None
-
 
     # --- 8️⃣ アラート条件
     df_merged["発注アラート1.0"] = df_merged["実績（30日）"] > (df_merged["在庫数"] + df_merged["発注済"])
