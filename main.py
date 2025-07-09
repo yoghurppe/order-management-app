@@ -1258,6 +1258,8 @@ elif mode == "rank_a_check":
 
 
 
+from zoneinfo import ZoneInfo
+
 elif mode == "difficult_items":
     st.subheader("🚫 入荷困難商品モード")
 
@@ -1269,36 +1271,32 @@ elif mode == "difficult_items":
         "Content-Type": "application/json"
     }
 
+    # データ取得
     df = fetch_table("difficult_items")
     if not df.empty:
         df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
         df["updated_at"] = pd.to_datetime(df["updated_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
-        df["選択"] = False
 
-        edited_df = st.data_editor(
-            df,
-            use_container_width=True,
-            num_rows="dynamic",
-            column_config={
-                "選択": st.column_config.CheckboxColumn("選択")
-            },
-            disabled=["id", "item_key", "reason", "note", "created_at", "updated_at"]  # ← 「選択」は外す！
-        )
+        st.write("### 📋 現在の入荷困難リスト")
 
-        # ✅ ここで必ず edited_df で判断！
-        selected_df = edited_df[edited_df["選択"]]
-        selected_ids = selected_df["id"].tolist()
-        st.write("選択ID:", selected_ids)
+        selected_ids = []
+        for i, row in df.iterrows():
+            checked = st.checkbox(
+                f"[ID:{row['id']}] {row['item_key']} | {row['reason']} | {row['note']}",
+                key=f"cb_{row['id']}"
+            )
+            if checked:
+                selected_ids.append(row['id'])
+
+        st.write("✅ 選択ID:", selected_ids)
 
         if st.button("✅ 選択した行を削除"):
             if selected_ids:
                 for _id in selected_ids:
-                    record = selected_df[selected_df["id"] == _id].to_dict(orient="records")[0]
+                    record = df[df["id"] == _id].to_dict(orient="records")[0]
 
                     record["item_id"] = record["id"]
                     record.pop("id")
-                    record.pop("created_at", None)
-                    record.pop("updated_at", None)
                     record["action"] = "delete"
                     record["action_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
 
@@ -1309,18 +1307,18 @@ elif mode == "difficult_items":
                     )
                     st.write("履歴POST:", res1.status_code, res1.text)
 
-                    _id = int(_id)
                     res2 = requests.delete(
                         f"{SUPABASE_URL}/rest/v1/difficult_items?id=eq.{_id}",
                         headers=HEADERS
                     )
                     st.write("削除DELETE:", res2.status_code, res2.text)
 
-                st.success("削除完了！")
+                st.success("✅ 削除完了！")
                 st.rerun()
             else:
                 st.warning("⚠️ 行が選択されていません")
 
+    # 新規登録フォーム
     with st.form("add_difficult_item"):
         item_key = st.text_input("ブランド / 商品名 / JAN など")
         reason = st.text_input("入荷困難理由")
@@ -1345,8 +1343,6 @@ elif mode == "difficult_items":
                 record = res.json()[0]
                 record["item_id"] = record["id"]
                 record.pop("id")
-                record.pop("created_at", None)
-                record.pop("updated_at", None)
                 record["action"] = "insert"
                 record["action_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
 
@@ -1362,8 +1358,8 @@ elif mode == "difficult_items":
             else:
                 st.error(f"登録失敗: {res.text}")
 
+    # 履歴表示
     df_history = fetch_table("difficult_items_history")
-
     if not df_history.empty:
         one_week_ago = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).replace(tzinfo=None) - datetime.timedelta(days=7)
         df_history["action_at"] = pd.to_datetime(df_history["action_at"], utc=True).dt.tz_localize(None)
