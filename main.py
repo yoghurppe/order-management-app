@@ -480,7 +480,6 @@ elif mode == "search_item":
         "Content-Type": "application/json"
     }
 
-    # ✅ バッチ取得（既存）
     def fetch_item_master():
         headers = {**HEADERS, "Prefer": "count=exact"}
         dfs = []
@@ -497,25 +496,53 @@ elif mode == "search_item":
             offset += limit
         return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
+    def fetch_warehouse_stock():
+        headers = {**HEADERS, "Prefer": "count=exact"}
+        dfs = []
+        offset, limit = 0, 1000
+        while True:
+            url = f"{SUPABASE_URL}/rest/v1/warehouse_stock?select=*&offset={offset}&limit={limit}"
+            res = requests.get(url, headers=headers)
+            if res.status_code == 416 or not res.json():
+                break
+            if res.status_code not in [200, 206]:
+                st.error(f"warehouse_stock の取得に失敗: {res.status_code} / {res.text}")
+                return pd.DataFrame()
+            dfs.append(pd.DataFrame(res.json()))
+            offset += limit
+        return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
     df_master = fetch_item_master()
+    df_warehouse = fetch_warehouse_stock()
+
     if df_master.empty:
         st.warning("商品情報データベースにデータが存在しません。")
         st.stop()
 
-    df_master["jan"]       = df_master["jan"].astype(str)
+    df_master["jan"] = df_master["jan"].astype(str)
     df_master["商品コード"] = df_master["商品コード"].astype(str)
-    df_master["商品名"]     = df_master["商品名"].astype(str)
+    df_master["商品名"] = df_master["商品名"].astype(str)
 
-    # ---------- 🔍 検索 UI ----------
+    df_warehouse["product_code"] = df_warehouse["product_code"].astype(str)
+    df_warehouse["stock_available"] = pd.to_numeric(df_warehouse["stock_available"], errors="coerce").fillna(0).astype(int)
+    df_warehouse["stock_total"] = pd.to_numeric(df_warehouse["stock_total"], errors="coerce").fillna(0).astype(int)
+
+    df_master = df_master.merge(
+        df_warehouse[["product_code", "stock_total", "stock_available"]],
+        left_on="jan", right_on="product_code",
+        how="left"
+    )
+    df_master["在庫"] = df_master["stock_total"].fillna(0).astype(int)
+    df_master["利用可能"] = df_master["stock_available"].fillna(0).astype(int)
+
     col1, col2 = st.columns(2)
-
     with col1:
         keyword_name = st.text_input(TEXT[language]["search_keyword"], "")
         keyword_code = st.text_input(TEXT[language]["search_code"], "")
 
     with col2:
         jan_filter_multi = st.text_area(
-            TEXT[language]["multi_jan"],                # ←動的ラベル
+            TEXT[language]["multi_jan"],
             placeholder="例:\n4901234567890\n4987654321098",
             height=120,
         )
@@ -533,44 +560,26 @@ elif mode == "search_item":
         [TEXT[language]["all"]] + sorted(df_master["取扱区分"].dropna().unique())
     )
 
-    # ---------- 🧹 フィルタリング ----------
     import re
-
-    # ① 複数 JAN リストを整形
     jan_list = [j.strip() for j in re.split(r"[,\n\r]+", jan_filter_multi) if j.strip()]
-
     df_view = df_master.copy()
 
-    # 複数 JAN が最優先
     if jan_list:
         df_view = df_view[df_view["jan"].isin(jan_list)]
-
-    # 単一キーワード（商品コード／JAN 部分一致）
     elif keyword_code:
         df_view = df_view[
             df_view["商品コード"].str.contains(keyword_code, case=False, na=False) |
             df_view["jan"].str.contains(keyword_code, case=False, na=False)
         ]
-
-    # 商品名キーワード
     if keyword_name:
-        df_view = df_view[
-            df_view["商品名"].str.contains(keyword_name, case=False, na=False)
-        ]
-
-    # メーカー
+        df_view = df_view[df_view["商品名"].str.contains(keyword_name, case=False, na=False)]
     if maker_filter != TEXT[language]["all"]:
         df_view = df_view[df_view["メーカー名"] == maker_filter]
-
-    # ランク
     if rank_filter != TEXT[language]["all"]:
         df_view = df_view[df_view["ランク"] == rank_filter]
-
-    # 取扱区分
     if type_filter != TEXT[language]["all"]:
         df_view = df_view[df_view["取扱区分"] == type_filter]
 
-    # ---------- 📋 一覧表示 ----------
     view_cols = [
         "商品コード", "jan", "ランク", "メーカー名", "商品名", "取扱区分",
         "在庫", "利用可能", "発注済", "仕入価格", "ケース入数", "発注ロット", "重量"
@@ -583,26 +592,19 @@ elif mode == "search_item":
         .rename(columns=COLUMN_NAMES[language])
     )
 
-    #️⃣ 追加: 件数カウント
     row_count = len(display_df)
-
-    #️⃣ 追加: ヘッダー行を左右 2 カラムで表示
-    h_left, h_right = st.columns([1, 0.15])        # 右側を少し細く
+    h_left, h_right = st.columns([1, 0.15])
     h_left.subheader(TEXT[language]["product_list"])
-    # HTMLで右寄せ & 同行内表示
     h_right.markdown(
         f"<h4 style='text-align:right; margin-top: 0.6em;'>{row_count:,}件</h4>",
         unsafe_allow_html=True
     )
 
-    # ✏️ 変更: ↓ 旧 subheader 行は不要なのでコメントアウト or 削除
-    # st.subheader(TEXT[language]["product_list"])
-
     st.dataframe(display_df, use_container_width=True)
 
     csv = display_df.to_csv(index=False).encode("utf-8-sig")
     st.download_button(
-        "📥 CSVダウンロード",
+        "📅 CSVダウンロード",
         data=csv,
         file_name="item_master_filtered.csv",
         mime="text/csv",
