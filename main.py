@@ -525,7 +525,7 @@ elif mode == "search_item":
 
     df_warehouse["product_code"] = df_warehouse["product_code"].astype(str)
     df_warehouse["stock_available"] = pd.to_numeric(df_warehouse["stock_available"], errors="coerce").fillna(0).astype(int)
-    df_warehouse["stock_total"] = pd.to_numeric(df_warehouse["stock_total"], errors="coerce").fillna(0).astype(int)
+    df_warehouse["stock_total"] = df_warehouse["stock_available"]  # stock_total がなければ同じ値を代入
 
     df_master = df_master.merge(
         df_warehouse[["product_code", "stock_total", "stock_available"]],
@@ -609,8 +609,6 @@ elif mode == "search_item":
         file_name="item_master_filtered.csv",
         mime="text/csv",
     )
-
-
 
 elif mode == "purchase_history":
     st.subheader("📜 発注履歴")
