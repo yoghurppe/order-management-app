@@ -249,7 +249,6 @@ if mode == "home":
 elif mode == "order_ai":
     st.subheader("📦 発注AIモード")
 
-    # 🔵 モード切替
     ai_mode = st.radio("発注AIモードを選択", ["通常モード", "JDモード"], index=0)
 
     if st.button("🤖 計算を開始する"):
@@ -307,12 +306,21 @@ elif mode == "order_ai":
 
         df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
         df_sales["stock_available"] = pd.to_numeric(df_sales["stock_available"], errors="coerce").fillna(0).astype(int)
-        df_sales["stock_ordered"] = pd.to_numeric(df_sales["stock_ordered"], errors="coerce").fillna(0).astype(int)
+
+        # 🔄 item_master から発注済をマージ
+        df_master["発注済"] = pd.to_numeric(df_master["発注済"], errors="coerce").fillna(0).astype(int)
+        df_sales = df_sales.merge(
+            df_master[["jan", "発注済"]],
+            on="jan",
+            how="left"
+        )
+        df_sales["発注済"] = df_sales["発注済"].fillna(0).astype(int)
+
         df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
         df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
         rank_multiplier = {
-            "Aランク": 1.0,  # 実際は使わない
+            "Aランク": 1.0,
             "Bランク": 1.2,
             "Cランク": 1.0,
             "TEST": 1.5
@@ -339,13 +347,12 @@ elif mode == "order_ai":
                 else:
                     stock = row.get("stock_available", 0)
 
-                ordered = row.get("stock_ordered", 0)
+                ordered = row["発注済"]
 
                 rank_row = df_master[df_master["jan"] == jan]
                 rank = rank_row["ランク"].values[0] if not rank_row.empty and "ランク" in rank_row else ""
                 multiplier = rank_multiplier.get(rank, 1.0)
 
-                # ✅ Aランクは在庫・発注済を引かず実績×1.2
                 if rank == "Aランク":
                     if (stock + ordered) < sold:
                         need_qty_raw = math.ceil(sold * 1.2)
@@ -354,7 +361,6 @@ elif mode == "order_ai":
                 else:
                     need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
 
-                # 在庫が少なくて実績ある場合の救済
                 if stock <= 1 and sold >= 1 and need_qty_raw <= 0:
                     need_qty = 1
                 else:
@@ -373,14 +379,12 @@ elif mode == "order_ai":
                 current_total = stock + ordered
                 if current_total > reorder_point:
                     continue
-
                 if need_qty <= 0:
                     continue
 
                 options = df_purchase[df_purchase["jan"] == jan].copy()
                 if options.empty:
                     continue
-
                 options = options[options["order_lot"] > 0]
 
                 if rank == "Aランク":
@@ -405,7 +409,6 @@ elif mode == "order_ai":
                             else:
                                 best_option = options.sort_values("order_lot").iloc[0]
 
-                # ✅ Aランクはフル数量をロットで丸める
                 if rank == "Aランク":
                     sets = math.ceil(need_qty_raw / best_option["order_lot"])
                 else:
@@ -430,25 +433,19 @@ elif mode == "order_ai":
 
             if results:
                 result_df = pd.DataFrame(results)
-
                 df_master["商品コード"] = df_master["商品コード"].astype(str).str.strip()
                 result_df["jan"] = result_df["jan"].astype(str).str.strip()
-
                 df_temp = df_master[["商品コード", "商品名", "取扱区分"]].copy()
                 df_temp.rename(columns={"商品コード": "jan"}, inplace=True)
-
                 result_df = pd.merge(result_df, df_temp, on="jan", how="left")
-
                 if "商品名" in result_df.columns:
                     result_df = result_df[result_df["商品名"].notna()]
                 if "取扱区分" in result_df.columns:
                     result_df = result_df[result_df["取扱区分"] != "取扱中止"]
                 else:
                     st.warning("⚠️『取扱区分』列が存在しません。")
-
                 column_order = ["jan", "商品名", "ランク", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
                 result_df = result_df[[col for col in column_order if col in result_df.columns]]
-
                 st.success(f"✅ 発注対象: {len(result_df)} 件")
                 st.dataframe(result_df)
 
