@@ -582,7 +582,7 @@ elif mode == "search_item":
 
     view_cols = [
         "商品コード", "jan", "ランク", "メーカー名", "商品名", "取扱区分",
-        "在庫", "利用可能", "発注済", "仕入価格", "ケース入数", "発注ロット", "重量"
+        "在庫", "発注済", "仕入価格", "ケース入数", "発注ロット", "重量"
     ]
     available_cols = [c for c in view_cols if c in df_view.columns]
 
