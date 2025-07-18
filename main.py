@@ -306,15 +306,20 @@ elif mode == "order_ai":
 
         df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
         df_sales["stock_available"] = pd.to_numeric(df_sales["stock_available"], errors="coerce").fillna(0).astype(int)
-
-        # 🔄 item_master から発注済をマージ
         df_master["発注済"] = pd.to_numeric(df_master["発注済"], errors="coerce").fillna(0).astype(int)
-        df_sales = df_sales.merge(
-            df_master[["jan", "発注済"]],
-            on="jan",
-            how="left"
-        )
-        df_sales["発注済"] = df_sales["発注済"].fillna(0).astype(int)
+
+        # 🔄 発注済を「上海」memoで修正
+        df_history["quantity"] = pd.to_numeric(df_history["quantity"], errors="coerce").fillna(0).astype(int)
+        df_history["memo"] = df_history["memo"].astype(str).fillna("")
+        df_shanghai = df_history[df_history["memo"].str.contains("上海", na=False)]
+        df_shanghai_grouped = df_shanghai.groupby("jan")["quantity"].sum().reset_index(name="shanghai_quantity")
+        df_master = df_master.merge(df_shanghai_grouped, on="jan", how="left")
+        df_master["shanghai_quantity"] = df_master["shanghai_quantity"].fillna(0).astype(int)
+        df_master["発注済_修正後"] = (df_master["発注済"] - df_master["shanghai_quantity"]).clip(lower=0)
+
+        df_sales.drop(columns=["発注済"], errors="ignore", inplace=True)
+        df_sales = df_sales.merge(df_master[["jan", "発注済", "発注済_修正後"]], on="jan", how="left")
+        df_sales["発注済"] = df_sales["発注済_修正後"].fillna(0).astype(int)
 
         df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
         df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
@@ -464,7 +469,6 @@ elif mode == "order_ai":
                     )
             else:
                 st.info("現在、発注が必要な商品はありません。")
-
 
 
 
