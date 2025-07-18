@@ -296,7 +296,6 @@ elif mode == "order_ai":
 
         df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
         df_sales["stock_available"] = pd.to_numeric(df_sales["stock_available"], errors="coerce").fillna(0).astype(int)
-
         df_master["発注済"] = pd.to_numeric(df_master["発注済"], errors="coerce").fillna(0).astype(int)
 
         # 🔄 発注済を「上海」memoで修正
@@ -316,7 +315,7 @@ elif mode == "order_ai":
         df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce").fillna(0)
 
         rank_multiplier = {
-            "Aランク": 1.0,
+            "Aランク": 1.5,
             "Bランク": 1.2,
             "Cランク": 1.0,
             "TEST": 1.5
@@ -333,13 +332,6 @@ elif mode == "order_ai":
         results = []
         for _, row in df_sales.iterrows():
             jan = row["jan"]
-            if jan == "4901301306876":
-                st.write("🧪 デバッグ対象 JAN:", jan)
-                st.write("販売実績:", row["quantity_sold"])
-                st.write("在庫:", row.get("stock_available", 0))
-                st.write("発注済（上海除外後）:", row["発注済"])
-                st.write("recent_jans:", recent_jans)
-            jan = row["jan"]
             sold = row["quantity_sold"]
             stock = row.get("stock_available", 0)
             ordered = row["発注済"]
@@ -348,13 +340,7 @@ elif mode == "order_ai":
             rank = master_row["ランク"].values[0] if not master_row.empty and "ランク" in master_row else ""
             multiplier = rank_multiplier.get(rank, 1.0)
 
-            if rank == "Aランク":
-                if (stock + ordered) < sold:
-                    need_qty_raw = math.ceil(sold * 1.2)
-                else:
-                    need_qty_raw = 0
-            else:
-                need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
+            need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
 
             if stock <= 1 and sold >= 1 and need_qty_raw <= 0:
                 need_qty = 1
@@ -365,11 +351,7 @@ elif mode == "order_ai":
                 continue
 
             if rank == "Aランク":
-                reorder_point = max(math.floor(sold * 1.0), 1)
-            if jan == "4901301306876":
-                st.write("理論必要数:", need_qty)
-                st.write("reorder_point:", reorder_point)
-                st.write("current_total:", stock + ordered)
+                reorder_point = max(math.floor(sold * 0.9), 1)
             elif rank == "Bランク":
                 reorder_point = max(math.floor(sold * 0.9), 1)
             else:
@@ -386,29 +368,22 @@ elif mode == "order_ai":
                 continue
             options = options[options["order_lot"] > 0]
 
-            if rank == "Aランク":
-                bigger_lots = options[options["order_lot"] >= need_qty]
-                if not bigger_lots.empty:
-                    best_option = bigger_lots.sort_values("order_lot", ascending=False).iloc[0]
-                else:
-                    best_option = options.sort_values("order_lot", ascending=False).iloc[0]
+            options["diff"] = (options["order_lot"] - need_qty).abs()
+            smaller_lots = options[options["order_lot"] <= need_qty]
+            if not smaller_lots.empty:
+                best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
             else:
-                options["diff"] = (options["order_lot"] - need_qty).abs()
-                smaller_lots = options[options["order_lot"] <= need_qty]
-                if not smaller_lots.empty:
-                    best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
+                near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.5) & (options["order_lot"] != 1)]
+                if not near_lots.empty:
+                    best_option = near_lots.loc[near_lots["diff"].idxmin()]
                 else:
-                    near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.5) & (options["order_lot"] != 1)]
-                    if not near_lots.empty:
-                        best_option = near_lots.loc[near_lots["diff"].idxmin()]
+                    one_lot = options[options["order_lot"] == 1]
+                    if not one_lot.empty:
+                        best_option = one_lot.iloc[0]
                     else:
-                        one_lot = options[options["order_lot"] == 1]
-                        if not one_lot.empty:
-                            best_option = one_lot.iloc[0]
-                        else:
-                            best_option = options.sort_values("order_lot").iloc[0]
+                        best_option = options.sort_values("order_lot").iloc[0]
 
-            sets = math.ceil((need_qty_raw if rank == "Aランク" else need_qty) / best_option["order_lot"])
+            sets = math.ceil(need_qty / best_option["order_lot"])
             qty = sets * best_option["order_lot"]
             total_cost = qty * best_option["price"]
 
@@ -418,7 +393,7 @@ elif mode == "order_ai":
                 "在庫": stock,
                 "発注済（修正前）": master_row["発注済"].values[0] if not master_row.empty else 0,
                 "発注済（上海除外後）": ordered,
-                "理論必要数": need_qty_raw if rank == "Aランク" else need_qty,
+                "理論必要数": need_qty,
                 "発注数": qty,
                 "ロット": best_option["order_lot"],
                 "数量": round(qty / best_option["order_lot"], 2),
