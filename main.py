@@ -1194,10 +1194,25 @@ elif mode == "rank_a_check":
     df_item = fetch_table("item_master")
     df_sales = fetch_table("sales")
     df_stock = fetch_table("warehouse_stock")
+    df_history = fetch_table("purchase_history")
 
-    if df_item.empty or df_sales.empty or df_stock.empty:
+    if df_item.empty or df_sales.empty or df_stock.empty or df_history.empty:
         st.warning("必要なテーブルが空です")
         st.stop()
+
+    # 🔄 上海メモを含む発注数量を差し引いた発注済を作成
+    df_history["quantity"] = pd.to_numeric(df_history["quantity"], errors="coerce").fillna(0).astype(int)
+    df_history["memo"] = df_history["memo"].astype(str).fillna("")
+    df_history["jan"] = df_history["jan"].astype(str).str.strip()
+
+    df_shanghai = df_history[df_history["memo"].str.contains("上海", na=False)]
+    df_shanghai_grouped = df_shanghai.groupby("jan")["quantity"].sum().reset_index(name="shanghai_quantity")
+
+    df_item["発注済"] = pd.to_numeric(df_item["発注済"], errors="coerce").fillna(0).astype(int)
+    df_item["jan"] = df_item["jan"].astype(str).str.strip()
+    df_item = df_item.merge(df_shanghai_grouped, on="jan", how="left")
+    df_item["shanghai_quantity"] = df_item["shanghai_quantity"].fillna(0).astype(int)
+    df_item["発注済"] = (df_item["発注済"] - df_item["shanghai_quantity"]).clip(lower=0)
 
     # 1️⃣ Aランクのみ + JAN 必須
     df_a = df_item[(df_item["ランク"] == "Aランク") & (df_item["jan"].notnull())].copy()
@@ -1262,6 +1277,7 @@ elif mode == "rank_a_check":
         "発注アラート1.0",
         "発注アラート1.2"
     ]])
+
 
 
 elif mode == "difficult_items":
