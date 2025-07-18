@@ -434,6 +434,8 @@ elif mode == "order_ai":
                     "jan": jan,
                     "販売実績": sold,
                     "在庫": stock,
+                    "発注済（修正前）": master_row["発注済"].values[0] if not master_row.empty else 0,  # ← 追加①
+                    "発注済（上海除外後）": ordered,  # ← 追加②
                     "発注済": ordered,
                     "理論必要数": need_qty_raw if rank == "Aランク" else need_qty,
                     "発注数": qty,
@@ -458,7 +460,11 @@ elif mode == "order_ai":
                     result_df = result_df[result_df["取扱区分"] != "取扱中止"]
                 else:
                     st.warning("⚠️『取扱区分』列が存在しません。")
-                column_order = ["jan", "商品名", "ランク", "販売実績", "在庫", "発注済", "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
+                column_order = [
+                    "jan", "商品名", "ランク", "販売実績", "在庫",
+                    "発注済（修正前）", "発注済（上海除外後）",  # ← 追加
+                    "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"
+                ]
                 result_df = result_df[[col for col in column_order if col in result_df.columns]]
                 st.success(f"✅ 発注対象: {len(result_df)} 件")
                 st.dataframe(result_df)
