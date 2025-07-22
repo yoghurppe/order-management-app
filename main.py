@@ -203,6 +203,10 @@ MODE_KEYS = {
         "日本語": "🅰️ Aランク商品確認",
         "中文": "🅰️ A等级商品检查"
     },
+    "rank_a_check": {
+        "日本語": "🅱️ Bランク商品確認",
+        "中文": "🅱️ B等级商品检查"
+    },
     "purchase_history": {
         "日本語": "📜 発注履歴",
         "中文": "📜 订货记录"
@@ -1277,6 +1281,78 @@ elif mode == "rank_a_check":
         "発注アラート1.0",
         "発注アラート1.2"
     ]])
+
+
+elif mode == "rank_b_check":
+    st.subheader("🅱️ Bランク商品確認モード")
+
+    # データ取得
+    df_item = fetch_table("item_master")
+    df_sales = fetch_table("sales")
+    df_stock = fetch_table("warehouse_stock")
+
+    if df_item.empty or df_sales.empty or df_stock.empty:
+        st.warning("必要なテーブルが空です")
+        st.stop()
+
+    # 1️⃣ Bランクのみ + JANあり
+    df_b = df_item[(df_item["ランク"] == "Bランク") & (df_item["jan"].notnull())].copy()
+    df_b["JAN"] = df_b["jan"].astype(str).str.strip()
+
+    df_sales["JAN"] = df_sales["jan"].astype(str).str.strip()
+    df_stock["JAN"] = df_stock["product_code"].astype(str).str.strip()
+    df_stock = df_stock.rename(columns={"stock_available": "在庫数"})
+
+    # 2️⃣ 実績30日
+    df_sales_30 = (
+        df_sales.groupby("JAN", as_index=False)["quantity_sold"]
+        .sum()
+        .rename(columns={"quantity_sold": "実績（30日）"})
+    )
+
+    # 3️⃣ 発注済 → item_master から
+    df_item["JAN"] = df_item["jan"].astype(str).str.strip()
+    df_item_sub = df_item[["JAN", "発注済"]].copy()
+
+    # 4️⃣ マージ
+    df_merged = (
+        df_b
+        .merge(df_sales_30, on="JAN", how="left")
+        .merge(df_item_sub, on="JAN", how="left")
+        .merge(df_stock[["JAN", "在庫数"]], on="JAN", how="left")
+    )
+
+    # 5️⃣ 必須列の補完
+    df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
+    df_merged["実績（30日）"] = df_merged["実績（30日）"].fillna(0)
+    df_merged["在庫数"] = df_merged["在庫数"].fillna(0)
+
+    # 6️⃣ アラート判定
+    df_merged["発注アラート1.0"] = df_merged["実績（30日）"] > (df_merged["在庫数"] + df_merged["発注済"])
+    df_merged["発注アラート2.0"] = (df_merged["実績（30日）"] * 2.0) > (df_merged["在庫数"] + df_merged["発注済"])
+
+    # 7️⃣ フィルター
+    check_1_0 = st.checkbox("✅ 発注アラート1.0のみ表示", value=False, key="b_alert_1")
+    check_2_0 = st.checkbox("✅ 発注アラート2.0のみ表示", value=False, key="b_alert_2")
+
+    df_result = df_merged.copy()
+    if check_1_0:
+        df_result = df_result[df_result["発注アラート1.0"]]
+    if check_2_0:
+        df_result = df_result[df_result["発注アラート2.0"]]
+
+    # 8️⃣ 出力
+    st.dataframe(df_result[[
+        "JAN",
+        "商品名",
+        "ランク",
+        "実績（30日）",
+        "在庫数",
+        "発注済",
+        "発注アラート1.0",
+        "発注アラート2.0"
+    ]])
+
 
 
 
