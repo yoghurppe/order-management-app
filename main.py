@@ -539,7 +539,7 @@ elif mode == "search_item":
 
     df_warehouse["product_code"] = df_warehouse["product_code"].astype(str)
     df_warehouse["stock_available"] = pd.to_numeric(df_warehouse["stock_available"], errors="coerce").fillna(0).astype(int)
-    df_warehouse["stock_total"] = df_warehouse["stock_available"]  # stock_total がなければ同じ値を代入
+    df_warehouse["stock_total"] = df_warehouse["stock_available"]
 
     df_master = df_master.merge(
         df_warehouse[["product_code", "stock_total", "stock_available"]],
@@ -548,6 +548,10 @@ elif mode == "search_item":
     )
     df_master["在庫"] = df_master["stock_total"].fillna(0).astype(int)
     df_master["利用可能"] = df_master["stock_available"].fillna(0).astype(int)
+
+    # 新しい価格列の追加
+    df_master["仕入価格（実績）"] = pd.to_numeric(df_master["average_cost"], errors="coerce").fillna(0).astype(int)
+    df_master["仕入価格（最安）"] = pd.to_numeric(df_master["purchase_cost"], errors="coerce").fillna(0).astype(int)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -574,8 +578,7 @@ elif mode == "search_item":
         [TEXT[language]["all"]] + sorted(df_master["取扱区分"].dropna().unique())
     )
 
-    import re
-    jan_list = [j.strip() for j in re.split(r"[,\n\r]+", jan_filter_multi) if j.strip()]
+    jan_list = [j.strip() for j in re.split(r"[,\\n\\r]+", jan_filter_multi) if j.strip()]
     df_view = df_master.copy()
 
     if jan_list:
@@ -596,7 +599,7 @@ elif mode == "search_item":
 
     view_cols = [
         "商品コード", "jan", "ランク", "メーカー名", "商品名", "取扱区分",
-        "在庫", "発注済", "仕入価格", "ケース入数", "発注ロット", "重量"
+        "在庫", "発注済", "仕入価格（実績）", "仕入価格（最安）", "ケース入数", "発注ロット", "重量"
     ]
     available_cols = [c for c in view_cols if c in df_view.columns]
 
@@ -623,6 +626,7 @@ elif mode == "search_item":
         file_name="item_master_filtered.csv",
         mime="text/csv",
     )
+
 
 elif mode == "purchase_history":
     st.subheader("📜 発注履歴")
