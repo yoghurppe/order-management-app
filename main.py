@@ -550,8 +550,8 @@ elif mode == "search_item":
     df_master["利用可能"] = df_master["stock_available"].fillna(0).astype(int)
 
     # 新しい価格列の追加
-    df_master["仕入価格（実績）"] = pd.to_numeric(df_master["average_cost"], errors="coerce").fillna(0).astype(int)
-    df_master["仕入価格（最安）"] = pd.to_numeric(df_master["purchase_cost"], errors="coerce").fillna(0).astype(int)
+    df_master["実績原価"] = pd.to_numeric(df_master["average_cost"], errors="coerce").fillna(0).astype(int)
+    df_master["最安原価"] = pd.to_numeric(df_master["purchase_cost"], errors="coerce").fillna(0).astype(int)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -599,7 +599,7 @@ elif mode == "search_item":
 
     view_cols = [
         "商品コード", "jan", "ランク", "メーカー名", "商品名", "取扱区分",
-        "在庫", "発注済", "仕入価格（実績）", "仕入価格（最安）", "ケース入数", "発注ロット", "重量"
+        "在庫", "発注済", "実績原価", "最安原価", "ケース入数", "発注ロット", "重量"
     ]
     available_cols = [c for c in view_cols if c in df_view.columns]
 
