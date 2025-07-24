@@ -1039,6 +1039,55 @@ if mode == "csv_upload":
             df_warehouse = preprocess_warehouse_stock(warehouse_file)
             upload_warehouse_stock(df_warehouse)
 
+    benten_file = st.file_uploader("🏭 BENTEN倉庫在庫（CSV）アップロード", type=["csv"])
+    if benten_file:
+        def preprocess_benten_stock(file):
+            df = pd.read_csv(file)
+            df.columns = df.columns.str.replace("　", "").str.replace("\ufeff", "").str.strip()
+
+            upc_col = None
+            stock_col = None
+            for col in df.columns:
+                if "UPC" in col:
+                    upc_col = col
+                if "利用可能" in col:
+                    stock_col = col
+
+            if not upc_col or not stock_col:
+                raise ValueError(f"❌ 'UPCコード' または '利用可能' 列が見つかりません！列名: {df.columns.tolist()}")
+
+            df = df[[upc_col, stock_col]].copy()
+            df.rename(columns={upc_col: "jan", stock_col: "stock"}, inplace=True)
+            df["jan"] = df["jan"].astype(str).str.strip()
+            df["stock"] = pd.to_numeric(df["stock"], errors="coerce").fillna(0).round().astype(int)
+            df["updated_at"] = pd.Timestamp.now()
+            return df
+
+        def upload_benten_stock(df):
+            try:
+                requests.delete(f"{SUPABASE_URL}/rest/v1/benten_stock?jan=neq.null", headers=HEADERS)
+                df = df.drop_duplicates(subset=["jan"], keep="last")
+                df = df.replace({pd.NA: None, pd.NaT: None, float("nan"): None}).where(pd.notnull(df), None)
+
+                for i in range(0, len(df), 500):
+                    batch = df.iloc[i:i+500].to_dict(orient="records")
+                    res = requests.post(
+                        f"{SUPABASE_URL}/rest/v1/benten_stock",
+                        headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
+                        json=batch
+                    )
+                    if res.status_code not in [200, 201]:
+                        st.error(f"❌ benten_stock バッチPOST失敗: {res.status_code} {res.text}")
+                        return
+
+                st.success(f"✅ benten_stock に {len(df)} 件アップロード完了")
+
+            except Exception as e:
+                st.error(f"❌ benten_stock アップロード中にエラー: {e}")
+
+        with st.spinner("📤 BENTEN倉庫CSV を処理中..."):
+            df_benten = preprocess_benten_stock(benten_file)
+            upload_benten_stock(df_benten)
 
 
 
