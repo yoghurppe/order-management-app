@@ -451,7 +451,7 @@ elif mode == "order_ai":
                     "ランク": rank
                 })
 
-            if results:
+             if results:
                 result_df = pd.DataFrame(results)
                 df_master["商品コード"] = df_master["商品コード"].astype(str).str.strip()
                 result_df["jan"] = result_df["jan"].astype(str).str.strip()
@@ -466,6 +466,9 @@ elif mode == "order_ai":
                 result_df = pd.merge(result_df, df_benten, on="jan", how="left")
                 result_df["弁天在庫"] = result_df["弁天在庫"].fillna(0).astype(int)
             
+                # ✅ 在庫 → JD在庫 に列名変更
+                result_df.rename(columns={"在庫": "JD在庫"}, inplace=True)
+            
                 # フィルタリング
                 if "商品名" in result_df.columns:
                     result_df = result_df[result_df["商品名"].notna()]
@@ -474,8 +477,8 @@ elif mode == "order_ai":
                 else:
                     st.warning("⚠️『取扱区分』列が存在しません。")
             
-                # 表示順に並べ替え（弁天在庫を追加）
-                column_order = ["jan", "商品名", "ランク", "販売実績", "在庫", "発注済", "弁天在庫",
+                # 表示順に並べ替え（JD在庫・弁天在庫を含む）
+                column_order = ["jan", "商品名", "ランク", "販売実績", "JD在庫", "弁天在庫", "発注済",
                                 "理論必要数", "発注数", "ロット", "数量", "単価", "総額", "仕入先"]
                 result_df = result_df[[col for col in column_order if col in result_df.columns]]
             
