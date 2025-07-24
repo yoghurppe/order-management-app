@@ -1060,7 +1060,7 @@ if mode == "csv_upload":
             df.rename(columns={upc_col: "jan", stock_col: "stock"}, inplace=True)
             df["jan"] = df["jan"].astype(str).str.strip()
             df["stock"] = pd.to_numeric(df["stock"], errors="coerce").fillna(0).round().astype(int)
-            df["updated_at"] = pd.Timestamp.now()
+            df["updated_at"] = pd.Timestamp.now().isoformat()
             return df
 
         def upload_benten_stock(df):
