@@ -1311,7 +1311,7 @@ elif mode == "rank_check":
     df_stock = df_stock.rename(columns={"stock_available": "JD在庫"})
 
     # 弁天在庫
-    df_benten["JAN"] = df_benten["upc"].astype(str).str.strip()
+    df_benten["JAN"] = df_benten["jan"].astype(str).str.strip()
     df_benten = df_benten.rename(columns={"stock": "弁天在庫"})
 
     # 実績（30日）
