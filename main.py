@@ -596,7 +596,7 @@ elif mode == "search_item":
         [TEXT[language]["all"]] + sorted(df_master["取扱区分"].dropna().unique())
     )
 
-    jan_list = [j.strip() for j in re.split(r"[,\\n\\r]+", jan_filter_multi) if j.strip()]
+    jan_list = [j.strip() for j in re.split(r"[,\n\r]+", jan_filter_multi) if j.strip()]
     df_view = df_master.copy()
 
     if jan_list:
