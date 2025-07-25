@@ -1276,13 +1276,9 @@ elif mode == "rank_check":
         st.warning("必要なテーブルが空です")
         st.stop()
 
-    import unicodedata
-    def normalize_text(text):
-        return unicodedata.normalize("NFKC", str(text)).replace(" ", "").strip()
-
-    # 前処理
+    # データ整形
     df_item["jan"] = df_item["jan"].astype(str).str.strip()
-    df_item["ランク"] = df_item["ランク"].map(normalize_text)
+    df_item["ランク"] = df_item["ランク"].astype(str).str.strip()  # ← 空白除去
 
     # 発注済（上海除外）
     df_history["quantity"] = pd.to_numeric(df_history["quantity"], errors="coerce").fillna(0).astype(int)
@@ -1296,20 +1292,18 @@ elif mode == "rank_check":
     df_item["shanghai_quantity"] = df_item["shanghai_quantity"].fillna(0).astype(int)
     df_item["発注済"] = (df_item["発注済"] - df_item["shanghai_quantity"]).clip(lower=0)
 
+    # ✅ デバッグ用：ランク一覧と件数確認
+    st.write("📌 ランク一覧:", df_item["ランク"].unique())
+    st.write("📌 A/Bランク 件数:", df_item[df_item["ランク"].isin(["Aランク", "Bランク"])].shape[0])
+
     # A or Bランク商品（JANあり）
     df_ab = df_item[df_item["ランク"].isin(["Aランク", "Bランク"]) & df_item["jan"].notnull()].copy()
     df_ab["JAN"] = df_ab["jan"].astype(str).str.strip()
 
-    st.write("🟢 A/Bランク対象:", len(df_ab))
-    st.dataframe(df_ab[["JAN", "商品名", "ランク"]].head(10))
-
-    # UIフィルター
+    # ランクフィルター
     selected_ranks = st.multiselect("📌 表示するランクを選択", ["Aランク", "Bランク"], default=["Aランク", "Bランク"])
-    check_1_0 = st.checkbox("✅ 発注アラート1.0のみ表示", value=False)
-    check_1_2 = st.checkbox("✅ 発注アラート1.2のみ表示", value=False)
-    st.write("📌 選択ランク:", selected_ranks)
 
-    # sales JAN化
+    # sales → JAN
     df_sales["JAN"] = df_sales["jan"].astype(str).str.strip()
 
     # JD在庫
@@ -1327,7 +1321,7 @@ elif mode == "rank_check":
         .rename(columns={"quantity_sold": "実績（30日）"})
     )
 
-    # 発注済テーブル
+    # 発注済
     df_item_sub = df_item[["jan", "発注済"]].copy()
     df_item_sub["JAN"] = df_item_sub["jan"].astype(str).str.strip()
     df_item_sub = df_item_sub[["JAN", "発注済"]]
@@ -1341,28 +1335,27 @@ elif mode == "rank_check":
         .merge(df_benten[["JAN", "弁天在庫"]], on="JAN", how="left")
     )
 
-    st.write("🟡 マージ後データ件数:", len(df_merged))
-    st.dataframe(df_merged.head(10))
-
     # 欠損補完
     df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
     df_merged["実績（30日）"] = df_merged["実績（30日）"].fillna(0)
     df_merged["JD在庫"] = df_merged["JD在庫"].fillna(0)
     df_merged["弁天在庫"] = df_merged["弁天在庫"].fillna(0)
-    df_merged["実績（7日）"] = None
+    df_merged["実績（7日）"] = None  # 未使用
 
     # アラート
     df_merged["発注アラート1.0"] = df_merged["実績（30日）"] > (df_merged["JD在庫"] + df_merged["発注済"])
     df_merged["発注アラート1.2"] = (df_merged["実績（30日）"] * 1.2) > (df_merged["JD在庫"] + df_merged["発注済"])
 
-    # フィルター適用（1行で）
-    df_result = df_merged[
-        df_merged["ランク"].isin(selected_ranks)
-        & (~check_1_0 | df_merged["発注アラート1.0"])
-        & (~check_1_2 | df_merged["発注アラート1.2"])
-    ].copy()
+    # アラートフィルター
+    check_1_0 = st.checkbox("✅ 発注アラート1.0のみ表示", value=False)
+    check_1_2 = st.checkbox("✅ 発注アラート1.2のみ表示", value=False)
 
-    st.write("🔴 最終表示件数:", len(df_result))
+    # フィルタ適用
+    df_result = df_merged[df_merged["ランク"].isin(selected_ranks)].copy()
+    if check_1_0:
+        df_result = df_result[df_result["発注アラート1.0"]]
+    if check_1_2:
+        df_result = df_result[df_result["発注アラート1.2"]]
 
     # 出力
     st.dataframe(df_result[[
@@ -1377,6 +1370,7 @@ elif mode == "rank_check":
         "発注アラート1.0",
         "発注アラート1.2"
     ]])
+
 
 
 
