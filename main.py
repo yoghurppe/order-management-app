@@ -1276,19 +1276,25 @@ elif mode == "rank_check":
         st.warning("必要なテーブルが空です")
         st.stop()
 
+    # データ整形
+    df_item["jan"] = df_item["jan"].astype(str).str.strip()
+    df_item["ランク"] = df_item["ランク"].astype(str).str.strip()  # ← 空白除去
+
     # 発注済（上海除外）
     df_history["quantity"] = pd.to_numeric(df_history["quantity"], errors="coerce").fillna(0).astype(int)
     df_history["memo"] = df_history["memo"].astype(str).fillna("")
     df_history["jan"] = df_history["jan"].astype(str).str.strip()
-
     df_shanghai = df_history[df_history["memo"].str.contains("上海", na=False)]
     df_shanghai_grouped = df_shanghai.groupby("jan")["quantity"].sum().reset_index(name="shanghai_quantity")
 
     df_item["発注済"] = pd.to_numeric(df_item["発注済"], errors="coerce").fillna(0).astype(int)
-    df_item["jan"] = df_item["jan"].astype(str).str.strip()
     df_item = df_item.merge(df_shanghai_grouped, on="jan", how="left")
     df_item["shanghai_quantity"] = df_item["shanghai_quantity"].fillna(0).astype(int)
     df_item["発注済"] = (df_item["発注済"] - df_item["shanghai_quantity"]).clip(lower=0)
+
+    # ✅ デバッグ用：ランク一覧と件数確認
+    st.write("📌 ランク一覧:", df_item["ランク"].unique())
+    st.write("📌 A/Bランク 件数:", df_item[df_item["ランク"].isin(["Aランク", "Bランク"])].shape[0])
 
     # A or Bランク商品（JANあり）
     df_ab = df_item[df_item["ランク"].isin(["Aランク", "Bランク"]) & df_item["jan"].notnull()].copy()
@@ -1364,10 +1370,6 @@ elif mode == "rank_check":
         "発注アラート1.0",
         "発注アラート1.2"
     ]])
-
-
-
-
 
 
 elif mode == "difficult_items":
