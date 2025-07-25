@@ -1292,10 +1292,6 @@ elif mode == "rank_check":
     df_item["shanghai_quantity"] = df_item["shanghai_quantity"].fillna(0).astype(int)
     df_item["発注済"] = (df_item["発注済"] - df_item["shanghai_quantity"]).clip(lower=0)
 
-    # ✅ デバッグ用：ランク一覧と件数確認
-    st.write("📌 ランク一覧:", df_item["ランク"].unique())
-    st.write("📌 A/Bランク 件数:", df_item[df_item["ランク"].isin(["Aランク", "Bランク"])].shape[0])
-
     # A or Bランク商品（JANあり）
     df_ab = df_item[df_item["ランク"].isin(["Aランク", "Bランク"]) & df_item["jan"].notnull()].copy()
     df_ab["JAN"] = df_ab["jan"].astype(str).str.strip()
