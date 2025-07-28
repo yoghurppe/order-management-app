@@ -219,6 +219,10 @@ MODE_KEYS = {
         "日本語": "CSVアップロード",
         "中文": "上传CSV"
     },
+    "order": {
+        "日本語": "📦 発注書作成モード",
+        "中文": "📦 订单书生成模式"
+    },
 }
 
 
@@ -1503,3 +1507,115 @@ elif mode == "difficult_items":
         st.dataframe(df_history, use_container_width=True)
     else:
         st.write("📜 **履歴はまだありません**")
+
+
+# 📦 発注書作成モード -----------------------------
+elif mode == "order":
+    st.subheader("📦 発注書作成モード")
+
+    # 入力方法選択
+    option = st.radio("入力方法を選択してください", ["テキスト貼り付け", "CSVアップロード"])
+    df_order = None
+
+    if option == "テキスト貼り付け":
+        input_text = st.text_area("注文テキストを貼り付け", height=300)
+        if st.button("テキストを変換"):
+            if not input_text.strip():
+                st.warning("⚠ テキストを入力してください")
+            else:
+                df_order = parse_items_fixed(input_text)
+
+    elif option == "CSVアップロード":
+        uploaded_file = st.file_uploader("注文CSVをアップロード", type=["csv"])
+        if uploaded_file is not None:
+            df_order = pd.read_csv(uploaded_file)
+            st.success("✅ CSVを読み込みました！")
+            st.dataframe(df_order)
+
+    # 初期設定フォーム
+    st.subheader("📋 初期設定情報")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        from datetime import datetime, date
+        external_id = datetime.now().strftime("%Y%m%d%H%M%S")  # 外部ID自動生成
+        st.text_input("外部ID（自動）", value=external_id, disabled=True)
+        supplier = st.text_input("仕入先", "0402 ハリマ共和物産株式会社")
+    with col2:
+        order_date = st.date_input("日付", value=date.today())
+        employee = st.text_input("従業員", "031 斎藤裕史")
+    with col3:
+        department = st.text_input("部門", "輸出事業部 : 輸出（ASEAN）")
+        location = st.text_input("場所", "JD-物流-千葉")
+    memo = st.text_input("メモ", "BCランク")
+
+    # 入力必須チェック
+    required_fields = [supplier, order_date, employee, department, location, memo]
+    if not all(required_fields):
+        st.error("⚠ 初期設定の全項目を入力してください。")
+        can_generate = False
+    else:
+        can_generate = True
+
+    # 共通処理
+    if df_order is not None and can_generate:
+        df_item = fetch_table("item_master")
+
+        # 納税スケジュール → 税率判定
+        def get_tax_rate(schedule):
+            if schedule is None:
+                return 0.0
+            if "消費税10" in schedule or "仕入10" in schedule:
+                return 0.10
+            elif "消費税8" in schedule or "仕入8" in schedule:
+                return 0.08
+            return 0.0
+
+        df_item["tax_rate"] = df_item["納税スケジュール"].apply(get_tax_rate)
+
+        # JOIN
+        df = df_order.merge(df_item, on="jan", how="left")
+
+        # 未設定JANの検出
+        missing_tax = df[df["tax_rate"] == 0.0]
+        if not missing_tax.empty:
+            st.warning("⚠ 納税スケジュール未設定の商品があります: " + 
+                       ", ".join(missing_tax["jan"].astype(str).tolist()))
+
+        # 日付を yyyy/mm/dd 形式
+        order_date_str = order_date.strftime("%Y/%m/%d")
+
+        # 計算
+        df["金額"] = df["単価"] * df["数量"]
+        df["税額"] = (df["金額"] * df["tax_rate"]).round().astype(int)
+        df["総額"] = df["金額"] + df["税額"]
+
+        # 出力フォーマット（13列固定）
+        df_out = pd.DataFrame({
+            "外部ID": external_id,
+            "仕入先": supplier,
+            "日付": order_date_str,
+            "従業員": employee,
+            "部門": department,
+            "メモ": memo,
+            "場所": location,
+            "アイテム": df["商品コード"].astype(str) + " " + df["商品名"],
+            "数量": df["数量"],
+            "単価/率": df["単価"],
+            "金額": df["金額"],
+            "税額": df["税額"],
+            "総額": df["総額"]
+        })
+
+        st.subheader("📑 発注書プレビュー")
+        st.dataframe(df_out)
+
+        # CSV出力（UTF-8 BOM付き、ファイル名に外部ID）
+        csv = df_out.to_csv(index=False, encoding="utf-8-sig")
+
+        st.download_button(
+            label="📥 発注書CSVをダウンロード",
+            data=csv,
+            file_name=f"発注書_{external_id}.csv",
+            mime="text/csv"
+        )
+
