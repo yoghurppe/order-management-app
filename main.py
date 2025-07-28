@@ -204,8 +204,8 @@ MODE_KEYS = {
         "中文": "订货AI判断"
     },
     "rank_check": {
-        "日本語": "ABランク商品確認",
-        "中文": "AB等级商品检查"
+        "日本語": "ABCランク商品確認",
+        "中文": "ABC等级商品检查"
     },
     "purchase_history": {
         "日本語": "📜 発注履歴",
@@ -1263,7 +1263,7 @@ elif mode == "monthly_sales":
 
 
 elif mode == "rank_check":
-    st.subheader("🅰️🅱️ ランク商品確認モード")
+    st.subheader("ランク商品確認モード")
 
     # データ取得
     df_item = fetch_table("item_master")
@@ -1292,12 +1292,12 @@ elif mode == "rank_check":
     df_item["shanghai_quantity"] = df_item["shanghai_quantity"].fillna(0).astype(int)
     df_item["発注済"] = (df_item["発注済"] - df_item["shanghai_quantity"]).clip(lower=0)
 
-    # A or Bランク商品（JANあり）
-    df_ab = df_item[df_item["ランク"].isin(["Aランク", "Bランク"]) & df_item["jan"].notnull()].copy()
+    # A or B or Cランク商品（JANあり）
+    df_ab = df_item[df_item["ランク"].isin(["Aランク", "Bランク", "Cランク"]) & df_item["jan"].notnull()].copy()
     df_ab["JAN"] = df_ab["jan"].astype(str).str.strip()
 
     # ランクフィルター
-    selected_ranks = st.multiselect("📌 表示するランクを選択", ["Aランク", "Bランク"], default=["Aランク", "Bランク"])
+    selected_ranks = st.multiselect("📌 表示するランクを選択", ["Aランク", "Bランク", "Cランク"], default=["Aランク", "Bランク", "Cランク"])
 
     # sales → JAN
     df_sales["JAN"] = df_sales["jan"].astype(str).str.strip()
