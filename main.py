@@ -20,46 +20,6 @@ def parse_items_fixed(text):
         table = str.maketrans('０１２３４５６７８９', '0123456789')
         return s.translate(table).strip()
 
-    for line in lines:
-        line = line.strip()
-
-        if "品番" in line:
-            item = {'品番': line.split("品番")[-1].strip()}
-
-        elif "JAN" in line:
-            item['jan'] = line.split("JAN")[-1].strip()
-
-        elif re.search(r'（[\d,]+円 × \d+点）', line):
-            m = re.search(r'（([\d,]+)円 × (\d+)点）', line)
-            item['単価'] = int(m.group(1).replace(',', ''))
-            item['ロット'] = int(m.group(2))
-
-        elif normalize_number(line).isdigit() and '数量' not in item:
-            item['数量'] = int(normalize_number(line))
-
-            if all(k in item for k in ['品番', 'jan', '単価', 'ロット', '数量']):
-                item['ロット×数量'] = item['ロット'] * item['数量']
-                items.append(item)
-                item = {}
-
-    df = pd.DataFrame(items)
-
-    if not df.empty:
-        df['小計'] = df['単価'] * df['ロット'] * df['数量']
-        subtotal = df['小計'].sum()
-
-        df.loc[len(df)] = {
-            '品番': '合計',
-            'jan': '',
-            '単価': '',
-            'ロット': '',
-            '数量': '',
-            'ロット×数量': '',
-            '小計': subtotal
-        }
-
-    return df
-
 # ページ設定
 st.set_page_config(page_title="管理補助システム", layout="wide")
 
