@@ -1637,10 +1637,13 @@ elif mode == "order":
         # 型変換（ここが重要）
         df["単価"] = pd.to_numeric(df["単価"], errors="coerce").fillna(0).astype(int)
         df["数量"] = pd.to_numeric(df["数量"], errors="coerce").fillna(0).astype(int)
-
+        
         # 計算
         df["金額"] = df["単価"] * df["数量"]
-        df["税額"] = (df["金額"] * df["tax_rate"]).round().astype(int)
+        
+        df["税額"] = (df["金額"] * df["tax_rate"]).round()
+        df["税額"] = pd.to_numeric(df["税額"], errors="coerce").fillna(0).astype(int)
+        
         df["総額"] = df["金額"] + df["税額"]
 
         # 出力フォーマット（13列固定）
