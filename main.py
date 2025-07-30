@@ -20,48 +20,45 @@ def parse_items_fixed(text):
         table = str.maketrans('０１２３４５６７８９', '0123456789')
         return s.translate(table).strip()
 
-# ページ設定
-st.set_page_config(page_title="管理補助システム", layout="wide")
+    for line in lines:
+        line = line.strip()
 
-# 🔑 パスワード（MD5ハッシュ化済）: 例「admin123」
-PASSWORD_HASH = "0f754d47528b6393d510866d26f508de"  # MD5("smikie0826")
+        if "品番" in line:
+            item = {'品番': line.split("品番")[-1].strip()}
 
-# 🧠 セッション状態
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
+        elif "JAN" in line:
+            item['jan'] = line.split("JAN")[-1].strip()
 
-# 🍪 クッキー確認
-cookie = st_javascript("document.cookie")
+        elif re.search(r'（[\d,]+円 × \d+点）', line):
+            m = re.search(r'（([\d,]+)円 × (\d+)点）', line)
+            item['単価'] = int(m.group(1).replace(',', ''))
+            item['ロット'] = int(m.group(2))
 
-# ✅ 認証済み or クッキー有効ならスルー
-if st.session_state.authenticated or ("auth_token=valid" in str(cookie)):
-    st.session_state.authenticated = True
+        elif normalize_number(line).isdigit() and '数量' not in item:
+            item['数量'] = int(normalize_number(line))
 
-    # 🔒 ログアウト機能（クッキー削除 + リロード）
-    if st.sidebar.button("🔒 ログアウト"):
-        st.session_state.authenticated = False
-        st_javascript("document.cookie = 'auth_token=; Max-Age=0'; location.reload();")
+            if all(k in item for k in ['品番', 'jan', '単価', 'ロット', '数量']):
+                item['ロット×数量'] = item['ロット'] * item['数量']
+                items.append(item)
+                item = {}
 
-else:
-    st.title("🔐 認証が必要です")
+    df = pd.DataFrame(items)
 
-    # ✅ エンターキー対応フォーム
-    with st.form("login_form"):
-        password = st.text_input("パスワードを入力", type="password")
-        submitted = st.form_submit_button("ログイン")
+    if not df.empty:
+        df['小計'] = df['単価'] * df['ロット'] * df['数量']
+        subtotal = df['小計'].sum()
 
-    if submitted:
-        hashed = hashlib.md5(password.encode()).hexdigest()
-        if hashed == PASSWORD_HASH:
-            st.session_state.authenticated = True
-            st_javascript("document.cookie = 'auth_token=valid; Max-Age=86400'")
-            st.success("✅ 認証成功、リロードします")
-            time.sleep(1)
-            st.experimental_rerun()
-        else:
-            st.error("❌ パスワードが違います")
+        df.loc[len(df)] = {
+            '品番': '合計',
+            'jan': '',
+            '単価': '',
+            'ロット': '',
+            '数量': '',
+            'ロット×数量': '',
+            '小計': subtotal
+        }
 
-    st.stop()
+    return df
     
 # 🟢 ここからアプリの中身（言語選択など）
 language = st.sidebar.selectbox("言語 / Language", ["日本語", "中文"], key="language")
@@ -1532,11 +1529,7 @@ elif mode == "order":
                 st.warning("⚠ テキストを入力してください")
             else:
                 df_order = parse_items_fixed(input_text)
-                # ✅ 品番列があれば合計行を削除
-                if df_order is not None and not df_order.empty and "品番" in df_order.columns:
-                    df_order = df_order[df_order["品番"] != "合計"]
-                else:
-                    st.warning("⚠ 商品データを正しく取得できませんでした")
+                df_order = df_order[df_order["品番"] != "合計"]  # 合計行削除
 
     elif option == "CSVアップロード":
         uploaded_file = st.file_uploader("注文CSVをアップロード", type=["csv"])
@@ -1545,7 +1538,7 @@ elif mode == "order":
             st.success("✅ CSVを読み込みました！")
             st.dataframe(df_order)
 
-    # 初期設定情報（プルダウン化）
+    # 初期設定情報（プルダウン化 / ベタ書き）
     st.subheader("📋 初期設定情報")
 
     suppliers = [
@@ -1561,6 +1554,7 @@ elif mode == "order":
         "0479 スケーター株式会社","0482 風雲商事株式会社","0484 ZSA商事株式会社",
         "0486 Maple International株式会社","0490 NEW WIND株式会社","0491 アプライド株式会社"
     ]
+
     employees = ["031 斎藤裕史","037 米澤和敏","043 徐越","079 隋艶偉"]
     departments = ["輸出事業部 : 輸出（ASEAN）","輸出事業部 : 輸出（中国）","輸出事業部"]
     locations = ["JD-物流-千葉","弁天倉庫"]
@@ -1583,10 +1577,9 @@ elif mode == "order":
     required_fields = [supplier, order_date, employee, department, location, memo]
     can_generate = all(required_fields)
 
-    if df_order is not None and can_generate and not df_order.empty:
+    if df_order is not None and can_generate:
         df_item = fetch_table("item_master")
 
-        # 納税スケジュール → 税率判定
         def get_tax_rate(schedule):
             if schedule is None:
                 return 0.0
@@ -1600,7 +1593,6 @@ elif mode == "order":
 
         df = df_order.merge(df_item, on="jan", how="left")
 
-        # 税率未設定チェック
         missing_tax = df[df["tax_rate"] == 0.0]
         if not missing_tax.empty:
             st.warning("⚠ 納税スケジュール未設定の商品があります: " +
@@ -1608,17 +1600,13 @@ elif mode == "order":
 
         order_date_str = order_date.strftime("%Y/%m/%d")
 
-        # 型変換
         df["単価"] = pd.to_numeric(df["単価"], errors="coerce").fillna(0).astype(int)
         df["数量"] = pd.to_numeric(df["数量"], errors="coerce").fillna(0).astype(int)
-
-        # 計算
         df["金額"] = df["単価"] * df["数量"]
         df["税額"] = (df["金額"] * df["tax_rate"]).round()
         df["税額"] = pd.to_numeric(df["税額"], errors="coerce").fillna(0).astype(int)
         df["総額"] = df["金額"] + df["税額"]
 
-        # 出力
         df_out = pd.DataFrame({
             "外部ID": external_id,
             "仕入先": supplier,
@@ -1638,8 +1626,8 @@ elif mode == "order":
         st.subheader("📑 発注書プレビュー")
         st.dataframe(df_out)
 
-        # CSV出力
         csv = df_out.to_csv(index=False, encoding="utf-8-sig")
+
         st.download_button(
             label="📥 発注書CSVをダウンロード",
             data=csv,
