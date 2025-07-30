@@ -1532,7 +1532,11 @@ elif mode == "order":
                 st.warning("⚠ テキストを入力してください")
             else:
                 df_order = parse_items_fixed(input_text)
-                df_order = df_order[df_order["品番"] != "合計"]  # 合計行削除
+                # ✅ 品番列があれば合計行を削除
+                if df_order is not None and not df_order.empty and "品番" in df_order.columns:
+                    df_order = df_order[df_order["品番"] != "合計"]
+                else:
+                    st.warning("⚠ 商品データを正しく取得できませんでした")
 
     elif option == "CSVアップロード":
         uploaded_file = st.file_uploader("注文CSVをアップロード", type=["csv"])
@@ -1541,7 +1545,7 @@ elif mode == "order":
             st.success("✅ CSVを読み込みました！")
             st.dataframe(df_order)
 
-    # 初期設定情報（プルダウン化 / ベタ書き）
+    # 初期設定情報（プルダウン化）
     st.subheader("📋 初期設定情報")
 
     suppliers = [
@@ -1557,8 +1561,7 @@ elif mode == "order":
         "0479 スケーター株式会社","0482 風雲商事株式会社","0484 ZSA商事株式会社",
         "0486 Maple International株式会社","0490 NEW WIND株式会社","0491 アプライド株式会社"
     ]
-
-    employees = ["079 隋艶偉","031 斎藤裕史","037 米澤和敏","043 徐越"]
+    employees = ["031 斎藤裕史","037 米澤和敏","043 徐越","079 隋艶偉"]
     departments = ["輸出事業部 : 輸出（ASEAN）","輸出事業部 : 輸出（中国）","輸出事業部"]
     locations = ["JD-物流-千葉","弁天倉庫"]
 
@@ -1575,14 +1578,15 @@ elif mode == "order":
         department = st.selectbox("部門", departments)
         location = st.selectbox("場所", locations)
 
-    memo = st.text_input("メモ", "")
+    memo = st.text_input("メモ", "BCランク")
 
     required_fields = [supplier, order_date, employee, department, location, memo]
     can_generate = all(required_fields)
 
-    if df_order is not None and can_generate:
+    if df_order is not None and can_generate and not df_order.empty:
         df_item = fetch_table("item_master")
 
+        # 納税スケジュール → 税率判定
         def get_tax_rate(schedule):
             if schedule is None:
                 return 0.0
@@ -1596,6 +1600,7 @@ elif mode == "order":
 
         df = df_order.merge(df_item, on="jan", how="left")
 
+        # 税率未設定チェック
         missing_tax = df[df["tax_rate"] == 0.0]
         if not missing_tax.empty:
             st.warning("⚠ 納税スケジュール未設定の商品があります: " +
@@ -1603,13 +1608,17 @@ elif mode == "order":
 
         order_date_str = order_date.strftime("%Y/%m/%d")
 
+        # 型変換
         df["単価"] = pd.to_numeric(df["単価"], errors="coerce").fillna(0).astype(int)
         df["数量"] = pd.to_numeric(df["数量"], errors="coerce").fillna(0).astype(int)
+
+        # 計算
         df["金額"] = df["単価"] * df["数量"]
         df["税額"] = (df["金額"] * df["tax_rate"]).round()
         df["税額"] = pd.to_numeric(df["税額"], errors="coerce").fillna(0).astype(int)
         df["総額"] = df["金額"] + df["税額"]
 
+        # 出力
         df_out = pd.DataFrame({
             "外部ID": external_id,
             "仕入先": supplier,
@@ -1629,8 +1638,8 @@ elif mode == "order":
         st.subheader("📑 発注書プレビュー")
         st.dataframe(df_out)
 
+        # CSV出力
         csv = df_out.to_csv(index=False, encoding="utf-8-sig")
-
         st.download_button(
             label="📥 発注書CSVをダウンロード",
             data=csv,
