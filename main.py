@@ -1625,14 +1625,18 @@ elif mode == "order":
         # JOIN
         df = df_order.merge(df_item, on="jan", how="left")
 
-        # 未設定JANの検出
+        # 納税スケジュール未設定チェック
         missing_tax = df[df["tax_rate"] == 0.0]
         if not missing_tax.empty:
-            st.warning("⚠ 納税スケジュール未設定の商品があります: " + 
+            st.warning("⚠ 納税スケジュール未設定の商品があります: " +
                        ", ".join(missing_tax["jan"].astype(str).tolist()))
 
         # 日付を yyyy/mm/dd 形式
         order_date_str = order_date.strftime("%Y/%m/%d")
+
+        # 型変換（ここが重要）
+        df["単価"] = pd.to_numeric(df["単価"], errors="coerce").fillna(0).astype(int)
+        df["数量"] = pd.to_numeric(df["数量"], errors="coerce").fillna(0).astype(int)
 
         # 計算
         df["金額"] = df["単価"] * df["数量"]
@@ -1659,7 +1663,7 @@ elif mode == "order":
         st.subheader("📑 発注書プレビュー")
         st.dataframe(df_out)
 
-        # CSV出力（UTF-8 BOM付き、ファイル名に外部ID）
+        # CSV出力（UTF-8 BOM付き）
         csv = df_out.to_csv(index=False, encoding="utf-8-sig")
 
         st.download_button(
