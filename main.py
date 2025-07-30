@@ -1615,7 +1615,7 @@ elif mode == "order":
         department = st.selectbox("部門", departments)
         location = st.selectbox("場所", locations)
 
-    memo = st.text_input("メモ", "BCランク")
+    memo = st.text_input("メモ", "")
 
     required_fields = [supplier, order_date, employee, department, location, memo]
     can_generate = all(required_fields)
