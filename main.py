@@ -1625,7 +1625,7 @@ elif mode == "order":
         "0479 スケーター株式会社","0482 風雲商事株式会社","0484 ZSA商事株式会社",
         "0486 Maple International株式会社","0490 NEW WIND株式会社","0491 アプライド株式会社"
     ]
-    employees = ["031 斎藤裕史","037 米澤和敏","043 徐越","079 隋艶偉"]
+    employees = ["079 隋艶偉","031 斎藤裕史","037 米澤和敏","043 徐越"]
     departments = ["輸出事業部 : 輸出（ASEAN）","輸出事業部 : 輸出（中国）","輸出事業部"]
     locations = ["JD-物流-千葉","弁天倉庫"]
 
@@ -1642,7 +1642,7 @@ elif mode == "order":
         department = st.selectbox("部門", departments)
         location = st.selectbox("場所", locations)
 
-    memo = st.text_input("メモ", "BCランク")
+    memo = st.text_input("メモ", "")
 
     # ---------- 発注書生成 ----------
     if df_order is not None and not df_order.empty:
