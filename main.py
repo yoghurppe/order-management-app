@@ -1580,7 +1580,7 @@ elif mode == "order":
 
             # よくある表記ゆれを修正
             rename_map = {
-                "janコード": "jan", "ＪＡＮ": "jan", "jan": "jan", "JAN": "jan",
+                "janコード": "jan", "ＪＡＮ": "jan", "JAN": "jan",
                 "数量": "数量", "数": "数量", "qty": "数量",
                 "ロット×数量": "ロット×数量",
                 "単価": "単価", "価格": "単価", "price": "単価"
@@ -1635,6 +1635,13 @@ elif mode == "order":
             st.error("❌ item_master に 'jan' 列がありません。Supabase 側の列名を確認してください。")
             st.stop()
 
+        # janを文字列に統一
+        df_order["jan"] = df_order["jan"].astype(str).str.strip()
+        df_item["jan"]  = df_item["jan"].astype(str).str.strip()
+
+        st.write("df_order jan dtype:", df_order["jan"].dtype)
+        st.write("df_item  jan dtype:", df_item["jan"].dtype)
+
         # 税率判定
         def get_tax_rate(schedule: str) -> float:
             if not schedule:
@@ -1650,12 +1657,15 @@ elif mode == "order":
         else:
             df_item["tax_rate"] = 0.0
 
+        # マージ
         df = df_order.merge(df_item, on="jan", how="left")
 
+        # 不明JAN警告
         missing = df[df["商品名"].isna()]
         if not missing.empty:
             st.warning(f"⚠ {len(missing)} 件が item_master に見つかりません。")
 
+        # 数量・単価
         qty_col = "ロット×数量" if "ロット×数量" in df.columns else "数量"
         df["数量"] = pd.to_numeric(df[qty_col], errors="coerce").fillna(0).astype(int)
         df["単価"] = pd.to_numeric(df["単価"], errors="coerce").fillna(0).astype(int)
@@ -1693,3 +1703,4 @@ elif mode == "order":
             file_name=f"発注書_{external_id}.csv",
             mime="text/csv"
         )
+
