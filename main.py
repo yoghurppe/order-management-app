@@ -1584,14 +1584,13 @@ elif mode == "order":
     elif option == "CSVアップロード":
         uploaded_file = st.file_uploader("注文CSVをアップロード", type=["csv"])
         if uploaded_file is not None:
-            try:
-                df_order = pd.read_csv(uploaded_file, encoding="utf-8-sig")
-            except UnicodeDecodeError:
-                df_order = pd.read_csv(uploaded_file, encoding="shift_jis")
+            df_order = pd.read_csv(uploaded_file)
             st.success("✅ CSVを読み込みました！")
             st.dataframe(df_order)
 
-    # 初期設定
+    # 初期設定情報
+    st.subheader("📋 初期設定情報")
+
     suppliers = [
         "0402 ハリマ共和物産株式会社","0077 大分共和株式会社","0025 株式会社オンダ",
         "0029 K・BLUE株式会社","0072 新富士バーナー株式会社","0073 株式会社　エィチ・ケイ",
@@ -1627,7 +1626,7 @@ elif mode == "order":
     if df_order is not None and not df_order.empty:
         df_item = fetch_table("item_master")
 
-        # 税率判定
+        # 納税スケジュール → 税率判定
         def get_tax_rate(schedule):
             if schedule is None:
                 return 0.0
@@ -1638,24 +1637,18 @@ elif mode == "order":
             return 0.0
 
         df_item["tax_rate"] = df_item["納税スケジュール"].apply(get_tax_rate)
-
-        # jan型を文字列で統一
-        df_order["jan"] = df_order["jan"].astype(str).str.strip()
-        df_item["jan"]  = df_item["jan"].astype(str).str.strip()
-
-        # マージ
         df = df_order.merge(df_item, on="jan", how="left")
 
         order_date_str = order_date.strftime("%Y/%m/%d")
 
-        # 数量・単価
-        qty_col = "ロット×数量" if "ロット×数量" in df.columns else "数量"
-        df["数量"] = pd.to_numeric(df[qty_col], errors="coerce").fillna(0).astype(int)
+        # 型変換
+        df["数量"] = pd.to_numeric(df["ロット×数量"], errors="coerce").fillna(0).astype(int) \
+            if "ロット×数量" in df.columns else pd.to_numeric(df["数量"], errors="coerce").fillna(0).astype(int)
         df["単価"] = pd.to_numeric(df["単価"], errors="coerce").fillna(0).astype(int)
 
-        # 金額計算
-        import numpy as np
+        # 金額・税額・総額計算（税額は切り捨て）
         df["金額"] = df["単価"] * df["数量"]
+        import numpy as np
         df["税額"] = np.floor(df["金額"] * df["tax_rate"]).astype(int)
         df["総額"] = df["金額"] + df["税額"]
 
