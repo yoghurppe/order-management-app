@@ -1600,7 +1600,7 @@ elif mode == "order":
                 else:
                     st.warning("⚠ 商品データを正しく取得できませんでした")
 
-    elif option == "CSVアップロード":
+    if option == "CSVアップロード":
         uploaded_file = st.file_uploader("注文CSVをアップロード", type=["csv"])
         if uploaded_file is not None:
             try:
