@@ -1584,11 +1584,9 @@ elif mode == "order":
 
             if df_order is not None:
                 st.success("✅ ファイルを読み込みました！")
-                st.dataframe(df_order.head())
 
                 # カラム名を標準化
                 df_order.columns = df_order.columns.str.strip().str.lower()
-                st.write("📌 ファイルカラム名:", df_order.columns.tolist())
 
                 # よくある表記ゆれを修正
                 rename_map = {
@@ -1602,7 +1600,6 @@ elif mode == "order":
                 # 必須列チェック
                 required_columns = {"jan", "単価"}
                 quantity_column_ok = "数量" in df_order.columns or "ロット×数量" in df_order.columns
-
                 missing_columns = [col for col in required_columns if col not in df_order.columns]
 
                 if missing_columns or not quantity_column_ok:
@@ -1628,7 +1625,7 @@ elif mode == "order":
         "0479 スケーター株式会社","0482 風雲商事株式会社","0484 ZSA商事株式会社",
         "0486 Maple International株式会社","0490 NEW WIND株式会社","0491 アプライド株式会社"
     ]
-    employees = ["079 隋艶偉","031 斎藤裕史","037 米澤和敏","043 徐越"]
+    employees = ["031 斎藤裕史","037 米澤和敏","043 徐越","079 隋艶偉"]
     departments = ["輸出事業部 : 輸出（ASEAN）","輸出事業部 : 輸出（中国）","輸出事業部"]
     locations = ["JD-物流-千葉","弁天倉庫"]
 
@@ -1645,13 +1642,12 @@ elif mode == "order":
         department = st.selectbox("部門", departments)
         location = st.selectbox("場所", locations)
 
-    memo = st.text_input("メモ", "")
+    memo = st.text_input("メモ", "BCランク")
 
     # ---------- 発注書生成 ----------
     if df_order is not None and not df_order.empty:
         df_item = fetch_table("item_master")
         df_item.columns = df_item.columns.str.strip().str.lower()
-        st.write("📌 item_master カラム名:", df_item.columns.tolist())
 
         if "jan" not in df_item.columns:
             st.error("❌ item_master に 'jan' 列がありません。Supabase 側の列名を確認してください。")
@@ -1678,11 +1674,6 @@ elif mode == "order":
 
         # マージ
         df = df_order.merge(df_item, on="jan", how="left")
-
-        # 不明JAN警告
-        missing = df[df["商品名"].isna()]
-        if not missing.empty:
-            st.warning(f"⚠ {len(missing)} 件が item_master に見つかりません。")
 
         # 数量・単価
         qty_col = "ロット×数量" if "ロット×数量" in df.columns else "数量"
