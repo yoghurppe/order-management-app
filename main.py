@@ -1564,33 +1564,55 @@ elif mode == "order":
                     st.warning("⚠ 商品データを正しく取得できませんでした")
 
     elif option == "CSVアップロード":
-        uploaded_file = st.file_uploader("注文CSVをアップロード", type=["csv"])
+        uploaded_file = st.file_uploader("注文ファイルをアップロード", type=["csv", "xlsx"])
         if uploaded_file is not None:
+            import os
+            filename = uploaded_file.name
+            ext = os.path.splitext(filename)[1].lower()
+
             try:
-                df_order = pd.read_csv(uploaded_file, encoding="utf-8-sig")
-            except UnicodeDecodeError:
-                df_order = pd.read_csv(uploaded_file, encoding="shift_jis")
-
-            st.success("✅ CSVを読み込みました！")
-            st.dataframe(df_order.head())
-
-            # カラム名を標準化
-            df_order.columns = df_order.columns.str.strip().str.lower()
-            st.write("📌 CSVカラム名:", df_order.columns.tolist())
-
-            # よくある表記ゆれを修正
-            rename_map = {
-                "janコード": "jan", "ＪＡＮ": "jan", "JAN": "jan",
-                "数量": "数量", "数": "数量", "qty": "数量",
-                "ロット×数量": "ロット×数量",
-                "単価": "単価", "価格": "単価", "price": "単価"
-            }
-            df_order.rename(columns={k.lower(): v for k, v in rename_map.items() if k.lower() in df_order.columns}, inplace=True)
-
-            # 必須列チェック
-            if "jan" not in df_order.columns:
-                st.error("❌ CSVに 'jan' 列がありません。列名を 'jan' にしてください。")
+                if ext == ".csv":
+                    df_order = pd.read_csv(uploaded_file, encoding="utf-8-sig")
+                elif ext == ".xlsx":
+                    df_order = pd.read_excel(uploaded_file)
+                else:
+                    st.error("❌ 未対応のファイル形式です。CSV または Excel をアップロードしてください。")
+                    df_order = None
+            except Exception as e:
+                st.error(f"❌ 読み込みエラー: {e}")
                 df_order = None
+
+            if df_order is not None:
+                st.success("✅ ファイルを読み込みました！")
+                st.dataframe(df_order.head())
+
+                # カラム名を標準化
+                df_order.columns = df_order.columns.str.strip().str.lower()
+                st.write("📌 ファイルカラム名:", df_order.columns.tolist())
+
+                # よくある表記ゆれを修正
+                rename_map = {
+                    "janコード": "jan", "ＪＡＮ": "jan", "JAN": "jan",
+                    "数量": "数量", "数": "数量", "qty": "数量",
+                    "ロット×数量": "ロット×数量",
+                    "単価": "単価", "価格": "単価", "price": "単価"
+                }
+                df_order.rename(columns={k.lower(): v for k, v in rename_map.items() if k.lower() in df_order.columns}, inplace=True)
+
+                # 必須列チェック
+                required_columns = {"jan", "単価"}
+                quantity_column_ok = "数量" in df_order.columns or "ロット×数量" in df_order.columns
+
+                missing_columns = [col for col in required_columns if col not in df_order.columns]
+
+                if missing_columns or not quantity_column_ok:
+                    msg = "❌ 必須列が不足しています：\n"
+                    if missing_columns:
+                        msg += "- " + "\n- ".join(missing_columns) + "\n"
+                    if not quantity_column_ok:
+                        msg += "- '数量' または 'ロット×数量' のいずれかが必要です"
+                    st.error(msg)
+                    df_order = None
 
     # ---------- 初期設定 ----------
     suppliers = [
@@ -1606,7 +1628,7 @@ elif mode == "order":
         "0479 スケーター株式会社","0482 風雲商事株式会社","0484 ZSA商事株式会社",
         "0486 Maple International株式会社","0490 NEW WIND株式会社","0491 アプライド株式会社"
     ]
-    employees = ["031 斎藤裕史","037 米澤和敏","043 徐越","079 隋艶偉"]
+    employees = ["079 隋艶偉","031 斎藤裕史","037 米澤和敏","043 徐越"]
     departments = ["輸出事業部 : 輸出（ASEAN）","輸出事業部 : 輸出（中国）","輸出事業部"]
     locations = ["JD-物流-千葉","弁天倉庫"]
 
@@ -1623,7 +1645,7 @@ elif mode == "order":
         department = st.selectbox("部門", departments)
         location = st.selectbox("場所", locations)
 
-    memo = st.text_input("メモ", "BCランク")
+    memo = st.text_input("メモ", "")
 
     # ---------- 発注書生成 ----------
     if df_order is not None and not df_order.empty:
@@ -1638,9 +1660,6 @@ elif mode == "order":
         # janを文字列に統一
         df_order["jan"] = df_order["jan"].astype(str).str.strip()
         df_item["jan"]  = df_item["jan"].astype(str).str.strip()
-
-        st.write("df_order jan dtype:", df_order["jan"].dtype)
-        st.write("df_item  jan dtype:", df_item["jan"].dtype)
 
         # 税率判定
         def get_tax_rate(schedule: str) -> float:
@@ -1668,6 +1687,15 @@ elif mode == "order":
         # 数量・単価
         qty_col = "ロット×数量" if "ロット×数量" in df.columns else "数量"
         df["数量"] = pd.to_numeric(df[qty_col], errors="coerce").fillna(0).astype(int)
+
+        # 単価（CSV優先）
+        df["単価"] = (
+            df["単価"]
+            .astype(str)
+            .str.replace(",", "", regex=False)
+            .str.replace("¥", "", regex=False)
+            .str.strip()
+        )
         df["単価"] = pd.to_numeric(df["単価"], errors="coerce").fillna(0).astype(int)
 
         import numpy as np
@@ -1703,4 +1731,3 @@ elif mode == "order":
             file_name=f"発注書_{external_id}.csv",
             mime="text/csv"
         )
-
