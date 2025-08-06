@@ -1563,6 +1563,43 @@ elif mode == "order":
                 else:
                     st.warning("⚠ 商品データを正しく取得できませんでした")
 
+elif mode == "order":
+    st.subheader("📦 発注書作成モード")
+
+    option = st.radio("入力方法を選択してください", ["テキスト貼り付け", "CSVアップロード"])
+    df_order = None
+
+    # ---------- CSVテンプレート配布 ----------
+    def provide_template():
+        template = pd.DataFrame({
+            "jan": [],
+            "数量": [],
+            "単価": []
+        })
+        csv_temp = template.to_csv(index=False, encoding="utf-8-sig")
+        st.download_button(
+            "📝 入力用CSVテンプレートをダウンロード",
+            data=csv_temp,
+            mime="text/csv",
+            file_name="order_template.csv",
+            help="必須列: jan, 数量, 単価（ロット×数量でも可）"
+        )
+
+    provide_template()
+
+    # ---------- 入力 ----------
+    if option == "テキスト貼り付け":
+        input_text = st.text_area("注文テキストを貼り付け", height=300)
+        if st.button("テキストを変換"):
+            if not input_text.strip():
+                st.warning("⚠ テキストを入力してください")
+            else:
+                df_order = parse_items_fixed(input_text)
+                if df_order is not None and not df_order.empty and "品番" in df_order.columns:
+                    df_order = df_order[df_order["品番"] != "合計"]
+                else:
+                    st.warning("⚠ 商品データを正しく取得できませんでした")
+
     elif option == "CSVアップロード":
         uploaded_file = st.file_uploader("注文CSVをアップロード", type=["csv"])
         if uploaded_file is not None:
@@ -1580,7 +1617,7 @@ elif mode == "order":
 
             # よくある表記ゆれを修正
             rename_map = {
-                "janコード": "jan", "ＪＡＮ": "jan", "jan": "jan", "JAN": "jan",
+                "janコード": "jan", "ＪＡＮ": "jan", "JAN": "jan",
                 "数量": "数量", "数": "数量", "qty": "数量",
                 "ロット×数量": "ロット×数量",
                 "単価": "単価", "価格": "単価", "price": "単価"
@@ -1635,6 +1672,10 @@ elif mode == "order":
             st.error("❌ item_master に 'jan' 列がありません。Supabase 側の列名を確認してください。")
             st.stop()
 
+        # 型を統一
+        df_order["jan"] = df_order["jan"].astype(str).str.strip()
+        df_item["jan"]  = df_item["jan"].astype(str).str.strip()
+
         # 税率判定
         def get_tax_rate(schedule: str) -> float:
             if not schedule:
@@ -1650,8 +1691,10 @@ elif mode == "order":
         else:
             df_item["tax_rate"] = 0.0
 
+        # マージ
         df = df_order.merge(df_item, on="jan", how="left")
 
+        # 不明JAN警告
         missing = df[df["商品名"].isna()]
         if not missing.empty:
             st.warning(f"⚠ {len(missing)} 件が item_master に見つかりません。")
