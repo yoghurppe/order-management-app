@@ -1527,12 +1527,15 @@ elif mode == "difficult_items":
 # parse_items_fixed は今のまま利用OK
 
 elif mode == "order":
+    import numpy as np
+    from datetime import datetime, date
+
     st.subheader("📦 発注書作成モード")
 
     option = st.radio("入力方法を選択してください", ["テキスト貼り付け", "CSVアップロード"])
     df_order = None
 
-    # ---------- CSVテンプレート配布 ----------
+    # ---------- テンプレート配布（CSVのみ） ----------
     def provide_template():
         template = pd.DataFrame({
             "jan": [],
@@ -1575,6 +1578,7 @@ elif mode == "order":
                 df_order = pd.read_csv(uploaded_file, encoding="shift_jis")
 
             df_order.columns = df_order.columns.str.strip().str.lower()
+
             rename_map = {
                 "janコード": "jan", "ＪＡＮ": "jan", "jan": "jan", "JAN": "jan",
                 "数量": "数量", "数": "数量", "qty": "数量",
@@ -1587,21 +1591,8 @@ elif mode == "order":
                 st.error("❌ CSV/エクセルに 'jan' 列がありません")
                 df_order = None
 
-    # ---------- 初期設定 ----------
-    from datetime import datetime, date
-    suppliers = [
-        "0402 ハリマ共和物産株式会社", "0077 大分共和株式会社", "0025 株式会社オンダ",
-        "0029 K・BLUE株式会社", "0072 新富士バーナー株式会社", "0073 株式会社 エィチ・ケイ",
-        "0085 中央物産株式会社", "0106 西川株式会社", "0197 大木化粧品株式会社", "0201 現金仕入れ",
-        "0202 トラスコ中山株式会社", "0256 株式会社 グランジェ", "0258 株式会社 ファイン",
-        "0263 株式会社メディファイン", "0285 有限会社オーザイ首藤", "0343 株式会社森フォレスト",
-        "0376 菅野株式会社", "0411 株式会社ラクーンコマース（スーパーデリバリー）",
-        "0435 株式会社 流久商事", "0444 ハナモンワークス 合同会社", "0445 富森商事 株式会社",
-        "0457 カネイシ株式会社", "0468 王子国際貿易株式会社", "0469 株式会社 新日配薬品",
-        "0474 株式会社 五洲", "0475 株式会社シゲマツ", "0476 カード仕入れ",
-        "0479 スケーター株式会社", "0482 風雲商事株式会社", "0484 ZSA商事株式会社",
-        "0486 Maple International株式会社", "0490 NEW WIND株式会社", "0491 アプライド株式会社"
-    ]
+    # ---------- 発注情報 ----------
+    suppliers = ["0402 ハリマ共和物産株式会社", "0025 株式会社オンダ", "0469 株式会社 新日配薬品"]
     employees = ["031 斎藤裕史", "037 米澤和敏", "043 徐越", "079 隋艶偉"]
     departments = ["輸出事業部 : 輸出（ASEAN）", "輸出事業部 : 輸出（中国）", "輸出事業部"]
     locations = ["JD-物流-千葉", "弁天倉庫"]
@@ -1609,7 +1600,7 @@ elif mode == "order":
     col1, col2, col3 = st.columns(3)
     with col1:
         external_id = datetime.now().strftime("%Y%m%d%H%M%S")
-        st.text_input("外部ID（自動）", value=external_id, disabled=True)
+        st.text_input("外部ID", value=external_id, disabled=True)
         supplier = st.selectbox("仕入先", suppliers)
     with col2:
         order_date = st.date_input("日付", value=date.today())
@@ -1625,11 +1616,11 @@ elif mode == "order":
         df_item = fetch_table("item_master")
         df_item.columns = df_item.columns.str.strip().str.lower()
 
-        # jan列クリーンアップ、先頭00000を削除
+        # JAN整形（先頭00000を削除）
         df_order["jan"] = df_order["jan"].astype(str).str.strip().str.replace(r"^0{5,}", "", regex=True)
         df_item["jan"] = df_item["jan"].astype(str).str.strip().str.replace(r"^0{5,}", "", regex=True)
 
-        # 税率判定
+        # 税率判定関数
         def get_tax_rate(schedule):
             if not schedule or pd.isna(schedule): return 0.0
             if "10" in schedule: return 0.10
@@ -1640,19 +1631,24 @@ elif mode == "order":
 
         df = df_order.merge(df_item, on="jan", how="left")
 
+        # 欠損JANの表示
         missing = df[df["商品名"].isna()]
         if not missing.empty:
             st.warning(f"⚠ {len(missing)} 件のJANが item_master に見つかりません")
             st.dataframe(missing[["jan"]])
 
+        # 数値変換
         qty_col = "ロット×数量" if "ロット×数量" in df.columns else "数量"
         df["数量"] = pd.to_numeric(df[qty_col], errors="coerce").fillna(0).astype(int)
         df["単価"] = pd.to_numeric(df["単価"], errors="coerce").fillna(0).astype(int)
+
+        # 金額・税額・総額
         df["金額"] = df["単価"] * df["数量"]
         df["税額"] = np.floor(df["金額"] * df["tax_rate"]).fillna(0).astype(int)
         df["総額"] = df["金額"] + df["税額"]
 
         order_date_str = order_date.strftime("%Y/%m/%d")
+
         df_out = pd.DataFrame({
             "外部ID": external_id,
             "仕入先": supplier,
@@ -1669,12 +1665,12 @@ elif mode == "order":
             "総額": df["総額"]
         })
 
-        st.subheader("📁 発注書プレビュー")
+        st.subheader("📑 発注書プレビュー")
         st.dataframe(df_out)
 
         csv_out = df_out.to_csv(index=False, encoding="utf-8-sig")
         st.download_button(
-            label="📅 発注書CSVをダウンロード",
+            label="📥 発注書CSVをダウンロード",
             data=csv_out,
             file_name=f"発注書_{external_id}.csv",
             mime="text/csv"
