@@ -498,18 +498,18 @@ elif mode == "order_ai":
                 sets = math.ceil(need_for_lot / lot)
                 qty = sets * lot
                 total_cost = qty * float(best_option["price"])
-
+                
                 results.append({
                     "jan": jan,
                     "販売実績": sold,
                     "在庫": stock,
                     "発注済": ordered,
                     "理論必要数": base_needed,
-                    "発注数": qty,
-                    "ロット": lot,
-                    "数量": round(qty / lot, 2),
-                    "単価": float(best_option["price"]),
-                    "総額": total_cost,
+                    "発注数": int(qty),                   # ← 整数
+                    "ロット": lot,                        # ← 整数
+                    "数量": int(sets),                    # ← 整数
+                    "単価": int(best_option["price"]),    # ← 整数
+                    "総額": int(total_cost),              # ← 整数
                     "仕入先": best_option.get("supplier", "不明"),
                     "ランク": rank
                 })
