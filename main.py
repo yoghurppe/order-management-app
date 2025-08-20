@@ -283,6 +283,9 @@ elif mode == "order_ai":
             "Content-Type": "application/json"
         }
 
+        import math
+        from datetime import date, timedelta
+
         def fetch_table(table_name):
             headers = {**HEADERS, "Prefer": "count=exact"}
             dfs = []
@@ -320,18 +323,18 @@ elif mode == "order_ai":
             st.warning("JDモード用の warehouse_stock データが不足しています。")
             st.stop()
 
-        # 正規化
+        # 正規化・型揃え
         df_sales["jan"] = df_sales["jan"].apply(normalize_jan)
         df_purchase["jan"] = df_purchase["jan"].apply(normalize_jan)
         df_master["jan"] = df_master["jan"].apply(normalize_jan)
+        df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
+        df_sales["stock_available"] = pd.to_numeric(df_sales["stock_available"], errors="coerce").fillna(0).astype(int)
+
         if ai_mode == "JDモード":
             df_warehouse["product_code"] = df_warehouse["product_code"].apply(normalize_jan)
             df_warehouse["stock_available"] = pd.to_numeric(df_warehouse["stock_available"], errors="coerce").fillna(0).astype(int)
 
-        df_sales["quantity_sold"] = pd.to_numeric(df_sales["quantity_sold"], errors="coerce").fillna(0).astype(int)
-        df_sales["stock_available"] = pd.to_numeric(df_sales["stock_available"], errors="coerce").fillna(0).astype(int)
-
-        # 発注履歴（上海除外計算で使用）
+        # 発注履歴（上海除外/直近判定に使用）
         df_history = fetch_table("purchase_history")
         if df_history.empty:
             df_history = pd.DataFrame(columns=["jan", "quantity", "memo", "order_date"])
@@ -339,18 +342,16 @@ elif mode == "order_ai":
         df_history["memo"] = df_history["memo"].astype(str).fillna("")
         df_history["jan"] = df_history["jan"].apply(normalize_jan)
 
-        # 🔄 「上海」を含む発注履歴を除外対象として集計
+        # 「上海」分を item_master 発注済から控除
         df_shanghai = df_history[df_history["memo"].str.contains("上海", na=False)]
         df_shanghai_grouped = df_shanghai.groupby("jan")["quantity"].sum().reset_index(name="shanghai_quantity")
-
-        # item_master の発注済に「上海」分を差し引いた列を追加
         if "発注済" not in df_master.columns:
             df_master["発注済"] = 0
         df_master = df_master.merge(df_shanghai_grouped, on="jan", how="left")
         df_master["shanghai_quantity"] = df_master["shanghai_quantity"].fillna(0).astype(int)
         df_master["発注済_修正後"] = (pd.to_numeric(df_master["発注済"], errors="coerce").fillna(0) - df_master["shanghai_quantity"]).clip(lower=0)
 
-        # df_sales 側に発注済を再マージ
+        # sales に反映
         df_sales.drop(columns=["発注済"], errors="ignore", inplace=True)
         df_sales = df_sales.merge(df_master[["jan", "発注済_修正後"]], on="jan", how="left")
         df_sales["発注済"] = df_sales["発注済_修正後"].fillna(0).astype(int)
@@ -359,18 +360,16 @@ elif mode == "order_ai":
         df_purchase["order_lot"] = pd.to_numeric(df_purchase["order_lot"], errors="coerce").fillna(0).astype(int)
         df_purchase["price"] = pd.to_numeric(df_purchase["price"], errors="coerce")
 
+        # ランク倍率（C/TESTで使用。A/Bは新仕様により未使用）
         rank_multiplier = {
-            "Aランク": 1.0,
-            "Bランク": 1.2,
+            "Aランク": 1.0,  # 未使用
+            "Bランク": 1.2,  # 未使用（発注数は1.7S、発注点1.2Sに変更）
             "Cランク": 1.0,
             "TEST": 1.5
         }
 
-        from datetime import date, timedelta
-        import math
-
         with st.spinner("🤖 発注AIが計算をしています..."):
-            # 直近発注の除外リスト（本日/昨日）
+            # 直近（本日/昨日）発注の除外
             df_history_recent = df_history.copy()
             df_history_recent["order_date"] = pd.to_datetime(df_history_recent["order_date"], errors="coerce").dt.date
             today = date.today()
@@ -378,63 +377,66 @@ elif mode == "order_ai":
             recent_jans = df_history_recent[df_history_recent["order_date"].isin([today, yesterday])]["jan"].dropna().astype(str).apply(normalize_jan).unique().tolist()
 
             results = []
+
             for _, row in df_sales.iterrows():
                 jan = row["jan"]
                 sold = row["quantity_sold"]
+                ordered = row["発注済"]
 
-                # 在庫
+                # 在庫取得
                 if ai_mode == "JDモード":
                     stock_row = df_warehouse[df_warehouse["product_code"] == jan]
                     stock = stock_row["stock_available"].values[0] if not stock_row.empty else 0
                 else:
                     stock = row.get("stock_available", 0)
 
-                ordered = row["発注済"]
-
-                # ランク・倍率
+                # ランク取得
                 rank_row = df_master[df_master["jan"] == jan]
                 if not rank_row.empty and ("ランク" in df_master.columns):
                     rank = str(rank_row.iloc[0]["ランク"]) if pd.notna(rank_row.iloc[0]["ランク"]) else ""
                 else:
                     rank = ""
-                multiplier = rank_multiplier.get(rank, 1.0)
-
-                # 必要数（理論）
-                if rank == "Aランク":
-                    if (stock + ordered) < sold:
-                        need_qty_raw = math.ceil(sold * 1.2)
-                    else:
-                        need_qty_raw = 0
-                else:
-                    need_qty_raw = math.ceil(sold * multiplier) - stock - ordered
-
-                # 最低1発注の特例
-                if stock <= 1 and sold >= 1 and need_qty_raw <= 0:
-                    need_qty = 1
-                else:
-                    need_qty = max(need_qty_raw, 0)
 
                 # 直近発注スキップ
                 if jan in recent_jans:
                     continue
 
-                # 発注点判定
-                if rank == "Aランク":
-                    reorder_point = max(math.floor(sold * 1.0), 1)
-                elif rank == "Bランク":
-                    reorder_point = max(math.floor(sold * 0.9), 1)
-                else:
-                    reorder_point = max(math.floor(sold * 0.7), 1)
-
                 current_total = stock + ordered
-                if current_total > reorder_point:
-                    continue
-                if need_qty <= 0:
-                    continue
 
-                # === ここから「価格がなくても出力」ロジック ===
+                # ===== 発注点判定 =====
+                if rank in ["Aランク", "Bランク"]:
+                    # 新仕様：在庫+発注済 が ceil(実績×1.2) を「下回ったら」発注
+                    reorder_point = max(math.ceil(sold * 1.2), 1)
+                    if current_total >= reorder_point:
+                        continue  # 下回っていない（=発注しない）
+                else:
+                    # 既存仕様（C/TEST）
+                    if rank == "Cランク":
+                        reorder_point = max(math.floor(sold * 0.7), 1)
+                    else:  # TEST or その他
+                        reorder_point = max(math.floor(sold * 0.7), 1)
+                    if current_total > reorder_point:
+                        continue
+
+                # ===== 発注数の基準 =====
+                if rank in ["Aランク", "Bランク"]:
+                    # 新仕様：発注数 = ceil(実績×1.7)
+                    base_needed = max(math.ceil(sold * 1.7), 0)
+                    # 「最低1個」特例は A/B でも有効にしておく（在庫ほぼゼロで実績ありの安全策）
+                    if stock <= 1 and sold >= 1 and base_needed <= 0:
+                        base_needed = 1
+                else:
+                    # C/TEST：不足分 = ceil(実績×倍率) - 在庫 - 発注済
+                    m = rank_multiplier.get(rank, 1.0)
+                    need_raw = math.ceil(sold * m) - stock - ordered
+                    base_needed = 1 if (stock <= 1 and sold >= 1 and need_raw <= 0) else max(need_raw, 0)
+                    if base_needed <= 0:
+                        continue  # 不足なし
+
+                # ここで base_needed > 0 なら発注必要
+
+                # 仕入候補抽出
                 options_all = df_purchase[df_purchase["jan"] == jan].copy()
-
                 valid_options = pd.DataFrame()
                 if not options_all.empty:
                     options_all["order_lot"] = pd.to_numeric(options_all["order_lot"], errors="coerce").fillna(0).astype(int)
@@ -442,41 +444,47 @@ elif mode == "order_ai":
                     options_lotpos = options_all[options_all["order_lot"] > 0].copy()
                     valid_options = options_lotpos[options_lotpos["price"].notna() & (options_lotpos["price"] > 0)].copy()
 
-                # ✅ 価格付き候補が無い → 空欄で出力
+                # 価格が無い/ロット無効 → 空欄で出力
                 if valid_options.empty:
-                    theory_needed = need_qty_raw if rank == "Aランク" else need_qty
                     results.append({
                         "jan": jan,
                         "販売実績": sold,
                         "在庫": stock,
                         "発注済": ordered,
-                        "理論必要数": theory_needed,
-                        "発注数": "",          # 空白
-                        "ロット": "",          # 空白
-                        "数量": "",            # 空白
-                        "単価": "",            # 空白
-                        "総額": "",            # 空白
-                        "仕入先": "",          # 空白
+                        "理論必要数": base_needed if rank not in ["Aランク", "Bランク"] else base_needed,  # 表示用
+                        "発注数": "",     # 空欄
+                        "ロット": "",     # 空欄
+                        "数量": "",       # 空欄
+                        "単価": "",       # 空欄
+                        "総額": "",       # 空欄
+                        "仕入先": "",     # 空欄
                         "ランク": rank
                     })
                     continue
 
-                # ここから先は価格あり通常選定
-                options = valid_options
+                # 価格あり：ロット最適化
+                options = valid_options.copy()
 
-                if rank == "Aランク":
-                    bigger_lots = options[options["order_lot"] >= need_qty]
+                # A/B は base_needed=ceil(1.7S) をロットで切り上げ
+                # C/TEST は「不足分」= base_needed をロットで切り上げ
+                need_for_lot = base_needed
+
+                if rank in ["Aランク", "Bランク"]:
+                    # ロット選定：できるだけ need_for_lot に近い（不足しない）ロットを選ぶ
+                    bigger_lots = options[options["order_lot"] >= need_for_lot]
                     if not bigger_lots.empty:
-                        best_option = bigger_lots.sort_values("order_lot", ascending=False).iloc[0]
+                        best_option = bigger_lots.sort_values("order_lot").iloc[0]  # 最小で足りるロット
                     else:
+                        # 全部小さい場合は最大ロット
                         best_option = options.sort_values("order_lot", ascending=False).iloc[0]
                 else:
-                    options["diff"] = (options["order_lot"] - need_qty).abs()
-                    smaller_lots = options[options["order_lot"] <= need_qty]
+                    # 従来ロジック
+                    options["diff"] = (options["order_lot"] - need_for_lot).abs()
+                    smaller_lots = options[options["order_lot"] <= need_for_lot]
                     if not smaller_lots.empty:
                         best_option = smaller_lots.loc[smaller_lots["diff"].idxmin()]
                     else:
-                        near_lots = options[(options["order_lot"] > need_qty) & (options["order_lot"] <= need_qty * 1.5) & (options["order_lot"] != 1)]
+                        near_lots = options[(options["order_lot"] > need_for_lot) & (options["order_lot"] <= need_for_lot * 1.5) & (options["order_lot"] != 1)]
                         if not near_lots.empty:
                             best_option = near_lots.loc[near_lots["diff"].idxmin()]
                         else:
@@ -486,23 +494,21 @@ elif mode == "order_ai":
                             else:
                                 best_option = options.sort_values("order_lot").iloc[0]
 
-                if rank == "Aランク":
-                    sets = math.ceil(need_qty_raw / best_option["order_lot"])
-                else:
-                    sets = math.ceil(need_qty / best_option["order_lot"])
-                qty = sets * best_option["order_lot"]
-                total_cost = qty * best_option["price"]
+                lot = int(best_option["order_lot"])
+                sets = math.ceil(need_for_lot / lot)
+                qty = sets * lot
+                total_cost = qty * float(best_option["price"])
 
                 results.append({
                     "jan": jan,
                     "販売実績": sold,
                     "在庫": stock,
                     "発注済": ordered,
-                    "理論必要数": need_qty_raw if rank == "Aランク" else need_qty,
+                    "理論必要数": base_needed,
                     "発注数": qty,
-                    "ロット": best_option["order_lot"],
-                    "数量": round(qty / best_option["order_lot"], 2),
-                    "単価": best_option["price"],
+                    "ロット": lot,
+                    "数量": round(qty / lot, 2),
+                    "単価": float(best_option["price"]),
                     "総額": total_cost,
                     "仕入先": best_option.get("supplier", "不明"),
                     "ランク": rank
@@ -512,7 +518,7 @@ elif mode == "order_ai":
             if results:
                 result_df = pd.DataFrame(results)
 
-                # 商品名・取扱区分の結合
+                # 商品名・取扱区分を結合
                 if "商品コード" in df_master.columns:
                     df_master["商品コード"] = df_master["商品コード"].astype(str).str.strip()
                     result_df["jan"] = result_df["jan"].astype(str).str.strip()
@@ -520,7 +526,7 @@ elif mode == "order_ai":
                     df_temp.rename(columns={"商品コード": "jan"}, inplace=True)
                     result_df = pd.merge(result_df, df_temp, on="jan", how="left")
 
-                # ✅ 弁天在庫を結合（表示のみ）
+                # 弁天在庫（表示のみ）
                 df_benten = fetch_table("benten_stock")
                 if not df_benten.empty:
                     df_benten["jan"] = df_benten["jan"].astype(str).str.strip()
@@ -528,10 +534,10 @@ elif mode == "order_ai":
                     result_df = pd.merge(result_df, df_benten, on="jan", how="left")
                     result_df["弁天在庫"] = result_df["弁天在庫"].fillna(0).astype(int)
 
-                # 在庫列名：通常モードでもUI統一のため JD在庫 に揃える
+                # 列名統一
                 result_df.rename(columns={"在庫": "JD在庫"}, inplace=True)
 
-                # 表示フィルタ（商品名あり / 取扱中止を除外）
+                # 表示フィルタ
                 if "商品名" in result_df.columns:
                     result_df = result_df[result_df["商品名"].notna()]
                 if "取扱区分" in result_df.columns:
@@ -551,7 +557,7 @@ elif mode == "order_ai":
                 csv = result_df.to_csv(index=False).encode("utf-8-sig")
                 st.download_button("📥 発注CSVダウンロード", data=csv, file_name="orders_available_based.csv", mime="text/csv")
 
-                # 仕入先別CSV（仕入先が空白の行はスキップ）
+                # 仕入先別CSV（仕入先が空白の行は除外）
                 st.markdown("---")
                 st.subheader("📦 仕入先別ダウンロード")
                 if "仕入先" in result_df.columns:
