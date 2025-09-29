@@ -1371,9 +1371,9 @@ elif mode == "rank_check":
     df_item["shanghai_quantity"] = df_item["shanghai_quantity"].fillna(0).astype(int)
     df_item["発注済"] = (df_item["発注済"] - df_item["shanghai_quantity"]).clip(lower=0)
 
-    # A/B/Cランク商品のみ（JANあり）
+    # A/B/C/取扱中止ランク商品のみ（JANあり）
     df_ab = df_item[
-        df_item["ランク"].isin(["Aランク", "Bランク", "Cランク"]) & df_item["jan"].notnull()
+        df_item["ランク"].isin(["Aランク", "Bランク", "Cランク", "取扱中止"]) & df_item["jan"].notnull()
     ].copy()
     df_ab["JAN"] = df_ab["jan"]
     df_ab = df_ab.drop_duplicates(subset=["JAN"])
@@ -1381,8 +1381,8 @@ elif mode == "rank_check":
     # ランクフィルター
     selected_ranks = st.multiselect(
         "📌 表示するランクを選択",
-        ["Aランク", "Bランク", "Cランク"],
-        default=["Aランク", "Bランク", "Cランク"]
+        ["Aランク", "Bランク", "Cランク", "取扱中止"],
+        default=["Aランク", "Bランク", "Cランク", "取扱中止"]
     )
 
     # sales → JAN
@@ -1409,8 +1409,12 @@ elif mode == "rank_check":
     df_item_sub = df_item_sub[["JAN", "発注済"]]
 
     # マージ
+    base_cols = ["JAN", "商品名", "ランク"]
+    if "purchase_cost" in df_ab.columns:
+        base_cols.append("purchase_cost")
+
     df_merged = (
-        df_ab[["JAN", "商品名", "ランク"]]
+        df_ab[base_cols].rename(columns={"purchase_cost": "最安原価"})
         .merge(df_sales_30, on="JAN", how="left")
         .merge(df_item_sub, on="JAN", how="left")
         .merge(df_stock[["JAN", "JD在庫"]], on="JAN", how="left")
@@ -1423,6 +1427,7 @@ elif mode == "rank_check":
     df_merged["JD在庫"] = df_merged["JD在庫"].fillna(0)
     df_merged["弁天在庫"] = df_merged["弁天在庫"].fillna(0)
     df_merged["実績（7日）"] = None
+    df_merged["最安原価"] = pd.to_numeric(df_merged.get("最安原価"), errors="coerce") 
 
     # アラート計算
     df_merged["発注アラート1.0"] = df_merged["実績（30日）"] > (
@@ -1452,6 +1457,7 @@ elif mode == "rank_check":
         "JD在庫",
         "弁天在庫",
         "発注済",
+        "最安原価",
         "発注アラート1.0",
         "発注アラート1.2"
     ]])
