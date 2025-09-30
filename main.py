@@ -1756,76 +1756,77 @@ elif mode == "order":
             file_name=f"発注書_{external_id}.csv",
             mime="text/csv"
         )
+elif mode == "store_profit":
+    st.subheader("🏪 店舗別粗利一覧")
 
-    elif mode == "store_profit":
-        st.subheader("🏪 店舗別粗利一覧")
+    # --- デバッグ: 今の mode と取得状況を表示 ---
+    st.caption(f"debug: mode={mode}")
 
-        # --- デバッグ: 今の mode と取得状況を表示 ---
-        st.caption(f"debug: mode={mode}")
+    # Supabase からデータ取得
+    df = fetch_table("store_profit_lines")
 
-        # Supabase からデータ取得
-        df = fetch_table("store_profit_lines")
+    st.caption(f"debug: fetched rows = {0 if df is None else len(df)}")
+    if df is None or df.empty:
+        st.warning("store_profit_lines が空か、読み出せていません。")
+        st.info("次を確認してください：\n"
+                "1) Supabaseにデータがあるか（SQLで SELECT count(*)）\n"
+                "2) RLSが有効なら、匿名キー(anon)に対してSELECT許可ポリシーがあるか\n"
+                "3) fetch_table が 'store_profit_lines' を正しいプロジェクトに向けているか")
+        st.stop()
 
-        st.caption(f"debug: fetched rows = {0 if df is None else len(df)}")
-        if df is None or df.empty:
-            st.warning("store_profit_lines が空か、読み出せていません。")
-            st.info("次を確認してください：\n"
-                    "1) Supabaseにデータがあるか（SQLで SELECT count(*)）\n"
-                    "2) RLSが有効なら、匿名キー(anon)に対してSELECT許可ポリシーがあるか\n"
-                    "3) fetch_table が 'store_profit_lines' を正しいプロジェクトに向けているか")
-            st.stop()
+    # 列の存在チェック
+    required_cols = {"report_period","line_type","store","qty","revenue","defined_cost","gross_profit","original_line"}
+    st.caption(f"debug: columns = {list(df.columns)}")
+    missing = required_cols - set(df.columns)
+    if missing:
+        st.error(f"必要列が足りません: {missing}")
+        st.stop()
 
-        # 列の存在チェック
-        required_cols = {"report_period","line_type","store","qty","revenue","defined_cost","gross_profit","original_line"}
-        st.caption(f"debug: columns = {list(df.columns)}")
-        missing = required_cols - set(df.columns)
-        if missing:
-            st.error(f"必要列が足りません: {missing}")
-            st.stop()
+    # 期間選択
+    periods = sorted(df["report_period"].dropna().unique())
+    if len(periods) == 0:
+        st.warning("report_period が見つかりません。アップロード時の period を確認してください。")
+        st.stop()
+    sel_period = st.selectbox("対象期間を選択", periods, index=len(periods)-1)
 
-        # 期間選択
-        periods = sorted(df["report_period"].dropna().unique())
-        if len(periods) == 0:
-            st.warning("report_period が見つかりません。アップロード時の period を確認してください。")
-            st.stop()
-        sel_period = st.selectbox("対象期間を選択", periods, index=len(periods)-1)
+    dfp = df[df["report_period"] == sel_period]
 
-        dfp = df[df["report_period"] == sel_period]
+    # 店舗別集計（detailのみ）
+    dfd = dfp[dfp["line_type"] == "detail"].copy()
+    if dfd.empty:
+        st.warning("この期間の明細行（line_type='detail'）がありません。CSVの取り込みを確認してください。")
+        st.stop()
 
-        # 店舗別集計（detailのみ）
-        dfd = dfp[dfp["line_type"] == "detail"].copy()
-        if dfd.empty:
-            st.warning("この期間の明細行（line_type='detail'）がありません。CSVの取り込みを確認してください。")
-            st.stop()
+    # 数値型に変換（念のため）
+    for c in ["qty","revenue","defined_cost","gross_profit"]:
+        dfd[c] = pd.to_numeric(dfd[c], errors="coerce").fillna(0).astype(int)
 
-        # 数値型に変換（念のため）
-        for c in ["qty","revenue","defined_cost","gross_profit"]:
-            dfd[c] = pd.to_numeric(dfd[c], errors="coerce").fillna(0).astype(int)
+    grouped = (
+        dfd.groupby("store", as_index=False)
+           .agg(qty=("qty","sum"),
+                revenue=("revenue","sum"),
+                defined_cost=("defined_cost","sum"),
+                gross_profit=("gross_profit","sum"))
+    )
+    grouped["gross_margin"] = (grouped["gross_profit"] / grouped["revenue"] * 100).fillna(0).round(2)
 
-        grouped = (
-            dfd.groupby("store", as_index=False)
-               .agg(qty=("qty","sum"),
-                    revenue=("revenue","sum"),
-                    defined_cost=("defined_cost","sum"),
-                    gross_profit=("gross_profit","sum"))
-        )
-        grouped["gross_margin"] = (grouped["gross_profit"] / grouped["revenue"] * 100).fillna(0).round(2)
+    st.write("### 店舗別集計")
+    st.dataframe(grouped, use_container_width=True)
 
-        st.write("### 店舗別集計")
-        st.dataframe(grouped, use_container_width=True)
+    # ダウンロード（集計 / 原文）
+    st.download_button(
+        "📥 店舗別集計をCSVダウンロード",
+        grouped.to_csv(index=False).encode("utf-8-sig"),
+        file_name=f"store_profit_summary_{sel_period}.csv",
+        mime="text/csv",
+    )
 
-        # ダウンロード（集計 / 原文）
-        st.download_button(
-            "📥 店舗別集計をCSVダウンロード",
-            grouped.to_csv(index=False).encode("utf-8-sig"),
-            file_name=f"store_profit_summary_{sel_period}.csv",
-            mime="text/csv",
-        )
+    csv_original = "\n".join(dfp["original_line"].tolist())
+    st.download_button(
+        "📥 元CSVをダウンロード（完全復元）",
+        csv_original,
+        file_name=f"store_profit_original_{sel_period}.csv",
+        mime="text/csv",
+    )
 
-        csv_original = "\n".join(dfp["original_line"].tolist())
-        st.download_button(
-            "📥 元CSVをダウンロード（完全復元）",
-            csv_original,
-            file_name=f"store_profit_original_{sel_period}.csv",
-            mime="text/csv",
-        )
+
