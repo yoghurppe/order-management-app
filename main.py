@@ -1756,16 +1756,13 @@ elif mode == "order":
             file_name=f"発注書_{external_id}.csv",
             mime="text/csv"
         )
+        
 elif mode == "store_profit":
     st.subheader("🏪 店舗別粗利一覧")
-
-    # --- デバッグ: 今の mode と取得状況を表示 ---
-    st.caption(f"debug: mode={mode}")
 
     # Supabase からデータ取得
     df = fetch_table("store_profit_lines")
 
-    st.caption(f"debug: fetched rows = {0 if df is None else len(df)}")
     if df is None or df.empty:
         st.warning("store_profit_lines が空か、読み出せていません。")
         st.info("次を確認してください：\n"
@@ -1776,7 +1773,6 @@ elif mode == "store_profit":
 
     # 列の存在チェック
     required_cols = {"report_period","line_type","store","qty","revenue","defined_cost","gross_profit","original_line"}
-    st.caption(f"debug: columns = {list(df.columns)}")
     missing = required_cols - set(df.columns)
     if missing:
         st.error(f"必要列が足りません: {missing}")
