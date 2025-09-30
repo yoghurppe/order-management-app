@@ -1760,54 +1760,26 @@ elif mode == "order":
     elif mode == "store_profit":
         st.subheader("🏪 店舗別粗利一覧")
 
+        # --- デバッグ: 今の mode と取得状況を表示 ---
+        st.caption(f"debug: mode={mode}")
+
         # Supabase からデータ取得
         df = fetch_table("store_profit_lines")
-        if df.empty:
-            st.warning("データがありません。CSVをアップロードしてから再度お試しください。")
+
+        st.caption(f"debug: fetched rows = {0 if df is None else len(df)}")
+        if df is None or df.empty:
+            st.warning("store_profit_lines が空か、読み出せていません。")
+            st.info("次を確認してください：\n"
+                    "1) Supabaseにデータがあるか（SQLで SELECT count(*)）\n"
+                    "2) RLSが有効なら、匿名キー(anon)に対してSELECT許可ポリシーがあるか\n"
+                    "3) fetch_table が 'store_profit_lines' を正しいプロジェクトに向けているか")
             st.stop()
 
-        # report_period セレクト
-        periods = sorted(df["report_period"].dropna().unique())
-        sel_period = st.selectbox("対象期間を選択", periods, index=len(periods)-1)
-
-        dfp = df[df["report_period"] == sel_period]
-
-        # 店舗別集計（line_type='detail' のみ）
-        dfd = dfp[dfp["line_type"] == "detail"].copy()
-        if dfd.empty:
-            st.warning("明細行が見つかりません")
-            st.stop()
-
-        grouped = (
-            dfd.groupby("store")
-            .agg({
-                "qty": "sum",
-                "revenue": "sum",
-                "defined_cost": "sum",
-                "gross_profit": "sum"
-            })
-            .reset_index()
-        )
-        grouped["gross_margin"] = (grouped["gross_profit"] / grouped["revenue"] * 100).round(2)
-
-        st.write("### 店舗別集計")
-        st.dataframe(grouped, use_container_width=True)
-
-        # ダウンロードボタン（①集計版、②原文CSV復元）
-        csv_grouped = grouped.to_csv(index=False, encoding="utf-8-sig")
-        st.download_button(
-            "📥 店舗別集計をCSVダウンロード",
-            csv_grouped,
-            file_name=f"store_profit_summary_{sel_period}.csv",
-            mime="text/csv",
-        )
-
-        csv_original = "\n".join(dfp["original_line"].tolist())
-        st.download_button(
-            "📥 元CSVをダウンロード（完全復元）",
-            csv_original,
-            file_name=f"store_profit_original_{sel_period}.csv",
-            mime="text/csv",
-        )
-
+        # 列の存在チェック
+        required_cols = {"report_period","line_type","store","qty","revenue","defined_cost","gross_profit","original_line"}
+        st.caption(f"debug: columns = {list(df.columns)}")
+        missing = required_cols - set(df.columns)
+        if missing:
+            st.error(f"必要列が足りません: {missing}")
+            st
 
