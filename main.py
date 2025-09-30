@@ -1810,13 +1810,76 @@ elif mode == "store_profit":
     )
     grouped["gross_margin"] = (grouped["gross_profit"] / grouped["revenue"] * 100).fillna(0).round(2)
 
-    st.write("### 店舗別集計")
-    st.dataframe(grouped, use_container_width=True)
+    # ---- 表示ラベル（日本語/中国語）と言語別フォーマット ----
+    LABELS = {
+        "日本語": {
+            "store": "店舗",
+            "qty": "数量",
+            "revenue": "売上",
+            "defined_cost": "定義原価",
+            "gross_profit": "粗利",
+            "gross_margin": "粗利率",
+        },
+        "中文": {
+            "store": "店铺",
+            "qty": "数量",
+            "revenue": "销售额",
+            "defined_cost": "定义成本",
+            "gross_profit": "毛利",
+            "gross_margin": "毛利率",
+        },
+    }
+    labels = LABELS.get(language, LABELS["日本語"])
 
-    # ダウンロード（集計 / 原文）
+    # 0除算などのNaN/infは0に
+    grouped.replace([float("inf"), float("-inf")], 0, inplace=True)
+    grouped.fillna(0, inplace=True)
+
+    # 表示用に列名を翻訳
+    display_df = grouped.rename(columns={
+        "store": labels["store"],
+        "qty": labels["qty"],
+        "revenue": labels["revenue"],
+        "defined_cost": labels["defined_cost"],
+        "gross_profit": labels["gross_profit"],
+        "gross_margin": labels["gross_margin"],
+    })
+
+    # 数字フォーマット：カンマ区切り / 粗利率は%付き（小数2桁）
+    def fmt_int(x): 
+        try: return f"{int(x):,}"
+        except: return x
+    def fmt_money(x):
+        try: return f"{int(round(float(x))):,}"
+        except: return x
+    def fmt_pct(x):
+        try: return f"{float(x):.2f}%"
+        except: return x
+
+    display_df[labels["qty"]] = display_df[labels["qty"]].map(fmt_int)
+    display_df[labels["revenue"]] = display_df[labels["revenue"]].map(fmt_money)
+    display_df[labels["defined_cost"]] = display_df[labels["defined_cost"]].map(fmt_money)
+    display_df[labels["gross_profit"]] = display_df[labels["gross_profit"]].map(fmt_money)
+    display_df[labels["gross_margin"]] = display_df[labels["gross_margin"]].map(fmt_pct)
+
+    st.write("### 店舗別集計")
+    # 粗利の大きい順で見やすく
+    display_df = display_df.sort_values(by=labels["gross_profit"], ascending=False, key=lambda s: s.str.replace(",", "", regex=False).astype(int))
+    st.dataframe(display_df, use_container_width=True)
+
+    # ---- ダウンロード（集計 / 原文）----
+    # 集計CSVは見た目の列名で出力（数値は生データのままが良ければ 'grouped' を使ってください）
+    grouped_l10n = grouped.rename(columns={
+        "store": labels["store"],
+        "qty": labels["qty"],
+        "revenue": labels["revenue"],
+        "defined_cost": labels["defined_cost"],
+        "gross_profit": labels["gross_profit"],
+        "gross_margin": labels["gross_margin"],
+    })
     st.download_button(
         "📥 店舗別集計をCSVダウンロード",
-        grouped.to_csv(index=False).encode("utf-8-sig"),
+        grouped_l10n.to_csv(index=False).encode("utf-8-sig"),
         file_name=f"store_profit_summary_{sel_period}.csv",
         mime="text/csv",
     )
@@ -1828,5 +1891,6 @@ elif mode == "store_profit":
         file_name=f"store_profit_original_{sel_period}.csv",
         mime="text/csv",
     )
+
 
 
