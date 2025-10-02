@@ -1806,6 +1806,95 @@ elif mode == "store_profit":
     )
     grouped["gross_margin"] = (grouped["gross_profit"] / grouped["revenue"] * 100).fillna(0).round(2)
 
+        # ---- 合計（全店）テーブルを先に表示する ---------------------------------
+    # 表示ラベル（日本語/中国語）
+    LABELS = {
+        "日本語": {
+            "store": "店舗",
+            "qty": "数量",
+            "revenue": "売上",
+            "defined_cost": "定義原価",
+            "gross_profit": "粗利",
+            "gross_margin": "粗利率",
+        },
+        "中文": {
+            "store": "店铺",
+            "qty": "数量",
+            "revenue": "销售额",
+            "defined_cost": "定义成本",
+            "gross_profit": "毛利",
+            "gross_margin": "毛利率",
+        },
+    }
+    TOTAL_LABELS = {
+        "日本語": {
+            "title": "🧮 合計（全店）",
+            "period": "対象期間",
+            "qty": "合計数量",
+            "revenue": "売上合計",
+            "defined_cost": "定義原価合計",
+            "gross_profit": "粗利合計",
+            "gross_margin": "粗利率",
+            "download": "📥 合計（全店）をCSVダウンロード",
+        },
+        "中文": {
+            "title": "🧮 合计（全店）",
+            "period": "期间",
+            "qty": "合计数量",
+            "revenue": "销售额合计",
+            "defined_cost": "定义成本合计",
+            "gross_profit": "毛利合计",
+            "gross_margin": "毛利率",
+            "download": "📥 下载合计（全店）CSV",
+        },
+    }
+    labels = LABELS.get(language, LABELS["日本語"])
+    tlabels = TOTAL_LABELS.get(language, TOTAL_LABELS["日本語"])
+
+    # フォーマッタ
+    def fmt_int(x):
+        try:
+            return f"{int(x):,}"
+        except:
+            return x
+    def fmt_money(x):
+        try:
+            return f"{int(round(float(x))):,}"
+        except:
+            return x
+    def fmt_pct(x):
+        try:
+            return f"{float(x):.2f}%"
+        except:
+            return x
+
+    # 合計値
+    total_qty     = int(grouped["qty"].sum())
+    total_rev     = int(grouped["revenue"].sum())
+    total_cost    = int(grouped["defined_cost"].sum())
+    total_gp      = int(grouped["gross_profit"].sum())
+    total_margin  = round((total_gp / total_rev * 100) if total_rev else 0.0, 2)
+
+    df_total = pd.DataFrame([{
+        tlabels["period"]: sel_period,
+        tlabels["qty"]: fmt_int(total_qty),
+        tlabels["revenue"]: fmt_money(total_rev),
+        tlabels["defined_cost"]: fmt_money(total_cost),
+        tlabels["gross_profit"]: fmt_money(total_gp),
+        tlabels["gross_margin"]: fmt_pct(total_margin),
+    }])
+
+    st.markdown(f"### {tlabels['title']}")
+    st.dataframe(df_total, use_container_width=True)
+
+    st.download_button(
+        tlabels["download"],
+        df_total.to_csv(index=False).encode("utf-8-sig"),
+        file_name=f"store_profit_total_{sel_period}.csv",
+        mime="text/csv",
+    )
+
+
     # ---- 表示ラベル（日本語/中国語）と言語別フォーマット ----
     LABELS = {
         "日本語": {
