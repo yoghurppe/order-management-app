@@ -263,14 +263,18 @@ GROUPS = [
     ("【アップロード】",  ["csv_upload"]),
 ]
 
+# === ここから置き換え ===
+from urllib.parse import urlencode
+
 with st.sidebar:
     st.markdown(f"### {TEXT[language]['mode_select']}")
 
-    # 見た目を整える軽量CSS
+    # スタイル
     st.markdown("""
     <style>
-      .nav-group { margin: .5rem 0 .2rem; font-weight: 700; }
-      .nav-btn {
+      .nav-group { margin: .5rem 0 .25rem; font-weight: 700; }
+      a.nav-btn {
+        display: block;
         width: 100%;
         text-align: left;
         padding: .45rem .6rem;
@@ -278,41 +282,49 @@ with st.sidebar:
         border-radius: .55rem;
         margin: .18rem 0;
         background: white;
-        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.1s ease;
       }
-      .nav-btn:hover { background: rgba(49,51,63,.06); }
-      .nav-btn.active {
-        background: rgba(14,165,233,.12);           /* 青っぽい薄いハイライト */
+      a.nav-btn:hover { background: rgba(49,51,63,.06); }
+      a.nav-btn.active {
+        background: rgba(14,165,233,.12);
         border-color: rgba(14,165,233,.45);
         font-weight: 600;
       }
     </style>
     """, unsafe_allow_html=True)
 
-    # グループごとにボタンを並べる（選択は session_state["mode"] に保持）
+    # グループごとに <a href="?mode=..."> を生成（右クリックで新規タブOK）
     for group_title, keys in GROUPS:
         st.markdown(f"<div class='nav-group'>{group_title}</div>", unsafe_allow_html=True)
         for k in keys:
-            label = local_label(k)
+            label = local_label(k)  # ラベルに <br> を含んでもOK
             active_class = "active" if st.session_state["mode"] == k else ""
-            button_html = f"""
-                <button class='nav-btn {active_class}' onClick="window.location.href='?mode={k}'">
-                    {label}
-                </button>
-            """
-            st.markdown(button_html, unsafe_allow_html=True)
 
-# URL パラメータからモードを検出（新API）
-mode_param = st.query_params.get("mode")  # 文字列 or None
-if mode_param in MODE_KEYS:               # 不正値ガード
+            # 既存のクエリを維持しつつ mode だけ上書き
+            params = dict(st.query_params)
+            params["mode"] = k
+            href = "?" + urlencode(params, doseq=True)
+
+            st.markdown(
+                f"<a class='nav-btn {active_class}' href='{href}'>{label}</a>",
+                unsafe_allow_html=True
+            )
+
+# URL → 状態 反映（新API）
+mode_param = st.query_params.get("mode")
+if mode_param in MODE_KEYS:
     st.session_state["mode"] = mode_param
 
-# 最終的な現在モード
+# 現在モード
 mode = st.session_state["mode"]
 
-# URL と状態を同期（直打ち/クリック後にURLへ反映）
+# 状態 → URL 同期（直打ちや初期表示時の補完）
 if st.query_params.get("mode") != mode:
     st.query_params["mode"] = mode
+# === ここまで置き換え ===
+
 
 
 # 各モードの処理分岐
