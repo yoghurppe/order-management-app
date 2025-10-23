@@ -207,8 +207,8 @@ MODE_KEYS = {
         "中文": "🏪 各店铺毛利一览"
     },
     "search_item": {
-        "日本語": f"🔍 商品情報検索{item_master_update_text}",
-        "中文": f"🔍 商品信息查询{item_master_update_text}"
+        "日本語": f"🔍 商品情報検索\n{item_master_update_text}",
+        "中文": f"🔍 商品信息查询\n{item_master_update_text}"
     },
     "monthly_sales": {
         "日本語": "販売実績（直近1ヶ月）",
@@ -219,15 +219,15 @@ MODE_KEYS = {
         "中文": "订货AI判断"
     },
     "rank_check": {
-        "日本語": "ABCランク商品確認",
-        "中文": "ABC等级商品检查"
+        "日本語": "ランク別発注確認",
+        "中文": "按等级确认订单"
     },
     "purchase_history": {
         "日本語": "📜 発注履歴",
         "中文": "📜 订货记录"
     },
     "order": {
-        "日本語": "📦 発注書作成モード",
+        "日本語": "📦 発注書作成",
         "中文": "📦 订单书生成模式"
     },
     "csv_upload": {
