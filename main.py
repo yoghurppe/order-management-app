@@ -302,13 +302,17 @@ with st.sidebar:
             """
             st.markdown(button_html, unsafe_allow_html=True)
 
-# URL パラメータからモードを検出
-params = st.experimental_get_query_params()
-if "mode" in params:
-    st.session_state["mode"] = params["mode"][0]
+# URL パラメータからモードを検出（新API）
+mode_param = st.query_params.get("mode")  # 文字列 or None
+if mode_param in MODE_KEYS:               # 不正値ガード
+    st.session_state["mode"] = mode_param
 
 # 最終的な現在モード
 mode = st.session_state["mode"]
+
+# URL と状態を同期（直打ち/クリック後にURLへ反映）
+if st.query_params.get("mode") != mode:
+    st.query_params["mode"] = mode
 
 
 # 各モードの処理分岐
