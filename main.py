@@ -74,7 +74,7 @@ language = st.sidebar.selectbox("言語 / Language", ["日本語", "中文"], ke
 # ユーザー表示用ラベルテキスト
 TEXT = {
     "日本語": {
-        "title_order_ai": "管理補助システム",
+        "title_order_ai": "【ASEAN】一元管理システム",
         "mode_select": "モードを選んでください",
         "upload_csv": "CSVアップロード",
         "order_ai": "発注AI判定",
