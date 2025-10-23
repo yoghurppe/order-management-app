@@ -308,10 +308,10 @@ with st.sidebar:
             href = "?" + urlencode(params, doseq=True)
 
             st.markdown(
-                f"<a class='nav-btn {active_class}' href='{href}'>{label}</a>",
+                f"<a class='nav-btn {active_class}' href='{href}' target='_self'>{label}</a>",
                 unsafe_allow_html=True
             )
-
+            
 # URL → 状態 反映（新API）
 mode_param = st.query_params.get("mode")
 if mode_param in MODE_KEYS:
