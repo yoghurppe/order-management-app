@@ -245,9 +245,68 @@ MODE_KEYS = {
 }
 
 
-mode_labels = [v[language] for v in MODE_KEYS.values()]
-mode_selection = st.sidebar.radio(TEXT[language]["mode_select"], mode_labels, index=0)
-mode = next(key for key, labels in MODE_KEYS.items() if labels[language] == mode_selection)
+# 単一選択モードの初期化
+if "mode" not in st.session_state:
+    st.session_state["mode"] = "home"  # デフォルトはトップ
+
+# 多言語ラベル取得
+def local_label(mode_key: str) -> str:
+    d = MODE_KEYS.get(mode_key, {})
+    return d.get(language) or d.get("日本語") or mode_key
+
+# 表示グループ定義（順番＝表示順）
+GROUPS = [
+    ("トップページ",      ["home"]),
+    ("【売上データ】",    ["store_profit"]),
+    ("【商品情報】",      ["search_item", "monthly_sales"]),
+    ("【発注】",          ["order_ai", "rank_check", "purchase_history", "order"]),
+    ("【アップロード】",  ["csv_upload"]),
+]
+
+with st.sidebar:
+    st.markdown(f"### {TEXT[language]['mode_select']}")
+
+    # 見た目を整える軽量CSS
+    st.markdown("""
+    <style>
+      .nav-group { margin: .5rem 0 .2rem; font-weight: 700; }
+      .nav-btn {
+        width: 100%;
+        text-align: left;
+        padding: .45rem .6rem;
+        border: 1px solid rgba(49,51,63,.2);
+        border-radius: .55rem;
+        margin: .18rem 0;
+        background: white;
+        cursor: pointer;
+      }
+      .nav-btn:hover { background: rgba(49,51,63,.06); }
+      .nav-btn.active {
+        background: rgba(14,165,233,.12);           /* 青っぽい薄いハイライト */
+        border-color: rgba(14,165,233,.45);
+        font-weight: 600;
+      }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # グループごとにボタンを並べる（選択は session_state["mode"] に保持）
+    for group_title, keys in GROUPS:
+        st.markdown(f"<div class='nav-group'>{group_title}</div>", unsafe_allow_html=True)
+        for k in keys:
+            label = local_label(k)
+            active_class = "active" if st.session_state["mode"] == k else ""
+            form_key = f"form_{k}"
+            with st.form(form_key, clear_on_submit=False):
+                st.markdown(
+                    f"<button class='nav-btn {active_class}' type='submit'>{label}</button>",
+                    unsafe_allow_html=True
+                )
+                submitted = st.form_submit_button("", use_container_width=True)
+                if submitted:
+                    st.session_state["mode"] = k
+
+# 最終的な現在モード
+mode = st.session_state["mode"]
 
 
 # 各モードの処理分岐
