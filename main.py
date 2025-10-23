@@ -2,7 +2,7 @@ import streamlit as st
 
 # ✅ ページ設定を追加
 st.set_page_config(
-    page_title="管理補助システム",
+    page_title="【ASEAN】一元管理システム",
     layout="wide",                 # 横幅を最大化
     initial_sidebar_state="expanded"
 )
