@@ -295,15 +295,17 @@ with st.sidebar:
         for k in keys:
             label = local_label(k)
             active_class = "active" if st.session_state["mode"] == k else ""
-            form_key = f"form_{k}"
-            with st.form(form_key, clear_on_submit=False):
-                st.markdown(
-                    f"<button class='nav-btn {active_class}' type='submit'>{label}</button>",
-                    unsafe_allow_html=True
-                )
-                submitted = st.form_submit_button("", use_container_width=True)
-                if submitted:
-                    st.session_state["mode"] = k
+            button_html = f"""
+                <button class='nav-btn {active_class}' onClick="window.location.href='?mode={k}'">
+                    {label}
+                </button>
+            """
+            st.markdown(button_html, unsafe_allow_html=True)
+
+# URL パラメータからモードを検出
+params = st.experimental_get_query_params()
+if "mode" in params:
+    st.session_state["mode"] = params["mode"][0]
 
 # 最終的な現在モード
 mode = st.session_state["mode"]
