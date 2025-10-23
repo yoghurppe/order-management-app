@@ -207,8 +207,8 @@ MODE_KEYS = {
         "中文": "🏪 各店铺毛利一览"
     },
     "search_item": {
-        "日本語": f"🔍 商品情報検索\n{item_master_update_text}",
-        "中文": f"🔍 商品信息查询\n{item_master_update_text}"
+        "日本語": f"🔍 商品情報検索<br>{item_master_update_text}",
+        "中文": f"🔍 商品信息查询<br>{item_master_update_text}"
     },
     "monthly_sales": {
         "日本語": "販売実績（直近1ヶ月）",
