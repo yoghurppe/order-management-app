@@ -2064,7 +2064,7 @@ elif mode == "daily_sales":
     # 日次専用テーブルを参照
     df = fetch_table("store_profit_daily_lines")
     if df is None or df.empty:
-        st.warning("store_profit_daily_summary が空か、読み出せていません。")
+        st.warning("store_profit_daily_lines が空か、読み出せていません。")
         st.stop()
 
     required = {"report_date","store","qty","revenue","defined_cost","gross_profit"}
