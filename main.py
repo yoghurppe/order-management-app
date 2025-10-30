@@ -17,6 +17,7 @@ import hashlib
 import time
 from zoneinfo import ZoneInfo
 from streamlit_javascript import st_javascript
+import numpy as np
 
 # ここに parse_items_fixed を追加
 def parse_items_fixed(text):
@@ -2079,23 +2080,23 @@ elif mode == "daily_sales":
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0).astype(int)
     if "gross_margin" in df.columns:
         df["gross_margin"] = pd.to_numeric(df["gross_margin"], errors="coerce")
-
+    
     # 期間解決：昨日があれば昨日、なければ最新日
     from datetime import datetime as _dt, timedelta as _td
     jst = ZoneInfo("Asia/Tokyo")
     yday = (_dt.now(jst) - _td(days=1)).date()
-
+    
     dates = sorted(d for d in df["report_date"].dropna().unique())
     if not dates:
         st.warning("report_date が見つかりません。")
         st.stop()
-
+    
     default_date = yday if yday in dates else dates[-1]
     sel_date = st.selectbox("対象日を選択", dates, index=dates.index(default_date))
-
+    
     # 当日データ
     cur = df[df["report_date"] == sel_date].copy()
-
+    
     # 前日データ（テーブル内で直近の1つ前の日付）
     idx = dates.index(sel_date)
     prev_date = dates[idx-1] if idx-1 >= 0 else None
@@ -2103,20 +2104,30 @@ elif mode == "daily_sales":
         prev = df[df["report_date"] == prev_date][["store","revenue"]].rename(columns={"revenue":"revenue_prev"})
     else:
         prev = pd.DataFrame(columns=["store","revenue_prev"])
-
+    
     # 集計（既に店舗別1行/日だが安全のため groupby）
-    cur_g = (cur.groupby("store", as_index=False)
-                .agg(qty=("qty","sum"),
-                     revenue=("revenue","sum"),
-                     defined_cost=("defined_cost","sum"),
-                     gross_profit=("gross_profit","sum")))
-    cur_g["gross_margin"] = (cur_g["gross_profit"] / cur_g["revenue"] * 100).replace([float("inf"), float("-inf")], 0).fillna(0).round(2)
-
-    # 前日結合・差分
-    cur_g = cur_g.merge(prev, on="store", how="left").fillna({"revenue_prev":0})
+    cur_g = (
+        cur.groupby("store", as_index=False)
+           .agg(qty=("qty","sum"),
+                revenue=("revenue","sum"),
+                defined_cost=("defined_cost","sum"),
+                gross_profit=("gross_profit","sum"))
+    )
+    
+    # 粗利率：0割り回避して安全に
+    cur_g["gross_margin"] = (
+        cur_g["gross_profit"] / cur_g["revenue"].replace(0, np.nan) * 100.0
+    ).round(2).fillna(0.0)
+    
+    # 前日結合・差分・前日比（ここが修正ポイント）
+    cur_g = cur_g.merge(prev, on="store", how="left")
+    cur_g["revenue_prev"] = pd.to_numeric(cur_g["revenue_prev"], errors="coerce").fillna(0)
+    
     cur_g["revenue_diff"] = cur_g["revenue"] - cur_g["revenue_prev"]
-    cur_g["revenue_rate"] = ((cur_g["revenue_diff"] / cur_g["revenue_prev"].replace({0: pd.NA})) * 100).astype(float)
-    cur_g["revenue_rate"] = cur_g["revenue_rate"].fillna(0).round(2)
+    
+    denom = cur_g["revenue_prev"].replace(0, np.nan)         # 0割り防止
+    cur_g["revenue_rate"] = (cur_g["revenue_diff"] / denom) * 100.0
+    cur_g["revenue_rate"] = cur_g["revenue_rate"].astype(float).round(2).fillna(0.0)
 
     # 合計カード
     def fmt_int(x):   return f"{int(x):,}"
