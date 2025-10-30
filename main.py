@@ -2062,7 +2062,7 @@ elif mode == "daily_sales":
     st.subheader("📆 店舗別前日売上")
 
     # 日次専用テーブルを参照
-    df = fetch_table("store_profit_daily_summary")
+    df = fetch_table("store_profit_daily_lines")
     if df is None or df.empty:
         st.warning("store_profit_daily_summary が空か、読み出せていません。")
         st.stop()
