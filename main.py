@@ -17,7 +17,6 @@ import hashlib
 import time
 from zoneinfo import ZoneInfo
 from streamlit_javascript import st_javascript
-import numpy as np
 
 # ここに parse_items_fixed を追加
 def parse_items_fixed(text):
@@ -2074,6 +2073,8 @@ elif mode == "daily_sales":
         st.error(f"必要列が足りません: {missing}")
         st.stop()
 
+    import numpy as np  # ← ファイルの先頭どこかで1回だけ
+    
     # 型整形
     df["report_date"] = pd.to_datetime(df["report_date"], errors="coerce").dt.date
     for c in ["qty","revenue","defined_cost","gross_profit"]:
@@ -2105,29 +2106,24 @@ elif mode == "daily_sales":
     else:
         prev = pd.DataFrame(columns=["store","revenue_prev"])
     
-    # 集計（既に店舗別1行/日だが安全のため groupby）
-    cur_g = (
-        cur.groupby("store", as_index=False)
-           .agg(qty=("qty","sum"),
-                revenue=("revenue","sum"),
-                defined_cost=("defined_cost","sum"),
-                gross_profit=("gross_profit","sum"))
-    )
+    # 集計（安全のため groupby）
+    cur_g = (cur.groupby("store", as_index=False)
+               .agg(qty=("qty","sum"),
+                    revenue=("revenue","sum"),
+                    defined_cost=("defined_cost","sum"),
+                    gross_profit=("gross_profit","sum")))
     
-    # 粗利率：0割り回避して安全に
-    cur_g["gross_margin"] = (
-        cur_g["gross_profit"] / cur_g["revenue"].replace(0, np.nan) * 100.0
-    ).round(2).fillna(0.0)
+    # 粗利率（0割り回避）
+    cur_g["gross_margin"] = (cur_g["gross_profit"] / cur_g["revenue"].replace(0, np.nan) * 100.0)\
+                                .astype(float).round(2).fillna(0.0)
     
-    # 前日結合・差分・前日比（ここが修正ポイント）
+    # 前日結合・差分・前日比（NaN安全）
     cur_g = cur_g.merge(prev, on="store", how="left")
     cur_g["revenue_prev"] = pd.to_numeric(cur_g["revenue_prev"], errors="coerce").fillna(0)
-    
     cur_g["revenue_diff"] = cur_g["revenue"] - cur_g["revenue_prev"]
-    
-    denom = cur_g["revenue_prev"].replace(0, np.nan)         # 0割り防止
-    cur_g["revenue_rate"] = (cur_g["revenue_diff"] / denom) * 100.0
-    cur_g["revenue_rate"] = cur_g["revenue_rate"].astype(float).round(2).fillna(0.0)
+    denom = cur_g["revenue_prev"].replace(0, np.nan)
+    cur_g["revenue_rate"] = (cur_g["revenue_diff"] / denom * 100.0).astype(float).round(2).fillna(0.0)
+
 
     # 合計カード
     def fmt_int(x):   return f"{int(x):,}"
