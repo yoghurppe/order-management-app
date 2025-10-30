@@ -2095,34 +2095,66 @@ elif mode == "daily_sales":
     default_date = yday if yday in dates else dates[-1]
     sel_date = st.selectbox("対象日を選択", dates, index=dates.index(default_date))
     
-    # 当日データ
+    # ── ここから「detail/total」を分けて使う ─────────────────────────────
     cur = df[df["report_date"] == sel_date].copy()
+    cur_detail = cur[cur["line_type"] == "detail"].copy()
+    cur_total  = cur[cur["line_type"] == "total"].copy()
     
-    # 前日データ（テーブル内で直近の1つ前の日付）
+    # total が無ければ detail から擬似的に作る（保険）
+    if cur_total.empty:
+        cur_total = (cur_detail.groupby("store", as_index=False)
+                       .agg(qty=("qty","sum"),
+                            revenue=("revenue","sum"),
+                            defined_cost=("defined_cost","sum"),
+                            gross_profit=("gross_profit","sum")))
+        cur_total["line_type"] = "total"
+    
+    # ─ 合計（全店）カードは「total の合計」だけで作る（detail と二重にしない） ─
+    totals_df = pd.DataFrame([{
+        "対象日": sel_date,
+        "合計数量": int(cur_total["qty"].sum()),
+        "売上合計": int(cur_total["revenue"].sum()),
+        "定義原価合計": int(cur_total["defined_cost"].sum()),
+        "粗利合計": int(cur_total["gross_profit"].sum()),
+        "粗利率": round(
+            (cur_total["gross_profit"].sum() /
+             (cur_total["revenue"].sum() if cur_total["revenue"].sum() != 0 else float("nan")) * 100),
+            2
+        ) if cur_total["revenue"].sum() else 0.0,
+    }])
+    
+    # ─ 店舗別テーブルは「detail だけ」を集計して作る ─
+    cur_g = (cur_detail.groupby("store", as_index=False)
+                .agg(qty=("qty","sum"),
+                     revenue=("revenue","sum"),
+                     defined_cost=("defined_cost","sum"),
+                     gross_profit=("gross_profit","sum")))
+    
+    # 粗利率（0割り回避）
+    cur_g["gross_margin"] = (cur_g["gross_profit"] /
+                             cur_g["revenue"].replace(0, np.nan) * 100.0)\
+                                .astype(float).round(2).fillna(0.0)
+    
+    # ─ 前日比は detail のみで比較 ─
     idx = dates.index(sel_date)
     prev_date = dates[idx-1] if idx-1 >= 0 else None
     if prev_date:
-        prev = df[df["report_date"] == prev_date][["store","revenue"]].rename(columns={"revenue":"revenue_prev"})
+        prev = (df[(df["report_date"] == prev_date) & (df["line_type"] == "detail")]
+                  .groupby("store", as_index=False)
+                  .agg(revenue_prev=("revenue","sum")))
     else:
         prev = pd.DataFrame(columns=["store","revenue_prev"])
     
-    # 集計（安全のため groupby）
-    cur_g = (cur.groupby("store", as_index=False)
-               .agg(qty=("qty","sum"),
-                    revenue=("revenue","sum"),
-                    defined_cost=("defined_cost","sum"),
-                    gross_profit=("gross_profit","sum")))
-    
-    # 粗利率（0割り回避）
-    cur_g["gross_margin"] = (cur_g["gross_profit"] / cur_g["revenue"].replace(0, np.nan) * 100.0)\
-                                .astype(float).round(2).fillna(0.0)
-    
-    # 前日結合・差分・前日比（NaN安全）
     cur_g = cur_g.merge(prev, on="store", how="left")
     cur_g["revenue_prev"] = pd.to_numeric(cur_g["revenue_prev"], errors="coerce").fillna(0)
     cur_g["revenue_diff"] = cur_g["revenue"] - cur_g["revenue_prev"]
     denom = cur_g["revenue_prev"].replace(0, np.nan)
-    cur_g["revenue_rate"] = (cur_g["revenue_diff"] / denom * 100.0).astype(float).round(2).fillna(0.0)
+    cur_g["revenue_rate"] = (cur_g["revenue_diff"] / denom * 100.0)\
+                                .astype(float).round(2).fillna(0.0)
+    
+    # ↓ 以降、表示は totals_df と cur_g を使ってください
+    #   （合計カード=totals_df / 店舗別テーブル=cur_g）
+
 
 
     # 合計カード
