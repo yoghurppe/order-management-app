@@ -203,12 +203,12 @@ MODE_KEYS = {
         "中文": "🏠 主页"
     },
     "store_profit": {
-        "日本語": "🏪 店舗別粗利一覧",
-        "中文": "🏪 各店铺毛利一览"
+        "日本語": "🏪 店舗別 粗利一覧",
+        "中文": "🏪 各店铺 毛利一览"
     },
     "daily_sales": {
-        "日本語": "📆 前日売上（全店）",
-        "中文": "📆 昨日销售（全店）"
+        "日本語": "📆 店舗別 前日売上",
+        "中文": "📆 各店铺 昨日销售"
     },
     "search_item": {
         "日本語": f"🔍 商品情報検索<br>{item_master_update_text}",
@@ -2059,7 +2059,7 @@ elif mode == "store_profit":
     )
 
 elif mode == "daily_sales":
-    st.subheader("📆 前日売上（全店）")
+    st.subheader("📆 店舗別前日売上")
 
     # 日次専用テーブルを参照
     df = fetch_table("store_profit_daily_summary")
