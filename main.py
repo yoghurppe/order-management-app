@@ -2061,45 +2061,38 @@ elif mode == "store_profit":
 elif mode == "daily_sales":
     st.subheader("📆 店舗別前日売上（最新日）")
 
-    # 日次専用テーブルを参照
     df = fetch_table("store_profit_daily_lines")
     if df is None or df.empty:
         st.warning("store_profit_daily_lines が空か、読み出せていません。")
         st.stop()
 
-    required = {"report_date","line_type","store","qty","revenue","defined_cost","gross_profit"}
+    required = {"report_date","line_type","store","item","qty","revenue","defined_cost","gross_profit"}
     missing = required - set(df.columns)
     if missing:
         st.error(f"必要列が足りません: {missing}")
         st.stop()
 
-    # 型整形
     df["report_date"] = pd.to_datetime(df["report_date"], errors="coerce").dt.date
     for c in ["qty","revenue","defined_cost","gross_profit"]:
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0).astype(int)
 
-    # 最新日だけ抽出
+    # 最新日だけ
     latest_date = df["report_date"].max()
     cur = df[df["report_date"] == latest_date].copy()
 
-    # detail / total を分離
+    # detailのみ + 「合計/総計/計で始まる疑似明細」や EMPTY を除外
+    pat_agg = r"^(合計|総計|計)\b"
     cur_detail = cur[cur["line_type"] == "detail"].copy()
-    cur_total  = cur[cur["line_type"] == "total"].copy()
+    cur_detail = cur_detail[
+        ~cur_detail["item"].astype(str).str.match(pat_agg, na=False) &
+        ~cur_detail["item_name"].astype(str).str.fullmatch(r"\s*EMPTY\s*", na=False)
+    ]
 
-    # total が無ければ detail から擬似的に作る（保険）
-    if cur_total.empty:
-        cur_total = (cur_detail.groupby("store", as_index=False)
-                        .agg(qty=("qty","sum"),
-                             revenue=("revenue","sum"),
-                             defined_cost=("defined_cost","sum"),
-                             gross_profit=("gross_profit","sum")))
-        cur_total["line_type"] = "total"
-
-    # ─ 合計（全店） ─  total の合計のみを使う（detail と二重集計しない）
-    tot_qty  = int(cur_total["qty"].sum())
-    tot_rev  = int(cur_total["revenue"].sum())
-    tot_cost = int(cur_total["defined_cost"].sum())
-    tot_gp   = int(cur_total["gross_profit"].sum())
+    # ─ 全店合計：detail のみから算出（重複なし） ─
+    tot_qty  = int(cur_detail["qty"].sum())
+    tot_rev  = int(cur_detail["revenue"].sum())
+    tot_cost = int(cur_detail["defined_cost"].sum())
+    tot_gp   = int(cur_detail["gross_profit"].sum())
     tot_mgn  = round((tot_gp / tot_rev * 100) if tot_rev else 0.0, 2)
 
     def fmt_int(x):   return f"{int(x):,}"
@@ -2124,22 +2117,17 @@ elif mode == "daily_sales":
         mime="text/csv",
     )
 
-    # ─ 店舗別（最新日） ─  detail のみを集計
+    # ─ 店舗別：detail のみから集計 ─
     cur_g = (cur_detail.groupby("store", as_index=False)
                 .agg(qty=("qty","sum"),
                      revenue=("revenue","sum"),
                      defined_cost=("defined_cost","sum"),
                      gross_profit=("gross_profit","sum")))
-
-    # 粗利率（0割り回避）
     cur_g["gross_margin"] = (
         (cur_g["gross_profit"] / cur_g["revenue"].replace({0: pd.NA}) * 100)
-        .astype(float)
-        .round(2)
-        .fillna(0.0)
+        .astype(float).round(2).fillna(0.0)
     )
 
-    # 表示ラベル
     LABELS = {
         "日本語": {"store":"店舗","qty":"数量","revenue":"売上","defined_cost":"定義原価","gross_profit":"粗利","gross_margin":"粗利率"},
         "中文":   {"store":"店铺","qty":"数量","revenue":"销售额","defined_cost":"定义成本","gross_profit":"毛利","gross_margin":"毛利率"},
@@ -2155,7 +2143,6 @@ elif mode == "daily_sales":
         "gross_margin": labels["gross_margin"],
     }).copy()
 
-    # 表示フォーマット
     disp[labels["qty"]]          = disp[labels["qty"]].map(fmt_int)
     disp[labels["revenue"]]      = disp[labels["revenue"]].map(fmt_money)
     disp[labels["defined_cost"]] = disp[labels["defined_cost"]].map(fmt_money)
@@ -2170,7 +2157,6 @@ elif mode == "daily_sales":
     )
     st.dataframe(disp, use_container_width=True)
 
-    # ダウンロード（数値そのまま）
     st.download_button(
         "📥 店舗別（数値そのまま）CSVダウンロード",
         cur_g.to_csv(index=False).encode("utf-8-sig"),
