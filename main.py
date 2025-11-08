@@ -661,8 +661,6 @@ elif mode == "order_ai":
 
 
 
-
-
 # 🔍 商品情報検索モード -----------------------------
 elif mode == "search_item":
     st.subheader("🔍 商品情報検索モード")
@@ -740,8 +738,87 @@ elif mode == "search_item":
         df_master["利用可能"] = 0
 
     # 価格列（存在しなければ0で埋める）
-    df_master["実績原価"] = pd.to_numeric(df
+    df_master["実績原価"] = pd.to_numeric(df_master.get("average_cost", 0), errors="coerce").fillna(0).astype(int)
+    df_master["最安原価"] = pd.to_numeric(df_master.get("purchase_cost", 0), errors="coerce").fillna(0).astype(int)
 
+    # ---------- 検索UI ----------
+    col1, col2 = st.columns(2)
+    with col1:
+        keyword_code = st.text_input("商品コード / JAN検索", "", placeholder="例: 4515061012818")
+    with col2:
+        keyword_name = st.text_input("商品名検索", "", placeholder="例: パーフェクトジェル")
+
+    jan_filter_multi = st.text_area(
+        "複数JAN入力（改行またはカンマ区切り）",
+        placeholder="例:\n4901234567890\n4987654321098",
+        height=120,
+    )
+
+    maker_filter = st.selectbox(
+        "メーカー名で絞り込み",
+        ["すべて"] + sorted(df_master.get("メーカー名", pd.Series(dtype=str)).dropna().unique().tolist())
+    )
+    rank_filter = st.selectbox(
+        "ランクで絞り込み",
+        ["すべて"] + sorted(df_master.get("ランク", pd.Series(dtype=str)).dropna().unique().tolist())
+    )
+    type_filter = st.selectbox(
+        "取扱区分で絞り込み",
+        ["すべて"] + sorted(df_master.get("取扱区分", pd.Series(dtype=str)).dropna().unique().tolist())
+    )
+
+    # ---------- 絞り込み ----------
+    jan_list = [j.strip() for j in re.split(r"[,\n\r]+", jan_filter_multi) if j.strip()]
+    df_view = df_master.copy()
+
+    # 優先度: 複数JAN > コード/JAN欄 > 商品名欄
+    if jan_list:
+        df_view = df_view[df_view["jan"].isin(jan_list)]
+    elif keyword_code:
+        df_view = df_view[
+            df_view["商品コード"].str.contains(keyword_code, case=False, na=False) |
+            df_view["jan"].str.contains(keyword_code, case=False, na=False)
+        ]
+    if keyword_name:
+        df_view = df_view[df_view["商品名"].str.contains(keyword_name, case=False, na=False)]
+
+    if maker_filter != "すべて" and "メーカー名" in df_view.columns:
+        df_view = df_view[df_view["メーカー名"] == maker_filter]
+    if rank_filter != "すべて" and "ランク" in df_view.columns:
+        df_view = df_view[df_view["ランク"] == rank_filter]
+    if type_filter != "すべて" and "取扱区分" in df_view.columns:
+        df_view = df_view[df_view["取扱区分"] == type_filter]
+
+    # ---------- 表示 ----------
+    view_cols = [
+        "商品コード", "jan", "ランク", "メーカー名", "商品名", "取扱区分",
+        "在庫", "発注済", "実績原価", "最安原価", "ケース入数", "発注ロット", "重量"
+    ]
+    available_cols = [c for c in view_cols if c in df_view.columns]
+
+    display_df = (
+        df_view[available_cols]
+        .sort_values(by=[c for c in ["商品コード", "jan"] if c in available_cols])
+    )
+
+    row_count = len(display_df)
+    h_left, h_right = st.columns([1, 0.15])
+    h_left.subheader("商品一覧")
+    h_right.markdown(
+        f"<h4 style='text-align:right; margin-top: 0.6em;'>{row_count:,}件</h4>",
+        unsafe_allow_html=True
+    )
+
+    st.dataframe(display_df, use_container_width=True)
+
+    # ---------- CSV DL ----------
+    csv = display_df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        "📅 CSVダウンロード",
+        data=csv,
+        file_name="item_master_filtered.csv",
+        mime="text/csv",
+    )
 
 
 elif mode == "purchase_history":
