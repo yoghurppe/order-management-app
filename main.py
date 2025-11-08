@@ -85,11 +85,11 @@ TEXT = {
         "search_brand": "メーカー名で絞り込み",
         "search_type": "取扱区分で絞り込み",
         "product_list": "商品一覧",
-        "search_keyword": "商品名・商品コードで検索",
+        "search_name": "商品名検索",
         "search_brand": "メーカー名で絞り込み",
         "search_type": "取扱区分で絞り込み",
         "search_rank": "ランクで絞り込み",
-        "search_code": "商品コード / JAN",
+        "search_code": "商品コード / JAN検索",
         "all": "すべて",
         "loading_data": "📊 データを読み込み中...",
         "multi_jan": "複数JAN入力（改行またはカンマ区切り）"
@@ -106,11 +106,11 @@ TEXT = {
         "search_brand": "按品牌筛选",
         "search_type": "按分类筛选",
         "product_list": "商品列表",
-        "search_keyword": "按商品名称或编号搜索",
+        "search_name": "按商品名称搜索",
         "search_brand": "按制造商筛选",
         "search_type": "按分类筛选",
         "search_rank": "按等级筛选",
-        "search_code": "商品编号 / 条码",
+        "search_code": "按商品编号 / 条码搜索",
         "all": "全部",
         "loading_data": "📊 正在读取数据...",
         "multi_jan": "批量输入条码（换行或逗号分隔）"
@@ -744,27 +744,27 @@ elif mode == "search_item":
     # ---------- 検索UI ----------
     col1, col2 = st.columns(2)
     with col1:
-        keyword_code = st.text_input("商品コード / JAN検索", "", placeholder="例: 4515061012818")
+        keyword_code = st.text_input(TEXT[language]["search_code"], "", placeholder="例: 4515061012818")
     with col2:
-        keyword_name = st.text_input("商品名検索", "", placeholder="例: パーフェクトジェル")
-
+        keyword_name = st.text_input(TEXT[language]["search_name"], "", placeholder="例: パーフェクトジェル")
+    
     jan_filter_multi = st.text_area(
-        "複数JAN入力（改行またはカンマ区切り）",
+        TEXT[language]["multi_jan"],
         placeholder="例:\n4901234567890\n4987654321098",
         height=120,
     )
-
+    
     maker_filter = st.selectbox(
-        "メーカー名で絞り込み",
-        ["すべて"] + sorted(df_master.get("メーカー名", pd.Series(dtype=str)).dropna().unique().tolist())
+        TEXT[language]["search_brand"],
+        [TEXT[language]["all"]] + sorted(df_master.get("メーカー名", pd.Series(dtype=str)).dropna().unique().tolist())
     )
     rank_filter = st.selectbox(
-        "ランクで絞り込み",
-        ["すべて"] + sorted(df_master.get("ランク", pd.Series(dtype=str)).dropna().unique().tolist())
+        TEXT[language]["search_rank"],
+        [TEXT[language]["all"]] + sorted(df_master.get("ランク", pd.Series(dtype=str)).dropna().unique().tolist())
     )
     type_filter = st.selectbox(
-        "取扱区分で絞り込み",
-        ["すべて"] + sorted(df_master.get("取扱区分", pd.Series(dtype=str)).dropna().unique().tolist())
+        TEXT[language]["search_type"],
+        [TEXT[language]["all"]] + sorted(df_master.get("取扱区分", pd.Series(dtype=str)).dropna().unique().tolist())
     )
 
     # ---------- 絞り込み ----------
