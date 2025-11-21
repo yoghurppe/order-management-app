@@ -1419,37 +1419,6 @@ elif mode == "monthly_sales":
     )
 
 
-    # ---------- 📋 表示 ----------
-    view_cols = [
-        "商品コード", "jan", "ランク", "メーカー名",
-        "商品名", "取扱区分", "販売数", "利用可能", "発注済"
-    ]
-    available_cols = [c for c in view_cols if c in df_view.columns]
-
-    display_df = (
-        df_view[available_cols]
-        .sort_values(by="商品コード")
-        .rename(columns=COLUMN_NAMES[language])
-    )
-
-    row_count = len(display_df)
-    h_left, h_right = st.columns([1, 0.15])
-    h_left.subheader(TEXT[language]["product_list"])
-    h_right.markdown(
-        f"<h4 style='text-align:right; margin-top: 0.6em;'>{row_count:,}件</h4>",
-        unsafe_allow_html=True
-    )
-
-    st.dataframe(display_df, use_container_width=True)
-
-    csv = display_df.to_csv(index=False).encode("utf-8-sig")
-    st.download_button(
-        "📥 CSVダウンロード",
-        data=csv,
-        file_name="monthly_sales_filtered.csv",
-        mime="text/csv",
-    )
-
 
 elif mode == "rank_check":
     st.subheader("📌 ランク商品確認モード")
