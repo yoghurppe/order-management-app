@@ -164,6 +164,82 @@ HEADERS_PRE = {
     "Content-Type": "application/json"
 }
 
+def apply_common_search_ui(df, language: str):
+    """
+    商品情報検索 / 販売実績（直近1ヶ月）で共通で使う検索UI＋フィルタ。
+    df を絞り込んだ結果を返す。
+    """
+
+    # ---------- 🔍 検索UI ----------
+    col1, col2 = st.columns(2)
+
+    with col1:
+        keyword_code = st.text_input(
+            TEXT[language]["search_code"],
+            "",
+            placeholder="例: 4515061012818"
+        )
+    with col2:
+        keyword_name = st.text_input(
+            TEXT[language]["search_name"],
+            "",
+            placeholder="例: パーフェクトジェル"
+        )
+
+    jan_filter_multi = st.text_area(
+        TEXT[language]["multi_jan"],
+        placeholder="例:\n4901234567890\n4987654321098",
+        height=120,
+    )
+
+    maker_filter = st.selectbox(
+        TEXT[language]["search_brand"],
+        [TEXT[language]["all"]] +
+        sorted(df.get("メーカー名", pd.Series(dtype=str)).dropna().unique().tolist())
+    )
+    rank_filter = st.selectbox(
+        TEXT[language]["search_rank"],
+        [TEXT[language]["all"]] +
+        sorted(df.get("ランク", pd.Series(dtype=str)).dropna().unique().tolist())
+    )
+    type_filter = st.selectbox(
+        TEXT[language]["search_type"],
+        [TEXT[language]["all"]] +
+        sorted(df.get("取扱区分", pd.Series(dtype=str)).dropna().unique().tolist())
+    )
+
+    # ---------- 絞り込み ----------
+    jan_list = [j.strip() for j in re.split(r"[,\n\r]+", jan_filter_multi) if j.strip()]
+    df_view = df.copy()
+
+    # 優先度: 複数JAN > コード/JAN欄 > 商品名欄
+    if jan_list:
+        if "jan" in df_view.columns:
+            df_view = df_view[df_view["jan"].isin(jan_list)]
+    elif keyword_code:
+        if "商品コード" in df_view.columns and "jan" in df_view.columns:
+            df_view = df_view[
+                df_view["商品コード"].str.contains(keyword_code, case=False, na=False) |
+                df_view["jan"].str.contains(keyword_code, case=False, na=False)
+            ]
+        elif "jan" in df_view.columns:
+            df_view = df_view[df_view["jan"].str.contains(keyword_code, case=False, na=False)]
+
+    if keyword_name and "商品名" in df_view.columns:
+        df_view = df_view[df_view["商品名"].str.contains(keyword_name, case=False, na=False)]
+
+    if maker_filter != TEXT[language]["all"] and "メーカー名" in df_view.columns:
+        df_view = df_view[df_view["メーカー名"] == maker_filter]
+
+    if rank_filter != TEXT[language]["all"] and "ランク" in df_view.columns:
+        df_view = df_view[df_view["ランク"] == rank_filter]
+
+    if type_filter != TEXT[language]["all"] and "取扱区分" in df_view.columns:
+        df_view = df_view[df_view["取扱区分"] == type_filter]
+
+    return df_view
+
+
 # 📅 item_master の最新更新日時を JST 表示で取得
 def fetch_latest_item_update():
     url = f"{SUPABASE_URL_PRE}/rest/v1/item_master?select=updated_at&order=updated_at.desc&limit=1"
@@ -741,53 +817,8 @@ elif mode == "search_item":
     df_master["実績原価"] = pd.to_numeric(df_master.get("average_cost", 0), errors="coerce").fillna(0).astype(int)
     df_master["最安原価"] = pd.to_numeric(df_master.get("purchase_cost", 0), errors="coerce").fillna(0).astype(int)
 
-    # ---------- 検索UI ----------
-    col1, col2 = st.columns(2)
-    with col1:
-        keyword_code = st.text_input(TEXT[language]["search_code"], "", placeholder="例: 4515061012818")
-    with col2:
-        keyword_name = st.text_input(TEXT[language]["search_name"], "", placeholder="例: パーフェクトジェル")
-    
-    jan_filter_multi = st.text_area(
-        TEXT[language]["multi_jan"],
-        placeholder="例:\n4901234567890\n4987654321098",
-        height=120,
-    )
-    
-    maker_filter = st.selectbox(
-        TEXT[language]["search_brand"],
-        [TEXT[language]["all"]] + sorted(df_master.get("メーカー名", pd.Series(dtype=str)).dropna().unique().tolist())
-    )
-    rank_filter = st.selectbox(
-        TEXT[language]["search_rank"],
-        [TEXT[language]["all"]] + sorted(df_master.get("ランク", pd.Series(dtype=str)).dropna().unique().tolist())
-    )
-    type_filter = st.selectbox(
-        TEXT[language]["search_type"],
-        [TEXT[language]["all"]] + sorted(df_master.get("取扱区分", pd.Series(dtype=str)).dropna().unique().tolist())
-    )
-
-    # ---------- 絞り込み ----------
-    jan_list = [j.strip() for j in re.split(r"[,\n\r]+", jan_filter_multi) if j.strip()]
-    df_view = df_master.copy()
-
-    # 優先度: 複数JAN > コード/JAN欄 > 商品名欄
-    if jan_list:
-        df_view = df_view[df_view["jan"].isin(jan_list)]
-    elif keyword_code:
-        df_view = df_view[
-            df_view["商品コード"].str.contains(keyword_code, case=False, na=False) |
-            df_view["jan"].str.contains(keyword_code, case=False, na=False)
-        ]
-    if keyword_name:
-        df_view = df_view[df_view["商品名"].str.contains(keyword_name, case=False, na=False)]
-
-    if maker_filter != "すべて" and "メーカー名" in df_view.columns:
-        df_view = df_view[df_view["メーカー名"] == maker_filter]
-    if rank_filter != "すべて" and "ランク" in df_view.columns:
-        df_view = df_view[df_view["ランク"] == rank_filter]
-    if type_filter != "すべて" and "取扱区分" in df_view.columns:
-        df_view = df_view[df_view["取扱区分"] == type_filter]
+    # ---------- 検索UI ＋ 絞り込み（共通関数） ----------
+    df_view = apply_common_search_ui(df_master, language)
 
     # ---------- 表示 ----------
     view_cols = [
@@ -810,6 +841,16 @@ elif mode == "search_item":
     )
 
     st.dataframe(display_df, use_container_width=True)
+
+    # ---------- CSV DL ----------
+    csv = display_df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        "📅 CSVダウンロード",
+        data=csv,
+        file_name="item_master_filtered.csv",
+        mime="text/csv",
+    )
+
 
     # ---------- CSV DL ----------
     csv = display_df.to_csv(index=False).encode("utf-8-sig")
@@ -1353,57 +1394,40 @@ elif mode == "monthly_sales":
     # 販売数 > 0 のみ
     df_joined = df_joined[df_joined["販売数"] > 0]
 
-    # ---------- 🔍 検索 UI ----------
-    col1, col2 = st.columns(2)
+    # ---------- 🔍 検索UI ＋ 絞り込み（商品情報検索と共通） ----------
+    df_view = apply_common_search_ui(df_joined, language)
 
-    with col1:
-        keyword_name = st.text_input(TEXT[language]["search_keyword"], "")
-        keyword_code = st.text_input(TEXT[language]["search_code"], "")
+    # ---------- 📋 表示 ----------
+    view_cols = [
+        "商品コード", "jan", "ランク", "メーカー名",
+        "商品名", "取扱区分", "販売数", "利用可能", "発注済"
+    ]
+    available_cols = [c for c in view_cols if c in df_view.columns]
 
-    with col2:
-        jan_filter_multi = st.text_area(
-            TEXT[language]["multi_jan"],
-            placeholder="例:\n4901234567890\n4987654321098",
-            height=120,
-        )
-
-    maker_filter = st.selectbox(
-        TEXT[language]["search_brand"],
-        [TEXT[language]["all"]] + sorted(df_joined["メーカー名"].dropna().unique())
-    )
-    rank_filter = st.selectbox(
-        TEXT[language]["search_rank"],
-        [TEXT[language]["all"]] + sorted(df_joined["ランク"].dropna().unique())
-    )
-    type_filter = st.selectbox(
-        TEXT[language]["search_type"],
-        [TEXT[language]["all"]] + sorted(df_joined["取扱区分"].dropna().unique())
+    display_df = (
+        df_view[available_cols]
+        .sort_values(by="商品コード")
+        .rename(columns=COLUMN_NAMES[language])
     )
 
-    import re
-    jan_list = [j.strip() for j in re.split(r"[,\n\r]+", jan_filter_multi) if j.strip()]
+    row_count = len(display_df)
+    h_left, h_right = st.columns([1, 0.15])
+    h_left.subheader(TEXT[language]["product_list"])
+    h_right.markdown(
+        f"<h4 style='text-align:right; margin-top: 0.6em;'>{row_count:,}件</h4>",
+        unsafe_allow_html=True
+    )
 
-    df_view = df_joined.copy()
+    st.dataframe(display_df, use_container_width=True)
 
-    if jan_list:
-        df_view = df_view[df_view["jan"].isin(jan_list)]
-    elif keyword_code:
-        df_view = df_view[
-            df_view["商品コード"].str.contains(keyword_code, case=False, na=False) |
-            df_view["jan"].str.contains(keyword_code, case=False, na=False)
-        ]
+    csv = display_df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        "📥 CSVダウンロード",
+        data=csv,
+        file_name="monthly_sales_filtered.csv",
+        mime="text/csv",
+    )
 
-    if keyword_name:
-        df_view = df_view[df_view["商品名"].str.contains(keyword_name, case=False, na=False)]
-
-    if maker_filter != TEXT[language]["all"]:
-        df_view = df_view[df_view["メーカー名"] == maker_filter]
-
-    if rank_filter != TEXT[language]["all"]:
-        df_view = df_view[df_view["ランク"] == rank_filter]
-
-    if type_filter != TEXT[language]["all"]:
-        df_view = df_view[df_view["取扱区分"] == type_filter]
 
     # ---------- 📋 表示 ----------
     view_cols = [
