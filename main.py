@@ -852,16 +852,6 @@ elif mode == "search_item":
     )
 
 
-    # ---------- CSV DL ----------
-    csv = display_df.to_csv(index=False).encode("utf-8-sig")
-    st.download_button(
-        "📅 CSVダウンロード",
-        data=csv,
-        file_name="item_master_filtered.csv",
-        mime="text/csv",
-    )
-
-
 elif mode == "purchase_history":
     st.subheader("📜 発注履歴")
 
