@@ -1423,7 +1423,9 @@ elif mode == "monthly_sales":
 elif mode == "rank_check":
     st.subheader("📌 ランク商品確認モード")
 
+    # =========================
     # データ取得
+    # =========================
     df_item = fetch_table("item_master")
     df_sales = fetch_table("sales")
     df_stock = fetch_table("warehouse_stock")
@@ -1434,106 +1436,168 @@ elif mode == "rank_check":
         st.warning("必要なテーブルが空です")
         st.stop()
 
-    # 🔑 データ整形
+    # =========================
+    # データ整形（item_master）
+    # =========================
     df_item["jan"] = df_item["jan"].astype(str).str.strip()
     df_item.loc[df_item["jan"].isin(["", "nan", "None", "NULL"]), "jan"] = None
     df_item["ランク"] = df_item["ランク"].astype(str).str.strip()
+    df_item["商品名"] = df_item["商品名"].astype(str)
+    df_item["メーカー名"] = df_item["メーカー名"].astype(str)
 
+    # =========================
     # 発注済（上海除外）
+    # =========================
     df_history["quantity"] = pd.to_numeric(df_history["quantity"], errors="coerce").fillna(0).astype(int)
     df_history["memo"] = df_history["memo"].astype(str).fillna("")
     df_history["jan"] = df_history["jan"].astype(str).str.strip()
+
     df_shanghai = df_history[df_history["memo"].str.contains("上海", na=False)]
-    df_shanghai_grouped = df_shanghai.groupby("jan")["quantity"].sum().reset_index(name="shanghai_quantity")
+    df_shanghai_grouped = (
+        df_shanghai.groupby("jan")["quantity"]
+        .sum()
+        .reset_index(name="shanghai_quantity")
+    )
 
     df_item["発注済"] = pd.to_numeric(df_item["発注済"], errors="coerce").fillna(0).astype(int)
     df_item = df_item.merge(df_shanghai_grouped, on="jan", how="left")
     df_item["shanghai_quantity"] = df_item["shanghai_quantity"].fillna(0).astype(int)
     df_item["発注済"] = (df_item["発注済"] - df_item["shanghai_quantity"]).clip(lower=0)
 
-    # A/B/C/取扱中止ランク商品のみ（JANあり）
+    # =========================
+    # 対象商品（A/B/C/取扱中止 + JANあり）
+    # =========================
     df_ab = df_item[
-        df_item["ランク"].isin(["Aランク", "Bランク", "Cランク", "取扱中止"]) & df_item["jan"].notnull()
+        df_item["ランク"].isin(["Aランク", "Bランク", "Cランク", "取扱中止"])
+        & df_item["jan"].notnull()
     ].copy()
+
     df_ab["JAN"] = df_ab["jan"]
     df_ab = df_ab.drop_duplicates(subset=["JAN"])
 
-    # ランクフィルター
+    # =========================
+    # フィルターUI
+    # =========================
+    col1, col2 = st.columns(2)
+
+    with col1:
+        name_filter = st.text_input("🔍 商品名で絞り込み（部分一致）")
+
+    with col2:
+        maker_list = sorted(df_ab["メーカー名"].dropna().unique().tolist())
+        selected_maker = st.selectbox(
+            "🏭 メーカー名で絞り込み",
+            ["すべて"] + maker_list
+        )
+
     selected_ranks = st.multiselect(
-        "📌 表示するランクを選択",
+        "📌 表示するランク",
         ["Aランク", "Bランク", "Cランク", "取扱中止"],
         default=["Aランク", "Bランク", "Cランク", "取扱中止"]
     )
 
-    # sales → JAN
+    # =========================
+    # sales → JAN（実績30日）
+    # =========================
     df_sales["JAN"] = df_sales["jan"].astype(str).str.strip()
 
-    # JD在庫
-    df_stock["JAN"] = df_stock["jan"].astype(str).str.strip()
-    df_stock = df_stock.rename(columns={"stock_available": "JD在庫"})
-
-    # 弁天在庫
-    df_benten["JAN"] = df_benten["jan"].astype(str).str.strip()
-    df_benten = df_benten.rename(columns={"stock": "弁天在庫"})
-
-    # 実績（30日）
     df_sales_30 = (
         df_sales.groupby("JAN", as_index=False)["quantity_sold"]
         .sum()
         .rename(columns={"quantity_sold": "実績（30日）"})
     )
 
+    # =========================
+    # 在庫
+    # =========================
+    df_stock["JAN"] = df_stock["jan"].astype(str).str.strip()
+    df_stock = df_stock.rename(columns={"stock_available": "JD在庫"})
+
+    df_benten["JAN"] = df_benten["jan"].astype(str).str.strip()
+    df_benten = df_benten.rename(columns={"stock": "弁天在庫"})
+
+    # =========================
     # 発注済
+    # =========================
     df_item_sub = df_item[["jan", "発注済"]].copy()
     df_item_sub["JAN"] = df_item_sub["jan"].astype(str).str.strip()
     df_item_sub = df_item_sub[["JAN", "発注済"]]
 
+    # =========================
     # マージ
-    base_cols = ["JAN", "商品名", "ランク"]
+    # =========================
+    base_cols = [
+        "JAN",
+        "商品名",
+        "メーカー名",
+        "ランク",
+        "ケース入数",
+        "発注ロット"
+    ]
+
     if "purchase_cost" in df_ab.columns:
         base_cols.append("purchase_cost")
 
     df_merged = (
-        df_ab[base_cols].rename(columns={"purchase_cost": "最安原価"})
+        df_ab[base_cols]
+        .rename(columns={"purchase_cost": "最安原価"})
         .merge(df_sales_30, on="JAN", how="left")
         .merge(df_item_sub, on="JAN", how="left")
         .merge(df_stock[["JAN", "JD在庫"]], on="JAN", how="left")
         .merge(df_benten[["JAN", "弁天在庫"]], on="JAN", how="left")
     )
 
+    # =========================
     # 欠損補完
-    df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
+    # =========================
     df_merged["実績（30日）"] = df_merged["実績（30日）"].fillna(0)
+    df_merged["発注済"] = df_merged["発注済"].fillna(0).astype(int)
     df_merged["JD在庫"] = df_merged["JD在庫"].fillna(0)
     df_merged["弁天在庫"] = df_merged["弁天在庫"].fillna(0)
-    df_merged["実績（7日）"] = None
-    df_merged["最安原価"] = pd.to_numeric(df_merged.get("最安原価"), errors="coerce") 
+    df_merged["最安原価"] = pd.to_numeric(df_merged.get("最安原価"), errors="coerce")
 
-    # アラート計算
+    # =========================
+    # 発注アラート
+    # =========================
     df_merged["発注アラート1.0"] = df_merged["実績（30日）"] > (
         df_merged["JD在庫"] + df_merged["弁天在庫"] + df_merged["発注済"]
     )
+
     df_merged["発注アラート1.2"] = (df_merged["実績（30日）"] * 1.2) > (
         df_merged["JD在庫"] + df_merged["弁天在庫"] + df_merged["発注済"]
     )
 
-    # フィルター
+    # =========================
+    # 条件フィルター
+    # =========================
     check_1_0 = st.checkbox("✅ 発注アラート1.0のみ表示", value=False)
     check_1_2 = st.checkbox("✅ 発注アラート1.2のみ表示", value=False)
 
     df_result = df_merged[df_merged["ランク"].isin(selected_ranks)].copy()
+
+    if name_filter:
+        df_result = df_result[df_result["商品名"].str.contains(name_filter, case=False, na=False)]
+
+    if selected_maker != "すべて":
+        df_result = df_result[df_result["メーカー名"] == selected_maker]
+
     if check_1_0:
         df_result = df_result[df_result["発注アラート1.0"]]
+
     if check_1_2:
         df_result = df_result[df_result["発注アラート1.2"]]
 
+    # =========================
     # 出力
+    # =========================
     st.dataframe(df_result[[
         "JAN",
         "商品名",
+        "メーカー名",
         "ランク",
+        "ケース入数",
+        "発注ロット",
         "実績（30日）",
-        "実績（7日）",
         "JD在庫",
         "弁天在庫",
         "発注済",
@@ -1541,6 +1605,7 @@ elif mode == "rank_check":
         "発注アラート1.0",
         "発注アラート1.2"
     ]])
+
 
 
 
