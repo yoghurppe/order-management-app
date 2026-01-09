@@ -197,10 +197,22 @@ def apply_common_search_ui(df, language: str):
         [TEXT[language]["all"]] +
         sorted(df.get("メーカー名", pd.Series(dtype=str)).dropna().unique().tolist())
     )
-    rank_filter = st.selectbox(
+    # ランク候補（空は除外）
+    rank_options = (
+        df.get("ランク", pd.Series(dtype=str))
+          .astype(str).str.strip()
+          .replace(["", "nan", "None", "NULL"], pd.NA)
+          .dropna()
+          .unique()
+          .tolist()
+    )
+    rank_options = sorted(rank_options)
+    
+    # 複数選択（デフォルトは全選択＝絞り込み無しと同じ）
+    rank_filter = st.multiselect(
         TEXT[language]["search_rank"],
-        [TEXT[language]["all"]] +
-        sorted(df.get("ランク", pd.Series(dtype=str)).dropna().unique().tolist())
+        options=rank_options,
+        default=rank_options
     )
     type_filter = st.selectbox(
         TEXT[language]["search_type"],
