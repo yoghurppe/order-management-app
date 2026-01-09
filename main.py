@@ -482,7 +482,9 @@ if mode == "home":
 elif mode == "order_ai":
     st.subheader("📦 発注AIモード")
 
-    ai_mode = st.radio("発注AIモードを選択", ["通常モード", "JDモード"], index=0)
+    ai_mode = "JDモード"
+    st.caption("✅ 発注AIは JD在庫（warehouse_stock）ベースで計算します（固定）")
+
 
     if st.button("🤖 計算を開始する"):
         SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -523,8 +525,8 @@ elif mode == "order_ai":
             df_sales = fetch_table("sales")
             df_purchase = fetch_table("purchase_data")
             df_master = fetch_table("item_master")
-            if ai_mode == "JDモード":
-                df_warehouse = fetch_table("warehouse_stock")
+            df_warehouse = fetch_table("warehouse_stock")  # JD固定なので常に取得
+
 
         if df_sales.empty or df_purchase.empty or df_master.empty:
             st.warning("必要なデータが不足しています。")
