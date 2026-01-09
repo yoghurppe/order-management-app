@@ -2,16 +2,30 @@ import streamlit as st
 
 st.markdown("""
 <style>
-/* ===== multiselect の選択タグ（赤をやめる：完全対応版） ===== */
+/* ===== multiselect の選択タグ（黒文字・目に優しい） ===== */
+
+/* タグ本体 */
 [data-baseweb="tag"] {
-    background-color: #E0F2FE !important;
-    color: #000000 !important;
+    background-color: #E5E7EB !important;   /* 薄いグレー */
+    color: #111827 !important;              /* 黒（少し柔らかめ） */
     border-radius: 6px !important;
     font-weight: 500 !important;
 }
-[data-baseweb="tag"] span { color: #0369A1 !important; }
-[data-baseweb="tag"] svg  { color: #0369A1 !important; }
-[data-baseweb="tag"]:hover { background-color: #BAE6FD !important; }
+
+/* テキスト部分（念のため明示） */
+[data-baseweb="tag"] span {
+    color: #111827 !important;
+}
+
+/* × ボタン */
+[data-baseweb="tag"] svg {
+    color: #374151 !important;              /* 濃いグレー */
+}
+
+/* hover */
+[data-baseweb="tag"]:hover {
+    background-color: #D1D5DB !important;   /* 少し濃いグレー */
+}
 </style>
 """, unsafe_allow_html=True)
 
