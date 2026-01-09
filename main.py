@@ -243,8 +243,9 @@ def apply_common_search_ui(df, language: str):
     if maker_filter != TEXT[language]["all"] and "メーカー名" in df_view.columns:
         df_view = df_view[df_view["メーカー名"] == maker_filter]
 
-    if rank_filter != TEXT[language]["all"] and "ランク" in df_view.columns:
-        df_view = df_view[df_view["ランク"] == rank_filter]
+    if "ランク" in df_view.columns and rank_filter:
+        # デフォルトが全選択なので、全選択のままなら実質変化なし
+        df_view = df_view[df_view["ランク"].isin(rank_filter)]
 
     if type_filter != TEXT[language]["all"] and "取扱区分" in df_view.columns:
         df_view = df_view[df_view["取扱区分"] == type_filter]
