@@ -5,7 +5,7 @@ st.markdown("""
 /* ===== multiselect の選択タグ（赤をやめる：完全対応版） ===== */
 [data-baseweb="tag"] {
     background-color: #E0F2FE !important;
-    color: #0369A1 !important;
+    color: #000000 !important;
     border-radius: 6px !important;
     font-weight: 500 !important;
 }
