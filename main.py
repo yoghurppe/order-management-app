@@ -385,6 +385,23 @@ with st.sidebar:
         border-color: rgba(14,165,233,.45);
         font-weight: 600;
       }
+      /* ===== multiselect の選択タグ（赤をやめる） ===== */
+        div[data-baseweb="tag"] {
+            background-color: #E0F2FE !important;   /* 薄い水色 */
+            color: #0369A1 !important;              /* 落ち着いた青 */
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        
+        /* × ボタン */
+        div[data-baseweb="tag"] svg {
+            color: #0369A1 !important;
+        }
+        
+        /* hover 時 */
+        div[data-baseweb="tag"]:hover {
+            background-color: #BAE6FD !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 
