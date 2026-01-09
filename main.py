@@ -405,6 +405,42 @@ if st.query_params.get("mode") != mode:
     st.query_params["mode"] = mode
 # === ここまで置き換え ===
 
+# ランク設定
+RANK_LABELS = ("Aランク", "Bランク", "Cランク")
+
+def normalize_rank_base(rank) -> str:
+    """
+    rank: 例 "Aランク", "Aランク★", "Bランク★", "TEST", None
+    return: "A" / "B" / "C" / ""（それ以外）
+    """
+    if rank is None:
+        return ""
+    s = str(rank).strip()
+    if s.startswith("Aランク"):
+        return "A"
+    if s.startswith("Bランク"):
+        return "B"
+    if s.startswith("Cランク"):
+        return "C"
+    return ""
+
+def add_base_rank_column(df: pd.DataFrame, col="rank") -> pd.DataFrame:
+    """
+    df[col] から base_rank を作って返す（コピーして返す）
+    """
+    if df is None or df.empty or col not in df.columns:
+        return df
+    out = df.copy()
+    # 正規表現で "A/B/Cランク" の A/B/C だけ抜く（★付きもOK）
+    out["base_rank"] = (
+        out[col]
+        .astype(str)
+        .str.strip()
+        .str.extract(r"^(A|B|C)ランク", expand=False)
+        .fillna("")
+    )
+    return out
+
 
 
 # 各モードの処理分岐
@@ -526,7 +562,8 @@ elif mode == "order_ai":
             "Aランク": 1.0,  # 未使用
             "Bランク": 1.2,  # 未使用（発注数は1.7S、発注点1.2Sに変更）
             "Cランク": 1.0,
-            "TEST": 1.5
+            "TEST": 1.5,
+            "NEW": 1.5
         }
 
         with st.spinner("🤖 発注AIが計算をしています..."):
@@ -558,6 +595,9 @@ elif mode == "order_ai":
                 else:
                     rank = ""
 
+                # ★対応：基底ランク（A/B/C or ""）
+                base_rank = normalize_rank_base(rank)
+
                 # 直近発注スキップ
                 if jan in recent_jans:
                     continue
@@ -565,7 +605,7 @@ elif mode == "order_ai":
                 current_total = stock + ordered
 
                 # ===== 発注点判定 =====
-                if rank in ["Aランク", "Bランク"]:
+                if base_rank in ["A", "B"]:
                     # 新仕様：在庫+発注済 が ceil(実績×1.2) を「下回ったら」発注
                     reorder_point = max(math.ceil(sold * 1.2), 1)
                     if current_total >= reorder_point:
@@ -580,7 +620,7 @@ elif mode == "order_ai":
                         continue
 
                 # ===== 発注数の基準 =====
-                if rank in ["Aランク", "Bランク"]:
+                if base_rank in ["A", "B"]:
                     # 新仕様：発注数 = ceil(実績×1.7)
                     base_needed = max(math.ceil(sold * 1.7), 0)
                     # 「最低1個」特例は A/B でも有効にしておく（在庫ほぼゼロで実績ありの安全策）
@@ -612,7 +652,7 @@ elif mode == "order_ai":
                         "販売実績": sold,
                         "在庫": stock,
                         "発注済": ordered,
-                        "理論必要数": base_needed if rank not in ["Aランク", "Bランク"] else base_needed,  # 表示用
+                        "理論必要数": base_needed,
                         "発注数": "",     # 空欄
                         "ロット": "",     # 空欄
                         "数量": "",       # 空欄
@@ -630,13 +670,11 @@ elif mode == "order_ai":
                 # C/TEST は「不足分」= base_needed をロットで切り上げ
                 need_for_lot = base_needed
 
-                if rank in ["Aランク", "Bランク"]:
-                    # ロット選定：できるだけ need_for_lot に近い（不足しない）ロットを選ぶ
+                if base_rank in ["A", "B"]:
                     bigger_lots = options[options["order_lot"] >= need_for_lot]
                     if not bigger_lots.empty:
-                        best_option = bigger_lots.sort_values("order_lot").iloc[0]  # 最小で足りるロット
+                        best_option = bigger_lots.sort_values("order_lot").iloc[0]
                     else:
-                        # 全部小さい場合は最大ロット
                         best_option = options.sort_values("order_lot", ascending=False).iloc[0]
                 else:
                     # 従来ロジック
@@ -654,6 +692,7 @@ elif mode == "order_ai":
                                 best_option = one_lot.iloc[0]
                             else:
                                 best_option = options.sort_values("order_lot").iloc[0]
+
 
                 lot = int(best_option["order_lot"])
                 sets = math.ceil(need_for_lot / lot)
@@ -1465,18 +1504,15 @@ elif mode == "rank_check":
     df_item["発注済"] = (df_item["発注済"] - df_item["shanghai_quantity"]).clip(lower=0)
 
     # =========================
-    # 対象商品（A/B/C/取扱中止 + JANあり）
+    # 対象商品（JANありは必須。ランクは全部OK：TEST含む）
     # =========================
-    df_ab = df_item[
-        df_item["ランク"].isin(["Aランク", "Aランク★", "Bランク", "Bランク★", "Cランク", "NEW", "取扱中止"])
-        & df_item["jan"].notnull()
-    ].copy()
+    df_ab = df_item[df_item["jan"].notnull()].copy()
 
-    df_ab["JAN"] = df_ab["jan"]
+    df_ab["JAN"] = df_ab["jan"].astype(str).str.strip()
     df_ab = df_ab.drop_duplicates(subset=["JAN"])
 
     # =========================
-    # フィルターUI
+    # フィルターUI（ランク候補を自動生成）
     # =========================
     col1, col2 = st.columns(2)
 
@@ -1490,11 +1526,25 @@ elif mode == "rank_check":
             ["すべて"] + maker_list
         )
 
-    selected_ranks = st.multiselect(
-        "📌 表示するランク",
-        ["Aランク", "Aランク★", "Bランク", "Bランク★", "Cランク", "NEW", "取扱中止"],
-        default=["Aランク", "Aランク★", "Bランク", "Bランク★", "Cランク", "NEW", "取扱中止"]
+    # ランク候補（自動生成：空やnanは除外）
+    rank_options = (
+        df_ab["ランク"].astype(str).str.strip()
+        .replace(["", "nan", "None", "NULL"], pd.NA)
+        .dropna()
+        .unique()
+        .tolist()
     )
+    rank_options = sorted(rank_options)
+
+    selected_ranks = st.multiselect(
+        "📌 表示するランク（自動）",
+        rank_options,
+        default=rank_options
+    )
+
+    if not rank_options:
+    st.warning("⚠️ ランクが登録されていないため、ランクフィルタを表示できません。")
+    selected_ranks = []
 
     # =========================
     # sales → JAN（実績30日）
