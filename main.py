@@ -1,5 +1,21 @@
 import streamlit as st
 
+st.markdown("""
+<style>
+/* ===== multiselect の選択タグ（赤をやめる：完全対応版） ===== */
+[data-baseweb="tag"] {
+    background-color: #E0F2FE !important;
+    color: #0369A1 !important;
+    border-radius: 6px !important;
+    font-weight: 500 !important;
+}
+[data-baseweb="tag"] span { color: #0369A1 !important; }
+[data-baseweb="tag"] svg  { color: #0369A1 !important; }
+[data-baseweb="tag"]:hover { background-color: #BAE6FD !important; }
+</style>
+""", unsafe_allow_html=True)
+
+
 # ✅ ページ設定を追加
 st.set_page_config(
     page_title="【ASEAN】一元管理システム",
@@ -385,23 +401,6 @@ with st.sidebar:
         border-color: rgba(14,165,233,.45);
         font-weight: 600;
       }
-      /* ===== multiselect の選択タグ（赤をやめる） ===== */
-        div[data-baseweb="tag"] {
-            background-color: #E0F2FE !important;   /* 薄い水色 */
-            color: #0369A1 !important;              /* 落ち着いた青 */
-            border-radius: 6px;
-            font-weight: 500;
-        }
-        
-        /* × ボタン */
-        div[data-baseweb="tag"] svg {
-            color: #0369A1 !important;
-        }
-        
-        /* hover 時 */
-        div[data-baseweb="tag"]:hover {
-            background-color: #BAE6FD !important;
-        }
     </style>
     """, unsafe_allow_html=True)
 
