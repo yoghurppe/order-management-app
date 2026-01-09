@@ -1536,15 +1536,16 @@ elif mode == "rank_check":
     )
     rank_options = sorted(rank_options)
 
-    selected_ranks = st.multiselect(
-        "📌 表示するランク（自動）",
-        rank_options,
-        default=rank_options
-    )
+    if rank_options:
+        selected_ranks = st.multiselect(
+            "📌 表示するランク（自動）",
+            rank_options,
+            default=rank_options
+        )
+    else:
+        st.warning("⚠️ ランクが登録されていないため、ランクフィルタを表示できません。")
+        selected_ranks = []
 
-    if not rank_options:
-    st.warning("⚠️ ランクが登録されていないため、ランクフィルタを表示できません。")
-    selected_ranks = []
 
     # =========================
     # sales → JAN（実績30日）
