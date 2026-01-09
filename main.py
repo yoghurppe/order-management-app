@@ -6,7 +6,7 @@ st.markdown("""
 
 /* タグ本体 */
 [data-baseweb="tag"] {
-    background-color: #E5E7EB !important;   /* 薄いグレー */
+    background-color: #D1D5DB !important;   /* 薄いグレー */
     color: #111827 !important;              /* 黒（少し柔らかめ） */
     border-radius: 6px !important;
     font-weight: 500 !important;
@@ -24,7 +24,7 @@ st.markdown("""
 
 /* hover */
 [data-baseweb="tag"]:hover {
-    background-color: #D1D5DB !important;   /* 少し濃いグレー */
+    background-color: #9CA3AF !important;   /* 少し濃いグレー */
 }
 </style>
 """, unsafe_allow_html=True)
