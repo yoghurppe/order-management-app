@@ -2343,6 +2343,7 @@ elif mode == "expiry_manage":
     # LARK_APP_SECRET="xxxx"
     # LARK_SPREADSHEET_TOKEN="O6VQsoFDOhOPV7t3qSslkoSEg3b"
     # LARK_SHEET_ID="91fd41"
+    st.write("secrets keys:", list(st.secrets.keys()))
     try:
         LARK_APP_ID = st.secrets["LARK_APP_ID"]
         LARK_APP_SECRET = st.secrets["LARK_APP_SECRET"]
