@@ -2343,7 +2343,6 @@ elif mode == "expiry_manage":
     # LARK_APP_SECRET="xxxx"
     # LARK_SPREADSHEET_TOKEN="O6VQsoFDOhOPV7t3qSslkoSEg3b"
     # LARK_SHEET_ID="91fd41"
-    st.write("secrets keys:", list(st.secrets.keys()))
     try:
         LARK_APP_ID = st.secrets["LARK_APP_ID"]
         LARK_APP_SECRET = st.secrets["LARK_APP_SECRET"]
@@ -2399,17 +2398,32 @@ elif mode == "expiry_manage":
             raise RuntimeError(f"Lark token error: {j}")
         return j["tenant_access_token"]
 
-    def lark_read_sheet_values(tenant_token: str, spreadsheet_token: str, sheet_id: str, rng: str = "A1:G5000"):
-        # values API: /values/{sheetId}!A1:G5000
-        range_str = f"{sheet_id}!{rng}"
-        url = f"https://open.larksuite.com/open-apis/sheets/v2/spreadsheets/{spreadsheet_token}/values/{range_str}"
-        headers = {"Authorization": f"Bearer {tenant_token}"}
-        r = requests.get(url, headers=headers, timeout=30)
+    def lark_read_sheet_values(
+        tenant_token: str,
+        spreadsheet_token: str,
+        sheet_id: str,
+        rng: str = "A1:G5000"
+    ):
+        url = (
+            f"https://open.larksuite.com/open-apis/sheets/v2/spreadsheets/"
+            f"{spreadsheet_token}/values/{sheet_id}"
+        )
+        headers = {
+            "Authorization": f"Bearer {tenant_token}"
+        }
+        params = {
+            "range": rng
+        }
+    
+        r = requests.get(url, headers=headers, params=params, timeout=30)
         r.raise_for_status()
         j = r.json()
+    
         if j.get("code") != 0:
             raise RuntimeError(f"Lark read error: {j}")
+    
         return j["data"]["valueRange"]["values"]
+
 
     # =========================
     # パース
