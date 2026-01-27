@@ -2404,16 +2404,15 @@ elif mode == "expiry_manage":
         sheet_id: str,
         rng: str = "A1:G5000"
     ):
+        # ✅ values_batch_get を使う（これが一番安定）
         url = (
             f"https://open.larksuite.com/open-apis/sheets/v2/spreadsheets/"
-            f"{spreadsheet_token}/values/{sheet_id}"
+            f"{spreadsheet_token}/values_batch_get"
         )
-        headers = {
-            "Authorization": f"Bearer {tenant_token}"
-        }
-        params = {
-            "range": rng
-        }
+        headers = {"Authorization": f"Bearer {tenant_token}"}
+    
+        # ranges は "sheetId!A1:G5000" 形式
+        params = {"ranges": f"{sheet_id}!{rng}"}
     
         r = requests.get(url, headers=headers, params=params, timeout=30)
         r.raise_for_status()
@@ -2422,7 +2421,13 @@ elif mode == "expiry_manage":
         if j.get("code") != 0:
             raise RuntimeError(f"Lark read error: {j}")
     
-        return j["data"]["valueRange"]["values"]
+        # data.valueRanges[0].values に入る
+        value_ranges = j.get("data", {}).get("valueRanges", [])
+        if not value_ranges:
+            return []
+    
+        return value_ranges[0].get("values", [])
+    
 
 
     # =========================
