@@ -357,6 +357,10 @@ MODE_KEYS = {
         "日本語": "CSVアップロード",
         "中文": "上传CSV"
     },
+    "expiry_manage": {
+    "日本語": "🧊 賞味期限管理",
+    "中文": "🧊 保质期管理"
+    },
     # "price_improve": {
     #     "日本語": "仕入価格改善リスト",
     #     "中文": "进货价格优化清单"
@@ -384,6 +388,7 @@ GROUPS = [
     ("【商品情報】",      ["search_item", "monthly_sales"]),
     ("【発注】",          ["order_ai", "rank_check", "purchase_history", "order"]),
     ("【アップロード】",  ["csv_upload"]),
+    ("【賞味期限】", ["expiry_manage"]),
 ]
 
 # === ここから置き換え ===
@@ -2320,3 +2325,338 @@ elif mode == "daily_sales":
         file_name=f"daily_sales_by_store_{latest_date}.csv",
         mime="text/csv",
     )
+
+
+elif mode == "expiry_manage":
+    # =========================
+    # 🧊 賞味期限管理モード
+    # =========================
+    st.subheader("🧊 賞味期限管理" if language == "日本語" else "🧊 保质期管理")
+
+    # --- Supabase（このファイル上部で定義済み：SUPABASE_URL_PRE / HEADERS_PRE を使う） ---
+    SUPABASE_URL = SUPABASE_URL_PRE
+    HEADERS = HEADERS_PRE
+
+    # --- Lark Sheets 設定（st.secrets 推奨） ---
+    # secrets.toml 例：
+    # LARK_APP_ID="xxxx"
+    # LARK_APP_SECRET="xxxx"
+    # LARK_SPREADSHEET_TOKEN="O6VQsoFDOhOPV7t3qSslkoSEg3b"
+    # LARK_SHEET_ID="91fd41"
+    try:
+        LARK_APP_ID = st.secrets["LARK_APP_ID"]
+        LARK_APP_SECRET = st.secrets["LARK_APP_SECRET"]
+        LARK_SPREADSHEET_TOKEN = st.secrets.get("LARK_SPREADSHEET_TOKEN", "O6VQsoFDOhOPV7t3qSslkoSEg3b")
+        LARK_SHEET_ID = st.secrets.get("LARK_SHEET_ID", "91fd41")
+    except Exception:
+        st.error("❌ Lark の認証情報が st.secrets にありません（LARK_APP_ID / LARK_APP_SECRET）")
+        st.stop()
+
+    # ---------- ラベル ----------
+    LABEL = {
+        "日本語": {
+            "sync": "🔄 Larkから同期（手動）",
+            "synced": "✅ 同期完了",
+            "syncing": "同期中...",
+            "err": "⚠️ エラー行",
+            "filters": "🔎 フィルタ",
+            "status": "状態",
+            "days": "残り日数",
+            "expiry": "最短賞味期限",
+            "download": "📥 CSVダウンロード",
+            "limit": "表示件数上限",
+            "keyword": "JAN / 商品名 検索",
+            "only_with_expiry": "賞味期限ありのみ",
+            "only_no_expiry": "未登録のみ",
+        },
+        "中文": {
+            "sync": "🔄 从Lark同步（手动）",
+            "synced": "✅ 同步完成",
+            "syncing": "同步中...",
+            "err": "⚠️ 错误行",
+            "filters": "🔎 筛选",
+            "status": "状态",
+            "days": "剩余天数",
+            "expiry": "最短保质期",
+            "download": "📥 下载CSV",
+            "limit": "显示条数上限",
+            "keyword": "搜索：条码 / 商品名",
+            "only_with_expiry": "仅显示已登记",
+            "only_no_expiry": "仅显示未登记",
+        }
+    }[language]
+
+    # =========================
+    # Lark API
+    # =========================
+    def lark_get_tenant_token(app_id: str, app_secret: str) -> str:
+        url = "https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal/"
+        r = requests.post(url, json={"app_id": app_id, "app_secret": app_secret}, timeout=30)
+        r.raise_for_status()
+        j = r.json()
+        if j.get("code") != 0:
+            raise RuntimeError(f"Lark token error: {j}")
+        return j["tenant_access_token"]
+
+    def lark_read_sheet_values(tenant_token: str, spreadsheet_token: str, sheet_id: str, rng: str = "A1:G5000"):
+        # values API: /values/{sheetId}!A1:G5000
+        range_str = f"{sheet_id}!{rng}"
+        url = f"https://open.larksuite.com/open-apis/sheets/v2/spreadsheets/{spreadsheet_token}/values/{range_str}"
+        headers = {"Authorization": f"Bearer {tenant_token}"}
+        r = requests.get(url, headers=headers, timeout=30)
+        r.raise_for_status()
+        j = r.json()
+        if j.get("code") != 0:
+            raise RuntimeError(f"Lark read error: {j}")
+        return j["data"]["valueRange"]["values"]
+
+    # =========================
+    # パース
+    # =========================
+    def normalize_jan_cell(x) -> str | None:
+        if x is None:
+            return None
+        s = str(x).strip()
+        if not s:
+            return None
+        # 数字以外除去（ハイフンやスペース混入対策）
+        s = re.sub(r"\D", "", s)
+        return s if s else None
+
+    def parse_date_cell(x):
+        """
+        Larkで日付表示になっていても、文字列で返ることがあるので複数フォーマット対応。
+        返り値は 'YYYY-MM-DD' (Supabase date向け) or None
+        """
+        if x is None:
+            return None
+        s = str(x).strip()
+        if not s:
+            return None
+
+        # よくある表記
+        for fmt in ("%Y/%m/%d", "%Y-%m-%d", "%Y.%m.%d", "%Y%m%d"):
+            try:
+                return datetime.datetime.strptime(s, fmt).date().isoformat()
+            except ValueError:
+                pass
+
+        # Larkが数値（シリアル）で返すケース対策：基本は出ないが念のため
+        # 例: 45234.0 のようなもの
+        try:
+            if re.fullmatch(r"\d+(\.\d+)?", s):
+                # Excelシリアル(1899-12-30基準)の可能性があるが、
+                # 確証がないのでエラーに倒して入力を直してもらう方が安全
+                raise ValueError(f"日付の形式が不明です（数値）: {s}")
+        except Exception:
+            pass
+
+        raise ValueError(f"日付として解釈できません: {s}")
+
+    def min_date_iso(*isos):
+        ds = [d for d in isos if d]
+        return min(ds) if ds else None
+
+    # =========================
+    # Supabase upsert（REST）
+    # =========================
+    def supabase_upsert_item_expiry(rows: list[dict]) -> int:
+        if not rows:
+            return 0
+        url = f"{SUPABASE_URL}/rest/v1/item_expiry"
+        # resolution=merge-duplicates で upsert（PK=jan想定）
+        headers = {**HEADERS, "Prefer": "resolution=merge-duplicates,return=representation"}
+        r = requests.post(url, headers=headers, json=rows, timeout=60)
+        if r.status_code not in [200, 201]:
+            raise RuntimeError(f"Supabase upsert failed: {r.status_code} {r.text}")
+        data = r.json()
+        return len(data) if isinstance(data, list) else len(rows)
+
+    def sync_lark_to_supabase() -> dict:
+        tenant = lark_get_tenant_token(LARK_APP_ID, LARK_APP_SECRET)
+        values = lark_read_sheet_values(
+            tenant_token=tenant,
+            spreadsheet_token=LARK_SPREADSHEET_TOKEN,
+            sheet_id=LARK_SHEET_ID,
+            rng="A1:G5000"
+        )
+
+        if not values or len(values) < 2:
+            return {"upserted": 0, "errors": []}
+
+        upserts = []
+        errors = []
+
+        # 1行目ヘッダー想定、2行目から
+        for row_idx, row in enumerate(values[1:], start=2):
+            try:
+                a = row[0] if len(row) > 0 else None  # JAN
+                b = row[1] if len(row) > 1 else None  # 商品名
+                c = row[2] if len(row) > 2 else None
+                d = row[3] if len(row) > 3 else None
+                e = row[4] if len(row) > 4 else None
+                f = row[5] if len(row) > 5 else None
+                g = row[6] if len(row) > 6 else None
+
+                jan = normalize_jan_cell(a)
+                if not jan:
+                    continue
+
+                expiry_1 = parse_date_cell(c)
+                expiry_2 = parse_date_cell(d)
+                expiry_3 = parse_date_cell(e)
+                expiry_4 = parse_date_cell(f)
+                expiry_5 = parse_date_cell(g)
+                expiry_min = min_date_iso(expiry_1, expiry_2, expiry_3, expiry_4, expiry_5)
+
+                upserts.append({
+                    "jan": jan,
+                    "name": str(b).strip() if b is not None else None,
+                    "expiry_1": expiry_1,
+                    "expiry_2": expiry_2,
+                    "expiry_3": expiry_3,
+                    "expiry_4": expiry_4,
+                    "expiry_5": expiry_5,
+                    "expiry_min": expiry_min,
+                    "updated_at": datetime.datetime.utcnow().isoformat()
+                })
+
+            except Exception as ex:
+                errors.append({"row": row_idx, "raw": row, "error": str(ex)})
+
+        # 500件ずつ
+        upserted_total = 0
+        for i in range(0, len(upserts), 500):
+            upserted_total += supabase_upsert_item_expiry(upserts[i:i+500])
+
+        return {"upserted": upserted_total, "errors": errors}
+
+    # =========================
+    # UI: 同期
+    # =========================
+    st.markdown("### " + LABEL["sync"])
+    if st.button(LABEL["sync"], key="expiry_sync_btn"):
+        with st.spinner(LABEL["syncing"]):
+            try:
+                result = sync_lark_to_supabase()
+                st.success(f"{LABEL['synced']}: {result['upserted']} 件")
+                if result["errors"]:
+                    st.warning(f"{LABEL['err']}: {len(result['errors'])} 件")
+                    st.dataframe(pd.DataFrame(result["errors"]), use_container_width=True)
+            except Exception as e:
+                st.error(f"❌ 同期失敗: {e}")
+
+    st.markdown("---")
+
+    # =========================
+    # 一覧取得（Supabase → pandas）
+    # =========================
+    @st.cache_data(ttl=30)
+    def fetch_item_expiry():
+        # 全件（必要なら後で range / pagination 追加）
+        url = f"{SUPABASE_URL}/rest/v1/item_expiry?select=*"
+        r = requests.get(url, headers=HEADERS, timeout=60)
+        if r.status_code != 200:
+            st.error(f"item_expiry の取得に失敗: {r.status_code} / {r.text}")
+            return pd.DataFrame()
+        return pd.DataFrame(r.json())
+
+    df = fetch_item_expiry()
+
+    # =========================
+    # 表示用加工
+    # =========================
+    if df.empty:
+        st.info("item_expiry にデータがありません。先に同期してください。")
+        st.stop()
+
+    # 型整形
+    df["jan"] = df["jan"].astype(str).str.strip()
+    if "name" in df.columns:
+        df["name"] = df["name"].astype(str)
+
+    df["expiry_min_dt"] = pd.to_datetime(df.get("expiry_min"), errors="coerce")
+    today = pd.Timestamp.now(tz="Asia/Tokyo").normalize()
+    df["残り日数"] = (df["expiry_min_dt"] - today).dt.days
+
+    def status(days):
+        if pd.isna(days):
+            return "未登録"
+        if days < 0:
+            return "期限切れ"
+        if days <= 30:
+            return "30日以内"
+        if days <= 60:
+            return "60日以内"
+        return "余裕あり"
+
+    df["状態"] = df["残り日数"].apply(status)
+
+    # =========================
+    # フィルタ
+    # =========================
+    st.markdown("### " + LABEL["filters"])
+    c1, c2, c3, c4 = st.columns([1.2, 1.0, 1.0, 0.8])
+
+    with c1:
+        kw = st.text_input(LABEL["keyword"], value="", key="expiry_kw")
+
+    with c2:
+        statuses = ["期限切れ", "30日以内", "60日以内", "余裕あり", "未登録"]
+        default_status = ["期限切れ", "30日以内"]
+        sel_status = st.multiselect(LABEL["status"], statuses, default=default_status, key="expiry_status")
+
+    with c3:
+        only_with = st.checkbox(LABEL["only_with_expiry"], value=False, key="expiry_only_with")
+        only_no = st.checkbox(LABEL["only_no_expiry"], value=False, key="expiry_only_no")
+
+    with c4:
+        limit = st.number_input(LABEL["limit"], min_value=50, max_value=5000, value=500, step=50, key="expiry_limit")
+
+    df_view = df.copy()
+
+    if kw:
+        kw_s = kw.strip()
+        # jan or name
+        cond = df_view["jan"].str.contains(kw_s, na=False)
+        if "name" in df_view.columns:
+            cond = cond | df_view["name"].astype(str).str.contains(kw_s, na=False)
+        df_view = df_view[cond]
+
+    if sel_status:
+        df_view = df_view[df_view["状態"].isin(sel_status)]
+
+    if only_with and not only_no:
+        df_view = df_view[df_view["expiry_min_dt"].notna()]
+    if only_no and not only_with:
+        df_view = df_view[df_view["expiry_min_dt"].isna()]
+
+    # =========================
+    # 表示
+    # =========================
+    df_view = df_view.sort_values(by=["expiry_min_dt", "jan"], ascending=[True, True])
+
+    # 表示列（expiry_1..5も出す）
+    cols = ["jan", "name", "expiry_min", "残り日数", "状態", "expiry_1", "expiry_2", "expiry_3", "expiry_4", "expiry_5"]
+    cols = [c for c in cols if c in df_view.columns]
+
+    row_count = len(df_view)
+    h_left, h_right = st.columns([1, 0.15])
+    h_left.subheader(f"{LABEL['expiry']} / {LABEL['days']}")
+    h_right.markdown(
+        f"<h4 style='text-align:right; margin-top: 0.6em;'>{row_count:,}件</h4>",
+        unsafe_allow_html=True
+    )
+
+    st.dataframe(df_view.head(int(limit))[cols], use_container_width=True)
+
+    # CSV ダウンロード
+    csv = df_view[cols].to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        LABEL["download"],
+        data=csv,
+        file_name="item_expiry_filtered.csv",
+        mime="text/csv",
+        key="expiry_download"
+    )
+
