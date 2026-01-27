@@ -2424,7 +2424,6 @@ elif mode == "expiry_manage":
         # data.valueRange.values
         return j["data"]["valueRange"]["values"]
 
-    
 
 
     # =========================
