@@ -2628,7 +2628,11 @@ elif mode == "expiry_manage":
     today = pd.Timestamp.today().normalize()
     
     # 残り日数
-    df["残り日数"] = (df["expiry_min_dt"] - today).dt.days
+    df["残り日数"] = (
+        (df["expiry_min_dt"] - today)
+        .dt.days
+        .astype("Int64")   # ← これ
+    )
 
 
     def status(days):
