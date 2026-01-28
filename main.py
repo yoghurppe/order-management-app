@@ -2591,8 +2591,36 @@ elif mode == "expiry_manage":
             st.error(f"item_expiry の取得に失敗: {r.status_code} / {r.text}")
             return pd.DataFrame()
         return pd.DataFrame(r.json())
+        
+    @st.cache_data(ttl=5)  # TTLは好みで 5〜30秒
+    def fetch_warehouse_stock():
+        # jan と stock_available だけ取る（軽量化）
+        url = f"{SUPABASE_URL}/rest/v1/warehouse_stock?select=jan,stock_available"
+        r = requests.get(url, headers=HEADERS, timeout=60)
+        if r.status_code != 200:
+            st.error(f"warehouse_stock の取得に失敗: {r.status_code} / {r.text}")
+            return pd.DataFrame()
+        return pd.DataFrame(r.json())
 
     df = fetch_item_expiry()
+
+    df_stock = fetch_warehouse_stock()
+
+    if not df_stock.empty:
+        # jan を文字列で揃える
+        df_stock["jan"] = df_stock["jan"].astype(str).str.strip()
+        # stock_available を数値化（空や文字が混ざっても落ちないように）
+        df_stock["stock_available"] = pd.to_numeric(df_stock["stock_available"], errors="coerce").fillna(0).astype(int)
+    
+        # item_expiry 側も jan を揃える（後で既にやってるならここは省略してOK）
+        df["jan"] = df["jan"].astype(str).str.strip()
+    
+        # left join：item_expiry を主にして在庫を付与
+        df = df.merge(df_stock[["jan", "stock_available"]], on="jan", how="left")
+    
+    # 在庫が無い（未取得/NULL）場合は 0 扱いに
+    df["stock_available"] = pd.to_numeric(df.get("stock_available"), errors="coerce").fillna(0).astype(int)
+
 
     # =========================
     # 表示用加工
@@ -2670,7 +2698,8 @@ elif mode == "expiry_manage":
     with c3:
         only_with = st.checkbox(LABEL["only_with_expiry"], value=False, key="expiry_only_with")
         only_no = st.checkbox(LABEL["only_no_expiry"], value=False, key="expiry_only_no")
-
+        only_zero_stock = st.checkbox("在庫0のみ", value=False, key="expiry_only_zero_stock")
+        
     with c4:
         limit = st.number_input(LABEL["limit"], min_value=50, max_value=5000, value=500, step=50, key="expiry_limit")
 
@@ -2691,14 +2720,17 @@ elif mode == "expiry_manage":
         df_view = df_view[df_view["expiry_min_dt"].notna()]
     if only_no and not only_with:
         df_view = df_view[df_view["expiry_min_dt"].isna()]
-
+    if only_zero_stock:
+        df_view = df_view[df_view["stock_available"] <= 0]
+    
     # =========================
     # 表示
     # =========================
     df_view = df_view.sort_values(by=["expiry_min_dt", "jan"], ascending=[True, True])
 
     # 表示列（expiry_1..5も出す）
-    cols = ["jan", "name", "expiry_min", "残り日数", "状態", "expiry_1", "expiry_2", "expiry_3", "expiry_4", "expiry_5"]
+    cols = ["jan", "name", "stock_available", "expiry_min", "残り日数", "状態",
+            "expiry_1", "expiry_2", "expiry_3", "expiry_4", "expiry_5"]
     cols = [c for c in cols if c in df_view.columns]
 
     row_count = len(df_view)
