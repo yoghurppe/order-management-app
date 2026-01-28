@@ -2444,33 +2444,32 @@ elif mode == "expiry_manage":
 
     def parse_date_cell(x):
         """
-        Larkで日付表示になっていても、文字列で返ることがあるので複数フォーマット対応。
-        返り値は 'YYYY-MM-DD' (Supabase date向け) or None
+        Lark Sheets の日付は
+        - 'YYYY/MM/DD' 等の文字列
+        - Excelシリアル値（例: 46326）
+        の両方が来る
         """
         if x is None:
             return None
+    
+        # 数値（Excelシリアル）
+        if isinstance(x, (int, float)):
+            base = datetime.date(1899, 12, 30)
+            return (base + datetime.timedelta(days=int(x))).isoformat()
+    
         s = str(x).strip()
         if not s:
             return None
-
-        # よくある表記
+    
+        # 文字列日付
         for fmt in ("%Y/%m/%d", "%Y-%m-%d", "%Y.%m.%d", "%Y%m%d"):
             try:
                 return datetime.datetime.strptime(s, fmt).date().isoformat()
             except ValueError:
                 pass
-
-        # Larkが数値（シリアル）で返すケース対策：基本は出ないが念のため
-        # 例: 45234.0 のようなもの
-        try:
-            if re.fullmatch(r"\d+(\.\d+)?", s):
-                # Excelシリアル(1899-12-30基準)の可能性があるが、
-                # 確証がないのでエラーに倒して入力を直してもらう方が安全
-                raise ValueError(f"日付の形式が不明です（数値）: {s}")
-        except Exception:
-            pass
-
+    
         raise ValueError(f"日付として解釈できません: {s}")
+
 
     def min_date_iso(*isos):
         ds = [d for d in isos if d]
