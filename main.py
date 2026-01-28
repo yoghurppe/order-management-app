@@ -2699,6 +2699,8 @@ elif mode == "expiry_manage":
         only_with = st.checkbox(LABEL["only_with_expiry"], value=False, key="expiry_only_with")
         only_no = st.checkbox(LABEL["only_no_expiry"], value=False, key="expiry_only_no")
         only_zero_stock = st.checkbox("在庫0のみ", value=False, key="expiry_only_zero_stock")
+        only_in_stock = st.checkbox("在庫ありのみ（在庫0は非表示）", value=True, key="expiry_only_in_stock")
+        show_zero_stock = st.checkbox("在庫0も表示", value=False, key="expiry_show_zero_stock")
         
     with c4:
         limit = st.number_input(LABEL["limit"], min_value=50, max_value=5000, value=500, step=50, key="expiry_limit")
@@ -2723,6 +2725,12 @@ elif mode == "expiry_manage":
     if only_zero_stock:
         df_view = df_view[df_view["stock_available"] <= 0]
     
+    # 在庫フィルタ（デフォルト：在庫0を非表示）
+    if "stock_available" in df_view.columns:
+        if st.session_state.get("expiry_only_in_stock", True) and not st.session_state.get("expiry_show_zero_stock", False):
+            df_view = df_view[df_view["stock_available"] > 0]
+    
+        
     # =========================
     # 表示
     # =========================
