@@ -2561,7 +2561,14 @@ elif mode == "expiry_manage":
                 st.success(f"{LABEL['synced']}: {result['upserted']} 件")
                 if result["errors"]:
                     st.warning(f"{LABEL['err']}: {len(result['errors'])} 件")
-                    st.dataframe(pd.DataFrame(result["errors"]), use_container_width=True)
+                    df_err = pd.DataFrame(result["errors"]).copy()
+                
+                    # raw(list) を文字列にして Arrow 変換エラー回避
+                    if "raw" in df_err.columns:
+                        df_err["raw"] = df_err["raw"].apply(lambda x: " | ".join(map(str, x)) if isinstance(x, (list, tuple)) else str(x))
+                
+                    st.dataframe(df_err, use_container_width=True)
+
             except Exception as e:
                 st.error(f"❌ 同期失敗: {e}")
 
