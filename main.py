@@ -2636,8 +2636,6 @@ elif mode == "expiry_manage":
             return "未登録"
         if days < 0:
             return "期限切れ"
-        if days <= 30:
-            return "30日以内"
         if days <= 60:
             return "60日以内"
         return "余裕あり"
@@ -2654,8 +2652,8 @@ elif mode == "expiry_manage":
         kw = st.text_input(LABEL["keyword"], value="", key="expiry_kw")
 
     with c2:
-        statuses = ["期限切れ", "30日以内", "60日以内", "余裕あり", "未登録"]
-        default_status = ["期限切れ", "30日以内"]
+        statuses = ["期限切れ", "60日以内", "余裕あり", "未登録"]
+        default_status = ["期限切れ", "60日以内"]
         sel_status = st.multiselect(LABEL["status"], statuses, default=default_status, key="expiry_status")
 
     with c3:
@@ -2700,7 +2698,17 @@ elif mode == "expiry_manage":
         unsafe_allow_html=True
     )
 
-    st.dataframe(df_view.head(int(limit))[cols], use_container_width=True)
+    def highlight_status(row):
+        if row["状態"] == "期限切れ":
+            return ["background-color: #ffcccc"] * len(row)
+        if row["状態"] == "30日以内":
+            return ["background-color: #fff2cc"] * len(row)
+        return [""] * len(row)
+    
+    st.dataframe(
+        df_view.head(int(limit))[cols].style.apply(highlight_status, axis=1),
+        use_container_width=True
+    )
 
     # CSV ダウンロード
     csv = df_view[cols].to_csv(index=False).encode("utf-8-sig")
