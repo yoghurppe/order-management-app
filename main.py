@@ -2701,8 +2701,8 @@ elif mode == "expiry_manage":
     def highlight_status(row):
         if row["状態"] == "期限切れ":
             return ["background-color: #ffcccc"] * len(row)
-        if row["状態"] == "30日以内":
-            return ["background-color: #fff2cc"] * len(row)
+        if row["状態"] == "60日以内":
+            return ["background-color: #ffe599"] * len(row)
         return [""] * len(row)
     
     st.dataframe(
