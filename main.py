@@ -386,9 +386,9 @@ GROUPS = [
     ("トップページ",      ["home"]),
     ("【売上データ】",    ["store_profit", "daily_sales"]),
     ("【商品情報】",      ["search_item", "monthly_sales"]),
+    ("【賞味期限】", ["expiry_manage"]),
     ("【発注】",          ["order_ai", "rank_check", "purchase_history", "order"]),
     ("【アップロード】",  ["csv_upload"]),
-    ("【賞味期限】", ["expiry_manage"]),
 ]
 
 # === ここから置き換え ===
