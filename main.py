@@ -2477,6 +2477,12 @@ elif mode == "expiry_manage":
     # =========================
     # Supabase upsert（REST）
     # =========================
+    def supabase_truncate_item_expiry():
+        url = f"{SUPABASE_URL}/rest/v1/rpc/truncate_item_expiry"
+        r = requests.post(url, headers=HEADERS, json={}, timeout=60)
+        if r.status_code not in [200, 204]:
+            raise RuntimeError(f"Supabase truncate failed: {r.status_code} {r.text}")
+
     def supabase_upsert_item_expiry(rows: list[dict]) -> int:
         if not rows:
             return 0
@@ -2490,6 +2496,7 @@ elif mode == "expiry_manage":
         return len(data) if isinstance(data, list) else len(rows)
 
     def sync_lark_to_supabase() -> dict:
+        supabase_truncate_item_expiry()
         tenant = lark_get_tenant_token(LARK_APP_ID, LARK_APP_SECRET)
         values = lark_read_sheet_values(
             tenant_token=tenant,
