@@ -2698,9 +2698,8 @@ elif mode == "expiry_manage":
     with c3:
         only_with = st.checkbox(LABEL["only_with_expiry"], value=False, key="expiry_only_with")
         only_no = st.checkbox(LABEL["only_no_expiry"], value=False, key="expiry_only_no")
-        only_zero_stock = st.checkbox("在庫0のみ", value=False, key="expiry_only_zero_stock")
         only_in_stock = st.checkbox("在庫ありのみ（在庫0は非表示）", value=True, key="expiry_only_in_stock")
-        show_zero_stock = st.checkbox("在庫0も表示", value=False, key="expiry_show_zero_stock")
+        only_zero_stock = st.checkbox("在庫0のみ", value=False, key="expiry_only_zero_stock")
         
     with c4:
         limit = st.number_input(LABEL["limit"], min_value=50, max_value=5000, value=500, step=50, key="expiry_limit")
