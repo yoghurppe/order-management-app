@@ -2582,7 +2582,7 @@ elif mode == "expiry_manage":
     # =========================
     # 一覧取得（Supabase → pandas）
     # =========================
-    @st.cache_data(ttl=30)
+    @st.cache_data(ttl=5)
     def fetch_item_expiry():
         # 全件（必要なら後で range / pagination 追加）
         url = f"{SUPABASE_URL}/rest/v1/item_expiry?select=*"
