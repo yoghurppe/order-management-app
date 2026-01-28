@@ -2590,9 +2590,31 @@ elif mode == "expiry_manage":
         st.stop()
 
     # 型整形
+    # 例: Lark側のヘッダ名に合わせて調整してね
+    # ここでは列名が jan, name, expiry_1..expiry_5 で来てる前提
+    
+    # --- 文字列列 ---
     df["jan"] = df["jan"].astype(str).str.strip()
-    if "name" in df.columns:
-        df["name"] = df["name"].astype(str)
+    df["name"] = df["name"].astype(str).fillna("").str.strip()
+    
+    # --- 日付列（空欄はNaT→Noneにする）---
+    expiry_cols = ["expiry_1", "expiry_2", "expiry_3", "expiry_4", "expiry_5"]
+    for c in expiry_cols:
+        if c in df.columns:
+            df[c] = pd.to_datetime(df[c], errors="coerce").dt.date
+    
+    # --- expiry_min を計算 ---
+    if set(expiry_cols).issubset(df.columns):
+        df["expiry_min"] = pd.to_datetime(df[expiry_cols].stack(), errors="coerce").groupby(level=0).min().dt.date
+    else:
+        df["expiry_min"] = None
+    
+    # --- updated_at ---
+    df["updated_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
+    
+    # --- JSON化のため NaT/NaN を None に ---
+    df = df.where(pd.notnull(df), None)
+
 
     df["expiry_min_dt"] = pd.to_datetime(df.get("expiry_min"), errors="coerce")
     today = pd.Timestamp.now(tz="Asia/Tokyo").normalize()
