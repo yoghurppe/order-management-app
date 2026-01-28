@@ -2622,9 +2622,15 @@ elif mode == "expiry_manage":
     df = df.where(pd.notnull(df), None)
 
 
+    # expiry_min を datetime に（tzなし）
     df["expiry_min_dt"] = pd.to_datetime(df.get("expiry_min"), errors="coerce")
-    today = pd.Timestamp.now(tz="Asia/Tokyo").normalize()
+    
+    # 今日も tzなし（date基準）にする
+    today = pd.Timestamp.today().normalize()
+    
+    # 残り日数
     df["残り日数"] = (df["expiry_min_dt"] - today).dt.days
+
 
     def status(days):
         if pd.isna(days):
