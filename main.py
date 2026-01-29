@@ -2770,3 +2770,11 @@ elif mode == "expiry_manage":
         key="expiry_download"
     )
 
+    test_jan = "4901085632505"
+    r = requests.get(
+        f"{SUPABASE_URL}/rest/v1/warehouse_stock?select=jan,product_code,stock_available&jan=eq.{test_jan}",
+        headers=HEADERS
+    )
+    st.write("DEBUG warehouse_stock", r.json())
+    st.write("DEBUG SUPABASE_URL", SUPABASE_URL)
+
