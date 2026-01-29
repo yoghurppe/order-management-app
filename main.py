@@ -2606,6 +2606,14 @@ elif mode == "expiry_manage":
 
     df_stock = fetch_warehouse_stock()
 
+    st.write("DEBUG df_expiry jan type/value",
+         type(df_expiry.loc[df_expiry["jan"]=="4901085632505","jan"].iloc[0]),
+         repr(df_expiry.loc[df_expiry["jan"]=="4901085632505","jan"].iloc[0]))
+
+    st.write("DEBUG df_stock jan type/value",
+         type(df_stock.loc[df_stock["jan"]=="4901085632505","jan"].iloc[0]),
+         repr(df_stock.loc[df_stock["jan"]=="4901085632505","jan"].iloc[0]))
+
     if not df_stock.empty:
         # jan を文字列で揃える
         df_stock["jan"] = df_stock["jan"].astype(str).str.strip()
