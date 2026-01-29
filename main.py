@@ -2602,6 +2602,10 @@ elif mode == "expiry_manage":
             return pd.DataFrame()
         return pd.DataFrame(r.json())
 
+    df = fetch_item_expiry()
+
+    df_stock = fetch_warehouse_stock()
+
     st.write("DEBUG df_stock head", df_stock.head(5))
     st.write("DEBUG df_stock columns", df_stock.columns.tolist())
     st.write("DEBUG df_stock rows count", len(df_stock))
@@ -2610,11 +2614,6 @@ elif mode == "expiry_manage":
         "DEBUG df_stock contains test jan?",
         (df_stock["jan"] == "4901085632505").any()
     )
-
-
-    df = fetch_item_expiry()
-
-    df_stock = fetch_warehouse_stock()
 
     if not df_stock.empty:
         # jan を文字列で揃える
