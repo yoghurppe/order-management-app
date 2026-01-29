@@ -2338,11 +2338,6 @@ elif mode == "expiry_manage":
     HEADERS = HEADERS_PRE
 
     # --- Lark Sheets 設定（st.secrets 推奨） ---
-    # secrets.toml 例：
-    # LARK_APP_ID="xxxx"
-    # LARK_APP_SECRET="xxxx"
-    # LARK_SPREADSHEET_TOKEN="O6VQsoFDOhOPV7t3qSslkoSEg3b"
-    # LARK_SHEET_ID="91fd41"
     try:
         LARK_APP_ID = st.secrets["LARK_APP_ID"]
         LARK_APP_SECRET = st.secrets["LARK_APP_SECRET"]
@@ -2408,25 +2403,17 @@ elif mode == "expiry_manage":
             "https://open.larksuite.com/open-apis/"
             f"sheets/v2/spreadsheets/{spreadsheet_token}/values_batch_get"
         )
-        headers = {
-            "Authorization": f"Bearer {tenant_token}"
-        }
-        params = {
-            "ranges": f"{sheet_id}!{rng}"
-        }
-    
+        headers = {"Authorization": f"Bearer {tenant_token}"}
+        params = {"ranges": f"{sheet_id}!{rng}"}
+
         r = requests.get(url, headers=headers, params=params, timeout=30)
         r.raise_for_status()
         j = r.json()
-    
+
         if j.get("code") != 0:
             raise RuntimeError(j)
-    
-        # ← ここがポイント
+
         return j["data"]["valueRanges"][0]["values"]
-
-
-
 
     # =========================
     # パース
@@ -2437,7 +2424,6 @@ elif mode == "expiry_manage":
         s = str(x).strip()
         if not s:
             return None
-        # 数字以外除去（ハイフンやスペース混入対策）
         s = re.sub(r"\D", "", s)
         return s if s else None
 
@@ -2450,25 +2436,22 @@ elif mode == "expiry_manage":
         """
         if x is None:
             return None
-    
-        # 数値（Excelシリアル）
+
         if isinstance(x, (int, float)):
             base = datetime.date(1899, 12, 30)
             return (base + datetime.timedelta(days=int(x))).isoformat()
-    
+
         s = str(x).strip()
         if not s:
             return None
-    
-        # 文字列日付
+
         for fmt in ("%Y/%m/%d", "%Y-%m-%d", "%Y.%m.%d", "%Y%m%d"):
             try:
                 return datetime.datetime.strptime(s, fmt).date().isoformat()
             except ValueError:
                 pass
-    
-        raise ValueError(f"日付として解釈できません: {s}")
 
+        raise ValueError(f"日付として解釈できません: {s}")
 
     def min_date_iso(*isos):
         ds = [d for d in isos if d]
@@ -2487,7 +2470,6 @@ elif mode == "expiry_manage":
         if not rows:
             return 0
         url = f"{SUPABASE_URL}/rest/v1/item_expiry"
-        # resolution=merge-duplicates で upsert（PK=jan想定）
         headers = {**HEADERS, "Prefer": "resolution=merge-duplicates,return=representation"}
         r = requests.post(url, headers=headers, json=rows, timeout=60)
         if r.status_code not in [200, 201]:
@@ -2511,11 +2493,10 @@ elif mode == "expiry_manage":
         upserts = []
         errors = []
 
-        # 1行目ヘッダー想定、2行目から
         for row_idx, row in enumerate(values[1:], start=2):
             try:
-                a = row[0] if len(row) > 0 else None  # JAN
-                b = row[1] if len(row) > 1 else None  # 商品名
+                a = row[0] if len(row) > 0 else None
+                b = row[1] if len(row) > 1 else None
                 c = row[2] if len(row) > 2 else None
                 d = row[3] if len(row) > 3 else None
                 e = row[4] if len(row) > 4 else None
@@ -2548,7 +2529,6 @@ elif mode == "expiry_manage":
             except Exception as ex:
                 errors.append({"row": row_idx, "raw": row, "error": str(ex)})
 
-        # 500件ずつ
         upserted_total = 0
         for i in range(0, len(upserts), 500):
             upserted_total += supabase_upsert_item_expiry(upserts[i:i+500])
@@ -2567,11 +2547,10 @@ elif mode == "expiry_manage":
                 if result["errors"]:
                     st.warning(f"{LABEL['err']}: {len(result['errors'])} 件")
                     df_err = pd.DataFrame(result["errors"]).copy()
-                
-                    # raw(list) を文字列にして Arrow 変換エラー回避
                     if "raw" in df_err.columns:
-                        df_err["raw"] = df_err["raw"].apply(lambda x: " | ".join(map(str, x)) if isinstance(x, (list, tuple)) else str(x))
-                
+                        df_err["raw"] = df_err["raw"].apply(
+                            lambda x: " | ".join(map(str, x)) if isinstance(x, (list, tuple)) else str(x)
+                        )
                     st.dataframe(df_err, use_container_width=True)
 
             except Exception as e:
@@ -2582,104 +2561,118 @@ elif mode == "expiry_manage":
     # =========================
     # 一覧取得（Supabase → pandas）
     # =========================
-    @st.cache_data(ttl=5)
+    @st.cache_data(ttl=60)
     def fetch_item_expiry():
-        # 全件（必要なら後で range / pagination 追加）
         url = f"{SUPABASE_URL}/rest/v1/item_expiry?select=*"
         r = requests.get(url, headers=HEADERS, timeout=60)
         if r.status_code != 200:
             st.error(f"item_expiry の取得に失敗: {r.status_code} / {r.text}")
             return pd.DataFrame()
         return pd.DataFrame(r.json())
-        
-    @st.cache_data(ttl=5)  # TTLは好みで 5〜30秒
-    def fetch_warehouse_stock():
-        # jan と stock_available だけ取る（軽量化）
-        url = f"{SUPABASE_URL}/rest/v1/warehouse_stock?select=jan,stock_available"
-        r = requests.get(url, headers=HEADERS, timeout=60)
-        if r.status_code != 200:
-            st.error(f"warehouse_stock の取得に失敗: {r.status_code} / {r.text}")
-            return pd.DataFrame()
-        return pd.DataFrame(r.json())
 
+    def chunk_list(lst, size=500):
+        for i in range(0, len(lst), size):
+            yield lst[i:i+size]
+
+    @st.cache_data(ttl=60)
+    def fetch_warehouse_stock_by_jans(jans: list[str]) -> pd.DataFrame:
+        """
+        item_expiry側のJAN一覧に対して、warehouse_stockから jan, stock_available を必要分だけ取得
+        """
+        if not jans:
+            return pd.DataFrame(columns=["jan", "stock_available"])
+
+        # 文字列化 & strip & 重複排除
+        jans = [str(x).strip() for x in jans if pd.notna(x) and str(x).strip() != ""]
+        jans = list(dict.fromkeys(jans))  # 順序保持で重複排除
+
+        all_rows = []
+
+        for chunk in chunk_list(jans, 500):
+            joined = ",".join(chunk)
+            url = (
+                f"{SUPABASE_URL}/rest/v1/warehouse_stock"
+                f"?select=jan,stock_available&jan=in.({joined})"
+            )
+            r = requests.get(url, headers=HEADERS, timeout=60)
+            if r.status_code != 200:
+                st.error(f"warehouse_stock の取得に失敗: {r.status_code} / {r.text}")
+                continue
+
+            rows = r.json()
+            if rows:
+                all_rows.extend(rows)
+
+        df_stock = pd.DataFrame(all_rows)
+        if df_stock.empty:
+            return pd.DataFrame(columns=["jan", "stock_available"])
+
+        df_stock["jan"] = df_stock["jan"].astype(str).str.strip()
+        df_stock["stock_available"] = pd.to_numeric(df_stock["stock_available"], errors="coerce").fillna(0).astype(int)
+
+        # JAN重複があり得るなら安全に集約
+        df_stock = df_stock.groupby("jan", as_index=False)["stock_available"].sum()
+
+        return df_stock
+
+    # =========================
+    # 取得 → JAN一覧から在庫取得 → merge
+    # =========================
     df = fetch_item_expiry()
 
-    df_stock = fetch_warehouse_stock()
-
-    st.write("DEBUG df_stock head", df_stock.head(5))
-    st.write("DEBUG df_stock columns", df_stock.columns.tolist())
-    st.write("DEBUG df_stock rows count", len(df_stock))
-
-    st.write(
-        "DEBUG df_stock contains test jan?",
-        (df_stock["jan"] == "4901085632505").any()
-    )
-
-    if not df_stock.empty:
-        # jan を文字列で揃える
-        df_stock["jan"] = df_stock["jan"].astype(str).str.strip()
-        # stock_available を数値化（空や文字が混ざっても落ちないように）
-        df_stock["stock_available"] = pd.to_numeric(df_stock["stock_available"], errors="coerce").fillna(0).astype(int)
-    
-        # item_expiry 側も jan を揃える（後で既にやってるならここは省略してOK）
-        df["jan"] = df["jan"].astype(str).str.strip()
-        
-        # left join：item_expiry を主にして在庫を付与
-        df = df.merge(df_stock[["jan", "stock_available"]], on="jan", how="left")
-
-    
-    
-    # 在庫が無い（未取得/NULL）場合は 0 扱いに
-    df["stock_available"] = pd.to_numeric(df.get("stock_available"), errors="coerce").fillna(0).astype(int)
-
-
-    # =========================
-    # 表示用加工
-    # =========================
     if df.empty:
         st.info("item_expiry にデータがありません。先に同期してください。")
         st.stop()
 
-    # 型整形
-    # 例: Lark側のヘッダ名に合わせて調整してね
-    # ここでは列名が jan, name, expiry_1..expiry_5 で来てる前提
-    
+    # expiry側のJANを正規化
+    df["jan"] = df["jan"].astype(str).str.strip()
+
+    jans = df["jan"].dropna().astype(str).str.strip().unique().tolist()
+    df_stock = fetch_warehouse_stock_by_jans(jans)
+
+    # left join：item_expiry を主にして在庫を付与
+    df = df.merge(df_stock, on="jan", how="left")
+
+    # 在庫が無い（未取得/NULL）場合は 0 扱いに
+    df["stock_available"] = pd.to_numeric(df.get("stock_available"), errors="coerce").fillna(0).astype(int)
+
+    # =========================
+    # 表示用加工
+    # =========================
     # --- 文字列列 ---
     df["jan"] = df["jan"].astype(str).str.strip()
     df["name"] = df["name"].astype(str).fillna("").str.strip()
-    
+
     # --- 日付列（空欄はNaT→Noneにする）---
     expiry_cols = ["expiry_1", "expiry_2", "expiry_3", "expiry_4", "expiry_5"]
     for c in expiry_cols:
         if c in df.columns:
             df[c] = pd.to_datetime(df[c], errors="coerce").dt.date
-    
+
     # --- expiry_min を計算 ---
     if set(expiry_cols).issubset(df.columns):
         df["expiry_min"] = pd.to_datetime(df[expiry_cols].stack(), errors="coerce").groupby(level=0).min().dt.date
     else:
         df["expiry_min"] = None
-    
+
     # --- updated_at ---
     df["updated_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
-    
+
     # --- JSON化のため NaT/NaN を None に ---
     df = df.where(pd.notnull(df), None)
 
-
     # expiry_min を datetime に（tzなし）
     df["expiry_min_dt"] = pd.to_datetime(df.get("expiry_min"), errors="coerce")
-    
-    # 今日も tzなし（date基準）にする
+
+    # 今日も tzなし（date基準）
     today = pd.Timestamp.today().normalize()
-    
+
     # 残り日数
     df["残り日数"] = (
         (df["expiry_min_dt"] - today)
         .dt.days
-        .astype("Int64")   # ← これ
+        .astype("Int64")
     )
-
 
     def status(days):
         if pd.isna(days):
@@ -2691,7 +2684,6 @@ elif mode == "expiry_manage":
         return "余裕あり"
 
     df["状態"] = df["残り日数"].apply(status)
-
 
     # =========================
     # フィルタ
@@ -2712,7 +2704,7 @@ elif mode == "expiry_manage":
         only_no = st.checkbox(LABEL["only_no_expiry"], value=False, key="expiry_only_no")
         only_in_stock = st.checkbox("在庫ありのみ（在庫0は非表示）", value=True, key="expiry_only_in_stock")
         only_zero_stock = st.checkbox("在庫0のみ", value=False, key="expiry_only_zero_stock")
-        
+
     with c4:
         limit = st.number_input(LABEL["limit"], min_value=50, max_value=5000, value=500, step=50, key="expiry_limit")
 
@@ -2720,7 +2712,6 @@ elif mode == "expiry_manage":
 
     if kw:
         kw_s = kw.strip()
-        # jan or name
         cond = df_view["jan"].str.contains(kw_s, na=False)
         if "name" in df_view.columns:
             cond = cond | df_view["name"].astype(str).str.contains(kw_s, na=False)
@@ -2735,19 +2726,17 @@ elif mode == "expiry_manage":
         df_view = df_view[df_view["expiry_min_dt"].isna()]
     if only_zero_stock:
         df_view = df_view[df_view["stock_available"] <= 0]
-    
+
     # 在庫フィルタ（デフォルト：在庫0を非表示）
     if "stock_available" in df_view.columns:
         if st.session_state.get("expiry_only_in_stock", True) and not st.session_state.get("expiry_show_zero_stock", False):
             df_view = df_view[df_view["stock_available"] > 0]
-    
-        
+
     # =========================
     # 表示
     # =========================
     df_view = df_view.sort_values(by=["expiry_min_dt", "jan"], ascending=[True, True])
 
-    # 表示列（expiry_1..5も出す）
     cols = ["jan", "name", "stock_available", "expiry_min", "残り日数", "状態",
             "expiry_1", "expiry_2", "expiry_3", "expiry_4", "expiry_5"]
     cols = [c for c in cols if c in df_view.columns]
@@ -2766,7 +2755,7 @@ elif mode == "expiry_manage":
         if row["状態"] == "60日以内":
             return ["background-color: #ffe599"] * len(row)
         return [""] * len(row)
-    
+
     st.dataframe(
         df_view.head(int(limit))[cols].style.apply(highlight_status, axis=1),
         use_container_width=True
@@ -2781,10 +2770,3 @@ elif mode == "expiry_manage":
         mime="text/csv",
         key="expiry_download"
     )
-
-    test_jan = "4901085632505"
-    r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/warehouse_stock?select=jan,product_code,stock_available&jan=eq.{test_jan}",
-        headers=HEADERS
-    )
-
