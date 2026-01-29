@@ -2606,14 +2606,6 @@ elif mode == "expiry_manage":
 
     df_stock = fetch_warehouse_stock()
 
-    st.write("DEBUG df_expiry jan type/value",
-         type(df_expiry.loc[df_expiry["jan"]=="4901085632505","jan"].iloc[0]),
-         repr(df_expiry.loc[df_expiry["jan"]=="4901085632505","jan"].iloc[0]))
-
-    st.write("DEBUG df_stock jan type/value",
-         type(df_stock.loc[df_stock["jan"]=="4901085632505","jan"].iloc[0]),
-         repr(df_stock.loc[df_stock["jan"]=="4901085632505","jan"].iloc[0]))
-
     if not df_stock.empty:
         # jan を文字列で揃える
         df_stock["jan"] = df_stock["jan"].astype(str).str.strip()
@@ -2622,7 +2614,15 @@ elif mode == "expiry_manage":
     
         # item_expiry 側も jan を揃える（後で既にやってるならここは省略してOK）
         df["jan"] = df["jan"].astype(str).str.strip()
-    
+
+    st.write("DEBUG df_expiry jan type/value",
+         type(df_expiry.loc[df_expiry["jan"]=="4901085632505","jan"].iloc[0]),
+         repr(df_expiry.loc[df_expiry["jan"]=="4901085632505","jan"].iloc[0]))
+
+    st.write("DEBUG df_stock jan type/value",
+         type(df_stock.loc[df_stock["jan"]=="4901085632505","jan"].iloc[0]),
+         repr(df_stock.loc[df_stock["jan"]=="4901085632505","jan"].iloc[0]))
+        
         # left join：item_expiry を主にして在庫を付与
         df = df.merge(df_stock[["jan", "stock_available"]], on="jan", how="left")
 
