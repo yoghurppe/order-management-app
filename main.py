@@ -2615,10 +2615,17 @@ elif mode == "expiry_manage":
         # item_expiry 側も jan を揃える（後で既にやってるならここは省略してOK）
         df["jan"] = df["jan"].astype(str).str.strip()
 
-        st.write("DEBUG df jan type/value",
-            type(df.loc[df["jan"]=="4901085632505","jan"].iloc[0]),
-            repr(df.loc[df["jan"]=="4901085632505","jan"].iloc[0])
-        )
+        test_jan = "4901085632505"
+        
+        a = df.loc[df["jan"] == test_jan, "jan"]
+        b = df_stock.loc[df_stock["jan"] == test_jan, "jan"]
+        
+        st.write("DEBUG df jan:", str(a.iloc[0]) if len(a) else "NOT FOUND")
+        st.write("DEBUG df jan dtype:", str(df["jan"].dtype))
+        
+        st.write("DEBUG df_stock jan:", str(b.iloc[0]) if len(b) else "NOT FOUND")
+        st.write("DEBUG df_stock jan dtype:", str(df_stock["jan"].dtype))
+
         
         st.write("DEBUG df_stock jan type/value",
             type(df_stock.loc[df_stock["jan"]=="4901085632505","jan"].iloc[0]),
