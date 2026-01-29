@@ -2602,6 +2602,16 @@ elif mode == "expiry_manage":
             return pd.DataFrame()
         return pd.DataFrame(r.json())
 
+    st.write("DEBUG df_stock head", df_stock.head(5))
+    st.write("DEBUG df_stock columns", df_stock.columns.tolist())
+    st.write("DEBUG df_stock rows count", len(df_stock))
+
+    st.write(
+        "DEBUG df_stock contains test jan?",
+        (df_stock["jan"] == "4901085632505").any()
+    )
+
+
     df = fetch_item_expiry()
 
     df_stock = fetch_warehouse_stock()
@@ -2614,34 +2624,10 @@ elif mode == "expiry_manage":
     
         # item_expiry 側も jan を揃える（後で既にやってるならここは省略してOK）
         df["jan"] = df["jan"].astype(str).str.strip()
-
-        test_jan = "4901085632505"
-        
-        a = df.loc[df["jan"] == test_jan, "jan"]
-        b = df_stock.loc[df_stock["jan"] == test_jan, "jan"]
-        
-        st.write("DEBUG df jan:", str(a.iloc[0]) if len(a) else "NOT FOUND")
-        st.write("DEBUG df jan dtype:", str(df["jan"].dtype))
-        
-        st.write("DEBUG df_stock jan:", str(b.iloc[0]) if len(b) else "NOT FOUND")
-        st.write("DEBUG df_stock jan dtype:", str(df_stock["jan"].dtype))
-
-        
-        st.write("DEBUG df_stock jan type/value",
-            type(df_stock.loc[df_stock["jan"]=="4901085632505","jan"].iloc[0]),
-            repr(df_stock.loc[df_stock["jan"]=="4901085632505","jan"].iloc[0])
-        )
         
         # left join：item_expiry を主にして在庫を付与
         df = df.merge(df_stock[["jan", "stock_available"]], on="jan", how="left")
 
-    st.write("DEBUG columns", df.columns.tolist())
-    st.write(
-        "DEBUG stock rows",
-        df[df["jan"] == "4901085632505"][[
-            c for c in df.columns if "stock" in c
-        ]]
-    )
     
     
     # 在庫が無い（未取得/NULL）場合は 0 扱いに
@@ -2802,5 +2788,4 @@ elif mode == "expiry_manage":
         f"{SUPABASE_URL}/rest/v1/warehouse_stock?select=jan,product_code,stock_available&jan=eq.{test_jan}",
         headers=HEADERS
     )
-    st.write("DEBUG warehouse_stock", r.json())
-    st.write("DEBUG SUPABASE_URL", SUPABASE_URL)
+
