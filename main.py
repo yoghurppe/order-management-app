@@ -2681,14 +2681,7 @@ elif mode == "expiry_manage":
 
     df["状態"] = df["残り日数"].apply(status)
 
-    st.write("DEBUG columns", df.columns.tolist())
-    st.write(
-        "DEBUG stock rows",
-        df[df["jan"] == "4901085632505"][[
-            c for c in df.columns if "stock" in c
-        ]]
-    )
-    
+
     # =========================
     # フィルタ
     # =========================
@@ -2786,3 +2779,11 @@ elif mode == "expiry_manage":
     st.write("DEBUG warehouse_stock", r.json())
     st.write("DEBUG SUPABASE_URL", SUPABASE_URL)
 
+    st.write("DEBUG columns", df.columns.tolist())
+    st.write(
+        "DEBUG stock rows",
+        df[df["jan"] == "4901085632505"][[
+            c for c in df.columns if "stock" in c
+        ]]
+    )
+    
