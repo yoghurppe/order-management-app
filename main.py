@@ -2374,6 +2374,7 @@ elif mode == "expiry_manage":
             # 列名（df列に入れる文字）
             "col_days": "残り日数",
             "col_status": "状態",
+            "sync_note": "※ 同期には約20秒程度かかります。同期完了後、ブラウザを更新（再読み込み）してください。",
         },
         "中文": {
             "sync": "🔄 从Lark同步（手动）",
@@ -2389,6 +2390,7 @@ elif mode == "expiry_manage":
             "keyword": "搜索：条码 / 商品名",
             "only_with_expiry": "仅显示已登记",
             "only_no_expiry": "仅显示未登记",
+            "sync_note": "※ 同步大约需要20秒左右。同步完成后，请刷新浏览器页面。",
 
             # 追加（在庫フィルタ）
             "only_in_stock": "仅显示有库存（库存0隐藏）",
@@ -2587,6 +2589,7 @@ elif mode == "expiry_manage":
     # UI: 同期
     # =========================
     st.markdown("### " + LABEL["sync"])
+    st.caption(LABEL["sync_note"])
     if st.button(LABEL["sync"], key="expiry_sync_btn"):
         with st.spinner(LABEL["syncing"]):
             try:
