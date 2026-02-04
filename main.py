@@ -2337,16 +2337,6 @@ elif mode == "expiry_manage":
     SUPABASE_URL = SUPABASE_URL_PRE
     HEADERS = HEADERS_PRE
 
-    # --- Lark Sheets 設定（st.secrets 推奨） ---
-    try:
-        LARK_APP_ID = st.secrets["LARK_APP_ID"]
-        LARK_APP_SECRET = st.secrets["LARK_APP_SECRET"]
-        LARK_SPREADSHEET_TOKEN = st.secrets.get("LARK_SPREADSHEET_TOKEN", "O6VQsoFDOhOPV7t3qSslkoSEg3b")
-        LARK_SHEET_ID = st.secrets.get("LARK_SHEET_ID", "91fd41")
-    except Exception:
-        st.error("❌ Lark の認証情報が st.secrets にありません（LARK_APP_ID / LARK_APP_SECRET）")
-        st.stop()
-
     # ---------- ラベル ----------
     LABEL = {
         "日本語": {
@@ -2363,6 +2353,27 @@ elif mode == "expiry_manage":
             "keyword": "JAN / 商品名 検索",
             "only_with_expiry": "賞味期限ありのみ",
             "only_no_expiry": "未登録のみ",
+
+            # 追加（在庫フィルタ）
+            "only_in_stock": "在庫ありのみ（在庫0は非表示）",
+            "only_zero_stock": "在庫0のみ",
+
+            # メッセージ類
+            "no_data": "item_expiry にデータがありません。先に同期してください。",
+            "sync_failed": "❌ 同期失敗",
+            "fetch_failed_item_expiry": "item_expiry の取得に失敗",
+            "fetch_failed_warehouse": "warehouse_stock の取得に失敗",
+            "lark_secret_missing": "❌ Lark の認証情報が st.secrets にありません（LARK_APP_ID / LARK_APP_SECRET）",
+
+            # 状態値（表示・フィルタ・色付けで共通利用）
+            "st_expired": "期限切れ",
+            "st_within": "60日以内",
+            "st_ok": "余裕あり",
+            "st_none": "未登録",
+
+            # 列名（df列に入れる文字）
+            "col_days": "残り日数",
+            "col_status": "状態",
         },
         "中文": {
             "sync": "🔄 从Lark同步（手动）",
@@ -2378,8 +2389,42 @@ elif mode == "expiry_manage":
             "keyword": "搜索：条码 / 商品名",
             "only_with_expiry": "仅显示已登记",
             "only_no_expiry": "仅显示未登记",
+
+            # 追加（在庫フィルタ）
+            "only_in_stock": "仅显示有库存（库存0隐藏）",
+            "only_zero_stock": "仅显示库存0",
+
+            # メッセージ類
+            "no_data": "item_expiry 没有数据。请先进行同步。",
+            "sync_failed": "❌ 同步失败",
+            "fetch_failed_item_expiry": "获取 item_expiry 失败",
+            "fetch_failed_warehouse": "获取 warehouse_stock 失败",
+            "lark_secret_missing": "❌ st.secrets 中缺少Lark认证信息（LARK_APP_ID / LARK_APP_SECRET）",
+
+            # 状態値（中国語）
+            "st_expired": "已过期",
+            "st_within": "60天以内",
+            "st_ok": "充足",
+            "st_none": "未登记",
+
+            # 列名（中国語）
+            "col_days": "剩余天数",
+            "col_status": "状态",
         }
     }[language]
+
+    COL_DAYS = LABEL["col_days"]
+    COL_STATUS = LABEL["col_status"]
+
+    # --- Lark Sheets 設定（st.secrets 推奨） ---
+    try:
+        LARK_APP_ID = st.secrets["LARK_APP_ID"]
+        LARK_APP_SECRET = st.secrets["LARK_APP_SECRET"]
+        LARK_SPREADSHEET_TOKEN = st.secrets.get("LARK_SPREADSHEET_TOKEN", "O6VQsoFDOhOPV7t3qSslkoSEg3b")
+        LARK_SHEET_ID = st.secrets.get("LARK_SHEET_ID", "91fd41")
+    except Exception:
+        st.error(LABEL["lark_secret_missing"])
+        st.stop()
 
     # =========================
     # Lark API
@@ -2451,6 +2496,7 @@ elif mode == "expiry_manage":
             except ValueError:
                 pass
 
+        # ここは内部エラーなので翻訳必須ではないが、表示され得るので一応英語混ぜず日本語のまま
         raise ValueError(f"日付として解釈できません: {s}")
 
     def min_date_iso(*isos):
@@ -2478,7 +2524,9 @@ elif mode == "expiry_manage":
         return len(data) if isinstance(data, list) else len(rows)
 
     def sync_lark_to_supabase() -> dict:
+        # ★ 同期時は Supabase 側を全削除してから upsert
         supabase_truncate_item_expiry()
+
         tenant = lark_get_tenant_token(LARK_APP_ID, LARK_APP_SECRET)
         values = lark_read_sheet_values(
             tenant_token=tenant,
@@ -2554,7 +2602,7 @@ elif mode == "expiry_manage":
                     st.dataframe(df_err, use_container_width=True)
 
             except Exception as e:
-                st.error(f"❌ 同期失敗: {e}")
+                st.error(f"{LABEL['sync_failed']}: {e}")
 
     st.markdown("---")
 
@@ -2566,7 +2614,7 @@ elif mode == "expiry_manage":
         url = f"{SUPABASE_URL}/rest/v1/item_expiry?select=*"
         r = requests.get(url, headers=HEADERS, timeout=60)
         if r.status_code != 200:
-            st.error(f"item_expiry の取得に失敗: {r.status_code} / {r.text}")
+            st.error(f"{LABEL['fetch_failed_item_expiry']}: {r.status_code} / {r.text}")
             return pd.DataFrame()
         return pd.DataFrame(r.json())
 
@@ -2582,7 +2630,6 @@ elif mode == "expiry_manage":
         if not jans:
             return pd.DataFrame(columns=["jan", "stock_available"])
 
-        # 文字列化 & strip & 重複排除
         jans = [str(x).strip() for x in jans if pd.notna(x) and str(x).strip() != ""]
         jans = list(dict.fromkeys(jans))  # 順序保持で重複排除
 
@@ -2596,7 +2643,7 @@ elif mode == "expiry_manage":
             )
             r = requests.get(url, headers=HEADERS, timeout=60)
             if r.status_code != 200:
-                st.error(f"warehouse_stock の取得に失敗: {r.status_code} / {r.text}")
+                st.error(f"{LABEL['fetch_failed_warehouse']}: {r.status_code} / {r.text}")
                 continue
 
             rows = r.json()
@@ -2612,7 +2659,6 @@ elif mode == "expiry_manage":
 
         # JAN重複があり得るなら安全に集約
         df_stock = df_stock.groupby("jan", as_index=False)["stock_available"].sum()
-
         return df_stock
 
     # =========================
@@ -2621,12 +2667,10 @@ elif mode == "expiry_manage":
     df = fetch_item_expiry()
 
     if df.empty:
-        st.info("item_expiry にデータがありません。先に同期してください。")
+        st.info(LABEL["no_data"])
         st.stop()
 
-    # expiry側のJANを正規化
     df["jan"] = df["jan"].astype(str).str.strip()
-
     jans = df["jan"].dropna().astype(str).str.strip().unique().tolist()
     df_stock = fetch_warehouse_stock_by_jans(jans)
 
@@ -2639,51 +2683,41 @@ elif mode == "expiry_manage":
     # =========================
     # 表示用加工
     # =========================
-    # --- 文字列列 ---
     df["jan"] = df["jan"].astype(str).str.strip()
     df["name"] = df["name"].astype(str).fillna("").str.strip()
 
-    # --- 日付列（空欄はNaT→Noneにする）---
     expiry_cols = ["expiry_1", "expiry_2", "expiry_3", "expiry_4", "expiry_5"]
     for c in expiry_cols:
         if c in df.columns:
             df[c] = pd.to_datetime(df[c], errors="coerce").dt.date
 
-    # --- expiry_min を計算 ---
     if set(expiry_cols).issubset(df.columns):
         df["expiry_min"] = pd.to_datetime(df[expiry_cols].stack(), errors="coerce").groupby(level=0).min().dt.date
     else:
         df["expiry_min"] = None
 
-    # --- updated_at ---
+    # updated_at（表示用に now を入れる）
     df["updated_at"] = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).isoformat()
 
-    # --- JSON化のため NaT/NaN を None に ---
+    # NaT/NaN を None に
     df = df.where(pd.notnull(df), None)
 
-    # expiry_min を datetime に（tzなし）
     df["expiry_min_dt"] = pd.to_datetime(df.get("expiry_min"), errors="coerce")
-
-    # 今日も tzなし（date基準）
     today = pd.Timestamp.today().normalize()
 
-    # 残り日数
-    df["残り日数"] = (
-        (df["expiry_min_dt"] - today)
-        .dt.days
-        .astype("Int64")
-    )
+    # 残り日数（言語別列名）
+    df[COL_DAYS] = ((df["expiry_min_dt"] - today).dt.days).astype("Int64")
 
-    def status(days):
+    def status_label(days):
         if pd.isna(days):
-            return "未登録"
+            return LABEL["st_none"]
         if days < 0:
-            return "期限切れ"
+            return LABEL["st_expired"]
         if days <= 60:
-            return "60日以内"
-        return "余裕あり"
+            return LABEL["st_within"]
+        return LABEL["st_ok"]
 
-    df["状態"] = df["残り日数"].apply(status)
+    df[COL_STATUS] = df[COL_DAYS].apply(status_label)
 
     # =========================
     # フィルタ
@@ -2695,15 +2729,15 @@ elif mode == "expiry_manage":
         kw = st.text_input(LABEL["keyword"], value="", key="expiry_kw")
 
     with c2:
-        statuses = ["期限切れ", "60日以内", "余裕あり", "未登録"]
-        default_status = ["期限切れ", "60日以内"]
+        statuses = [LABEL["st_expired"], LABEL["st_within"], LABEL["st_ok"], LABEL["st_none"]]
+        default_status = [LABEL["st_expired"], LABEL["st_within"]]
         sel_status = st.multiselect(LABEL["status"], statuses, default=default_status, key="expiry_status")
 
     with c3:
         only_with = st.checkbox(LABEL["only_with_expiry"], value=False, key="expiry_only_with")
         only_no = st.checkbox(LABEL["only_no_expiry"], value=False, key="expiry_only_no")
-        only_in_stock = st.checkbox("在庫ありのみ（在庫0は非表示）", value=True, key="expiry_only_in_stock")
-        only_zero_stock = st.checkbox("在庫0のみ", value=False, key="expiry_only_zero_stock")
+        only_in_stock = st.checkbox(LABEL["only_in_stock"], value=True, key="expiry_only_in_stock")
+        only_zero_stock = st.checkbox(LABEL["only_zero_stock"], value=False, key="expiry_only_zero_stock")
 
     with c4:
         limit = st.number_input(LABEL["limit"], min_value=50, max_value=5000, value=500, step=50, key="expiry_limit")
@@ -2712,24 +2746,25 @@ elif mode == "expiry_manage":
 
     if kw:
         kw_s = kw.strip()
-        cond = df_view["jan"].str.contains(kw_s, na=False)
+        cond = df_view["jan"].astype(str).str.contains(kw_s, na=False)
         if "name" in df_view.columns:
             cond = cond | df_view["name"].astype(str).str.contains(kw_s, na=False)
         df_view = df_view[cond]
 
     if sel_status:
-        df_view = df_view[df_view["状態"].isin(sel_status)]
+        df_view = df_view[df_view[COL_STATUS].isin(sel_status)]
 
     if only_with and not only_no:
         df_view = df_view[df_view["expiry_min_dt"].notna()]
     if only_no and not only_with:
         df_view = df_view[df_view["expiry_min_dt"].isna()]
+
     if only_zero_stock:
         df_view = df_view[df_view["stock_available"] <= 0]
 
     # 在庫フィルタ（デフォルト：在庫0を非表示）
     if "stock_available" in df_view.columns:
-        if st.session_state.get("expiry_only_in_stock", True) and not st.session_state.get("expiry_show_zero_stock", False):
+        if st.session_state.get("expiry_only_in_stock", True):
             df_view = df_view[df_view["stock_available"] > 0]
 
     # =========================
@@ -2737,7 +2772,7 @@ elif mode == "expiry_manage":
     # =========================
     df_view = df_view.sort_values(by=["expiry_min_dt", "jan"], ascending=[True, True])
 
-    cols = ["jan", "name", "stock_available", "expiry_min", "残り日数", "状態",
+    cols = ["jan", "name", "stock_available", "expiry_min", COL_DAYS, COL_STATUS,
             "expiry_1", "expiry_2", "expiry_3", "expiry_4", "expiry_5"]
     cols = [c for c in cols if c in df_view.columns]
 
@@ -2750,9 +2785,9 @@ elif mode == "expiry_manage":
     )
 
     def highlight_status(row):
-        if row["状態"] == "期限切れ":
+        if row[COL_STATUS] == LABEL["st_expired"]:
             return ["background-color: #ffcccc"] * len(row)
-        if row["状態"] == "60日以内":
+        if row[COL_STATUS] == LABEL["st_within"]:
             return ["background-color: #ffe599"] * len(row)
         return [""] * len(row)
 
