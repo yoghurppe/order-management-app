@@ -1504,43 +1504,43 @@ elif mode == "monthly_sales":
 elif mode == "rank_check":
     st.subheader("📌 ランク商品確認モード")
 
-# =========================
-# データ取得
-# =========================
-df_item = fetch_table("item_master")
-df_sales = fetch_table("sales")
-df_stock = fetch_table("warehouse_stock")
-df_benten = fetch_table("benten_stock")
-df_history = fetch_table("purchase_history")
-
-# =========================
-# 必須/任意 テーブル判定
-# =========================
-required = {
-    "item_master": df_item,
-    "sales": df_sales,
-    "warehouse_stock": df_stock,
-}
-
-optional = {
-    "benten_stock": df_benten,
-    "purchase_history": df_history,
-}
-
-# 必須が空なら止める
-empty_required = [name for name, df in required.items() if df is None or df.empty]
-if empty_required:
-    st.warning(f"必要なテーブルが空です（必須）: {', '.join(empty_required)}")
-    st.stop()
-
-# 任意が空なら 0行DFを用意して続行
-if df_benten is None or df_benten.empty:
-    # jan / stock だけあれば後続の merge が成立する
-    df_benten = pd.DataFrame(columns=["jan", "stock"])
-
-if df_history is None or df_history.empty:
-    # jan / quantity / memo があれば後続処理が成立する
-    df_history = pd.DataFrame(columns=["jan", "quantity", "memo"])
+    # =========================
+    # データ取得
+    # =========================
+    df_item = fetch_table("item_master")
+    df_sales = fetch_table("sales")
+    df_stock = fetch_table("warehouse_stock")
+    df_benten = fetch_table("benten_stock")
+    df_history = fetch_table("purchase_history")
+    
+    # =========================
+    # 必須/任意 テーブル判定
+    # =========================
+    required = {
+        "item_master": df_item,
+        "sales": df_sales,
+        "warehouse_stock": df_stock,
+    }
+    
+    optional = {
+        "benten_stock": df_benten,
+        "purchase_history": df_history,
+    }
+    
+    # 必須が空なら止める
+    empty_required = [name for name, df in required.items() if df is None or df.empty]
+    if empty_required:
+        st.warning(f"必要なテーブルが空です（必須）: {', '.join(empty_required)}")
+        st.stop()
+    
+    # 任意が空なら 0行DFを用意して続行
+    if df_benten is None or df_benten.empty:
+        # jan / stock だけあれば後続の merge が成立する
+        df_benten = pd.DataFrame(columns=["jan", "stock"])
+    
+    if df_history is None or df_history.empty:
+        # jan / quantity / memo があれば後続処理が成立する
+        df_history = pd.DataFrame(columns=["jan", "quantity", "memo"])
 
     # =========================
     # データ整形（item_master）
