@@ -1936,7 +1936,7 @@ elif mode == "order":
         "0042 ビクトリノックス・ジャパン株式会社",
     ]
     employees = ["079 隋艶偉", "005 川崎里子", "037 米澤和敏", "043 徐越"]
-    departments = ["輸出事業 : 輸出（ASEAN）", "輸出事業 : 輸出（中国）", "輸出事業"]
+    departments = ["輸出事業", "輸出事業 : 輸出（中国）"]
     locations = ["JD-物流-千葉", "弁天倉庫"]
 
     col1, col2, col3 = st.columns(3)
